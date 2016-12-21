@@ -88,6 +88,18 @@ class DSARequestSpec extends AbstractSpec {
   }
 
   "SubscribeRequest" should {
+    "support `path` property for single value lists" in {
+      val path = SubscriptionPath("pathX", 2)
+      val req = SubscribeRequest(Rid, path)
+      req.path shouldBe path
+    }
+    "split multiple-path request into multiple single-path requests" in {
+      val paths = List(SubscriptionPath("path1", 1), SubscriptionPath("path2", 2, Some(2)),
+        SubscriptionPath("path3", 3, Some(3)))
+      val req = SubscribeRequest(Rid, paths)
+      req.split should contain only (SubscribeRequest(Rid, paths(0)), SubscribeRequest(Rid, paths(1)),
+        SubscribeRequest(Rid, paths(2)))
+    }
     "serialize requests to JSON" in {
       val paths = List(SubscriptionPath("path1", 1), SubscriptionPath("path2", 2, Some(2)),
         SubscriptionPath("path3", 3, Some(3)))
@@ -104,6 +116,15 @@ class DSARequestSpec extends AbstractSpec {
   }
 
   "UnsubscribeRequest" should {
+    "support `sid` property for single value lists" in {
+      val req = UnsubscribeRequest(Rid, 3)
+      req.sid shouldBe 3
+    }
+    "split multiple-sid request into multiple single-sid requests" in {
+      val req = UnsubscribeRequest(Rid, 4, 5, 6)
+      req.split should contain only (UnsubscribeRequest(Rid, 4), UnsubscribeRequest(Rid, 5),
+        UnsubscribeRequest(Rid, 6))
+    }
     "serialize requests to JSON" in {
       val req = UnsubscribeRequest(Rid, List(1, 2, 3))
       req.toJson shouldBe baseJson(UnsubscribeRequest.MethodName) ~ ("sids" -> List(1, 2, 3))

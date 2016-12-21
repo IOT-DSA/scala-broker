@@ -130,9 +130,12 @@ case class SubscriptionPath(path: String, sid: Int, qos: Option[Int] = None) {
 }
 case class SubscribeRequest(rid: Int, paths: Iterable[SubscriptionPath]) extends DSARequest {
   val method = SubscribeRequest.MethodName
+  lazy val path = paths.head.ensuring(paths.size == 1)
+  def split = paths.map(SubscribeRequest(rid, _))
   def toJson = baseJson ~ ("paths" -> paths.map(_.toJson))
 }
 object SubscribeRequest extends DSARequestJsonFactory[SubscribeRequest] {
+  def apply(rid: Int, paths: SubscriptionPath*): SubscribeRequest = apply(rid, paths.toList)
   val MethodName = "subscribe"
   def extract(json: JValue) = {
     val rid = (json \ "rid").extract[Int]
@@ -149,11 +152,14 @@ object SubscribeRequest extends DSARequestJsonFactory[SubscribeRequest] {
 /**
  * UNSUBSCRIBE request.
  */
-case class UnsubscribeRequest(rid: Int, sids: List[Int]) extends DSARequest {
+case class UnsubscribeRequest(rid: Int, sids: Iterable[Int]) extends DSARequest {
   val method = UnsubscribeRequest.MethodName
+  lazy val sid = sids.head.ensuring(sids.size == 1)
+  def split = sids.map(UnsubscribeRequest(rid, _))
   def toJson = baseJson ~ ("sids" -> sids)
 }
 object UnsubscribeRequest extends DSARequestJsonFactory[UnsubscribeRequest] {
+  def apply(rid: Int, sids: Int*): UnsubscribeRequest = apply(rid, sids.toList)
   val MethodName = "unsubscribe"
   def extract(json: JValue) = {
     val rid = (json \ "rid").extract[Int]
