@@ -1,0 +1,17 @@
+{
+	"msg": 1001,
+	"requests": 
+	[
+		{
+			"rid": 105,
+			"method": "list",
+			"path": "/downstream/ResponderA/node1"
+		},
+
+		{
+			"rid": 106,
+			"method": "list",
+			"path": "/downstream/ResponderA/node2"
+		}
+	]
+}

@@ -1,0 +1,15 @@
+{
+	"msg": 2003,
+	"requests": 
+	[
+		{
+			"rid": 203,
+			"method": "invoke",
+			"path": "/downstream/ResponderA/node1/echo",
+			"params": 
+			{
+				"string": "something"
+			}
+		}
+	]
+}

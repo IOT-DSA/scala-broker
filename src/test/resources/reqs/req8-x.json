@@ -1,0 +1,20 @@
+{
+	"msg": 1004,
+	"requests": 
+	[
+		{
+			"rid": 108,
+			"method": "close"
+		},
+
+		{
+			"rid": 109,
+			"method": "close"
+		},
+
+		{
+			"rid": 106,
+			"method": "close"
+		}
+	]
+}

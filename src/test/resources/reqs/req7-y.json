@@ -1,0 +1,16 @@
+{
+	"msg": 2004,
+	"requests": 
+	[
+		{
+			"rid": 204,
+			"method": "list",
+			"path": "/downstream/ResponderB/node1"
+		},
+
+		{
+			"rid": 204,
+			"method": "close"
+		}
+	]
+}

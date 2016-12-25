@@ -1,0 +1,33 @@
+{
+	"msg": 1002,
+	"requests": 
+	[
+		{
+			"rid": 107,
+			"method": "subscribe",
+			"paths": 
+			[
+				{
+					"path": "/downstream/ResponderB/node1",
+					"sid": 0,
+					"qos": 2
+				},
+				{
+					"path": "/downstream/ResponderA/node3",
+					"sid": 1,
+					"qos": 1
+				},				
+				{
+					"path": "/downstream/ResponderB/node2",
+					"sid": 2
+				}
+			]
+		},
+
+		{
+			"rid": 108,
+			"method": "list",
+			"path": "/downstream/ResponderB/node1"
+		}
+	]
+}

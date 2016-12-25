@@ -1,0 +1,10 @@
+{
+	"msg": 2002,
+	"requests": 
+	[
+		{
+			"rid": 201,
+			"method": "close"
+		}
+	]
+}

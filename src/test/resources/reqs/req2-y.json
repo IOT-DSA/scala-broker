@@ -1,0 +1,19 @@
+{
+	"msg": 2001,
+	"requests": 
+	[
+		{
+			"rid": 201,
+			"method": "list",
+			"path": "/downstream/ResponderA/node1"
+		},
+
+		{
+			"rid": 202,
+			"method": "set",
+			"permit": "write",
+			"path": "/downstream/ResponderA/node2",
+			"value": "abc"
+		}
+	]
+}

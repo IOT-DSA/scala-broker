@@ -1,0 +1,22 @@
+{
+	"msg": 1003,
+	"requests": 
+	[
+		{
+			"rid": 105,
+			"method": "close"
+		},
+
+		{
+			"rid": 109,
+			"method": "list",
+			"path": "/downstream/ResponderA/node1"
+		},
+
+		{
+			"rid": 110,
+			"method": "invoke",
+			"path": "/downstream/ResponderA/node1/getStatus"
+		}
+	]
+}
