@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+tools/publish-req req1-x.json x
+tools/publish-req req2-y.json y
+tools/publish-req req3-x.json x
+tools/publish-req req4-y.json y
+tools/publish-req req5-y.json y
+tools/publish-req req6-x.json x
+tools/publish-req req7-y.json y
+tools/publish-req req8-x.json x

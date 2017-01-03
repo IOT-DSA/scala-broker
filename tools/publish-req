@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+sbt "runMain org.dsa.iot.broker.tools.FileProducer BROKER_IN_REQ src/test/resources/reqs/$1 $2"

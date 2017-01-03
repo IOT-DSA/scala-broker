@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+KAFKA_HOME=/usr/local/Cellar/kafka/0.10.1.0
+ZK_URL=localhost:2181
+
+$KAFKA_HOME/bin/kafka-topics --zookeeper $ZK_URL --list

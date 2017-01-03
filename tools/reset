@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+KAFKA_HOME=/usr/local/Cellar/kafka/0.10.1.0
+
+$KAFKA_HOME/bin/kafka-streams-application-reset --application-id $1 --intermediate-topics BROKER_IN_DOWNSTREAM,BROKER_IN_INTERNAL --input-topics BROKER_IN_REQ

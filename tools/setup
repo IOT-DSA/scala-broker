@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+tools/reset dsa_broker_010
+
+tools/delete-topic BROKER_IN_REQ
+tools/delete-topic BROKER_IN_DOWNSTREAM
+tools/delete-topic BROKER_IN_INTERNAL
+tools/delete-topic BROKER_OUT_REQ
+
+tools/create-topic BROKER_IN_REQ 10 1
+tools/create-topic BROKER_IN_DOWNSTREAM 10 1
+tools/create-topic BROKER_IN_INTERNAL 1 1
+tools/create-topic BROKER_OUT_REQ 10 1
