@@ -1,10 +1,9 @@
-import models.ConnectionRequest
 import play.api.libs.json.Json
 
 /**
  * Types and utility methods for models.
  */
-package object models {
+package object controllers {
 
   implicit val ConnectionRequestReads = Json.reads[ConnectionRequest]
 

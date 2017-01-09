@@ -1,4 +1,4 @@
-package models
+package controllers
 
 import org.scalatestplus.play.PlaySpec
 import play.api.libs.json._

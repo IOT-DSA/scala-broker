@@ -3,7 +3,6 @@ package controllers
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import javax.inject.{ Inject, Singleton }
-import models.{ ConnectionRequest, ConnectionRequestReads }
 import models.actors.WebSocketActor
 import play.api.{ Configuration, Logger }
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
@@ -13,6 +12,12 @@ import play.api.libs.json.Reads
 import play.api.libs.streams.ActorFlow
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, WebSocket }
 
+/**
+ * DSA Client-Broker connection request.
+ */
+case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponder: Boolean,
+                             linkData: Option[JsValue], version: String, formats: List[String],
+                             enableWebSocketCompression: Boolean)
 /**
  * Handles main web requests.
  */
