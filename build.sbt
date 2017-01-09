@@ -31,5 +31,6 @@ libraryDependencies ++= Seq(
   "org.scalatest"           %% "scalatest"               % "2.2.1"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.12.1"        % "test",
   "org.scalatestplus.play"  %% "scalatestplus-play"      % "1.5.1"         % "test",
-  "org.mockito"              % "mockito-core"            % "1.10.19"       % "test"
+  "org.mockito"              % "mockito-core"            % "1.10.19"       % "test",
+  "com.typesafe.akka"       %% "akka-testkit"            % "2.4.12"        % "test"
 )
