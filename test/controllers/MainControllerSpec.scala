@@ -3,7 +3,6 @@ package controllers
 import org.scalatestplus.play.{ OneAppPerTest, PlaySpec }
 
 import javax.inject.{ Inject, Singleton }
-import models.ConnectionRequest
 import play.api.libs.json.JsValue.jsValueToJsLookup
 import play.api.libs.json.Json
 import play.api.test.FakeRequest
