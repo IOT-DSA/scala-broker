@@ -143,20 +143,35 @@ package object models {
   implicit val DSAResponseFormat: Format[DSAResponse] = Json.format[DSAResponse]
 
   /**
-   * RequestMessage <-> JSON
+   * DSAMessage <-> JSON
    */
-  implicit val RequestMessageFormat: Format[RequestMessage] = (
-    (__ \ "msg").format[Int] ~
-    (__ \ "ack").formatNullable[Int] ~
-    (__ \ "requests").formatNullable[List[DSARequest]])(RequestMessage, unlift(RequestMessage.unapply))
+  implicit val DSAMessageFormat: Format[DSAMessage] = new Format[DSAMessage] {
 
-  /**
-   * ResponseMessage <-> JSON
-   */
-  implicit val ResponseMessageFormat: Format[ResponseMessage] = (
-    (__ \ "msg").format[Int] ~
-    (__ \ "ack").formatNullable[Int] ~
-    (__ \ "responses").formatNullable[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
+    val PingMessageFormat: Format[PingMessage] = (
+      (__ \ "msg").format[Int] ~
+      (__ \ "ack").formatNullable[Int])(PingMessage, unlift(PingMessage.unapply))
+
+    val RequestMessageFormat: Format[RequestMessage] = (
+      (__ \ "msg").format[Int] ~
+      (__ \ "ack").formatNullable[Int] ~
+      (__ \ "requests").format[List[DSARequest]])(RequestMessage, unlift(RequestMessage.unapply))
+
+    val ResponseMessageFormat: Format[ResponseMessage] = (
+      (__ \ "msg").format[Int] ~
+      (__ \ "ack").formatNullable[Int] ~
+      (__ \ "responses").format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
+
+    def writes(msg: DSAMessage) = msg match {
+      case m: PingMessage     => PingMessageFormat.writes(m)
+      case m: RequestMessage  => RequestMessageFormat.writes(m)
+      case m: ResponseMessage => ResponseMessageFormat.writes(m)
+    }
+
+    def reads(json: JsValue) = (json \ "requests").toOption.map { _ => RequestMessageFormat.reads(json) }
+      .orElse((json \ "responses").toOption.map { _ => ResponseMessageFormat.reads(json) })
+      .orElse((json \ "msg").toOption.map { _ => PingMessageFormat.reads(json) })
+      .getOrElse(JsError("Invalid message format: no 'msg', 'requests', 'responses'"))
+  }
 
   /* helpers */
 

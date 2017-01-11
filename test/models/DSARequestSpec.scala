@@ -98,16 +98,16 @@ class DSARequestSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
   }
 
   "RequestMessage" should {
-    "serialize empty messages to JSON" in {
-      val msg = RequestMessage(10)
+    "serialize ping messages to JSON" in {
+      val msg = PingMessage(10)
       val json = Json.toJson(msg)
       json mustBe Json.obj("msg" -> 10)
     }
     "serialize multiple requests to JSON" in {
-      val msg = RequestMessage(101, Some(20), Some(ScalaList(ListRequest(Rid, Path), CloseRequest(Rid))))
+      val msg = RequestMessage(101, Some(20), ScalaList(ListRequest(Rid, Path), CloseRequest(Rid)))
       val json = Json.toJson(msg)
       json mustBe Json.obj("msg" -> 101, "ack" -> 20, "requests" -> Json.arr(baseJsonWithPath(List), baseJson(Close)))
-      json.as[RequestMessage] mustBe msg
+      json.as[DSAMessage] mustBe msg
     }
   }
 
