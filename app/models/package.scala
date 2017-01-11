@@ -80,13 +80,13 @@ package object models {
       (__ \ 'rid).format[Int] ~
       (__ \ 'path).format[String] ~
       (__ \ 'value).format[DSAVal] ~
-      (__ \ 'permit).formatNullable[String])(SetRequest.apply, unlift(SetRequest.unapply))
+      (__ \ 'permit).formatNullable[String])(SetRequest, unlift(SetRequest.unapply))
     val RemoveRequestFormat = Json.format[RemoveRequest]
     val InvokeRequestFormat = (
       (__ \ 'rid).format[Int] ~
       (__ \ 'path).format[String] ~
       (__ \ 'params).formatNullable[DSAMap].inmap(emptyIfNone, noneIfEmpty) ~
-      (__ \ 'permit).formatNullable[String])(InvokeRequest.apply, unlift(InvokeRequest.unapply))
+      (__ \ 'permit).formatNullable[String])(InvokeRequest, unlift(InvokeRequest.unapply))
     val SubscribeRequestFormat = Json.format[SubscribeRequest]
     val UnsubscribeRequestFormat = Json.format[UnsubscribeRequest]
     val CloseRequestFormat = Json.format[CloseRequest]
@@ -118,6 +118,29 @@ package object models {
 
     private def emptyIfNone(opt: Option[DSAMap]) = opt getOrElse Map.empty
   }
+
+  /**
+   * DSAError <-> JSON
+   */
+  implicit val DSAErrorFormat: Format[DSAError] = (
+    (__ \ "msg").formatNullable[String] ~
+    (__ \ "type").formatNullable[String] ~
+    (__ \ "phase").formatNullable[String] ~
+    (__ \ "path").formatNullable[String] ~
+    (__ \ "detail").formatNullable[String])(DSAError, unlift(DSAError.unapply))
+
+  /**
+   * ColumnInfo <-> JSON
+   */
+  implicit val ColumnInfoFormat: Format[ColumnInfo] = (
+    (__ \ "name").format[String] ~
+    (__ \ "type").format[String])(ColumnInfo, unlift(ColumnInfo.unapply))
+    
+  /**
+   * DSAResponse <-> JSON
+   */
+  implicit val StreamStateReads = enumReads(StreamState)
+  implicit val DSAResponseFormat = Json.format[DSAResponse] 
 
   /* helpers */
 
