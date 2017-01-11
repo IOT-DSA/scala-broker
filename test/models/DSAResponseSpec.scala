@@ -60,6 +60,21 @@ class DSAResponseSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
     }
   }
 
+  "ResponseMessage" should {
+    "serialize empty messages to JSON" in {
+      val msg = ResponseMessage(10)
+      val json = Json.toJson(msg)
+      json mustBe Json.obj("msg" -> 10)
+    }
+    "serialize multiple responses to JSON" in {
+      val msg = ResponseMessage(101, Some(20), Some(ScalaList(DSAResponse(10, Closed), DSAResponse(11, Open))))
+      val json = Json.toJson(msg)
+      json mustBe Json.obj("msg" -> 101, "ack" -> 20, "responses" ->
+        Json.arr(Json.obj("rid" -> 10, "stream" -> "closed"), Json.obj("rid" -> 11, "stream" -> "open")))
+      json.as[ResponseMessage] mustBe msg
+    }
+  }
+
   private def testJson[T: Reads: Writes](req: T, js: JsValue) = {
     val json = Json.toJson(req)
     json mustBe js

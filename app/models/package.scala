@@ -135,12 +135,28 @@ package object models {
   implicit val ColumnInfoFormat: Format[ColumnInfo] = (
     (__ \ "name").format[String] ~
     (__ \ "type").format[String])(ColumnInfo, unlift(ColumnInfo.unapply))
-    
+
   /**
    * DSAResponse <-> JSON
    */
   implicit val StreamStateReads = enumReads(StreamState)
-  implicit val DSAResponseFormat = Json.format[DSAResponse] 
+  implicit val DSAResponseFormat: Format[DSAResponse] = Json.format[DSAResponse]
+
+  /**
+   * RequestMessage <-> JSON
+   */
+  implicit val RequestMessageFormat: Format[RequestMessage] = (
+    (__ \ "msg").format[Int] ~
+    (__ \ "ack").formatNullable[Int] ~
+    (__ \ "requests").formatNullable[List[DSARequest]])(RequestMessage, unlift(RequestMessage.unapply))
+
+  /**
+   * ResponseMessage <-> JSON
+   */
+  implicit val ResponseMessageFormat: Format[ResponseMessage] = (
+    (__ \ "msg").format[Int] ~
+    (__ \ "ack").formatNullable[Int] ~
+    (__ \ "responses").formatNullable[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
 
   /* helpers */
 
