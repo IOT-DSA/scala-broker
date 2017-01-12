@@ -147,6 +147,8 @@ package object models {
    */
   implicit val DSAMessageFormat: Format[DSAMessage] = new Format[DSAMessage] {
 
+    val AllowedMessageFormat = Json.format[AllowedMessage]
+
     val PingMessageFormat: Format[PingMessage] = (
       (__ \ "msg").format[Int] ~
       (__ \ "ack").formatNullable[Int])(PingMessage, unlift(PingMessage.unapply))
@@ -162,15 +164,21 @@ package object models {
       (__ \ "responses").format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
 
     def writes(msg: DSAMessage) = msg match {
+      case EmptyMessage       => Json.obj()
+      case m: AllowedMessage  => AllowedMessageFormat.writes(m)
       case m: PingMessage     => PingMessageFormat.writes(m)
       case m: RequestMessage  => RequestMessageFormat.writes(m)
       case m: ResponseMessage => ResponseMessageFormat.writes(m)
     }
 
-    def reads(json: JsValue) = (json \ "requests").toOption.map { _ => RequestMessageFormat.reads(json) }
-      .orElse((json \ "responses").toOption.map { _ => ResponseMessageFormat.reads(json) })
-      .orElse((json \ "msg").toOption.map { _ => PingMessageFormat.reads(json) })
-      .getOrElse(JsError("Invalid message format: no 'msg', 'requests', 'responses'"))
+    def reads(json: JsValue) = json match {
+      case JsObject(fields) if fields.isEmpty => JsSuccess(EmptyMessage)
+      case JsObject(fields) if fields.contains("allowed") => AllowedMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("requests") => RequestMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("responses") => ResponseMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("msg") => PingMessageFormat.reads(json)
+      case _ => JsError("Unrecognized message: " + json)
+    }
   }
 
   /* helpers */

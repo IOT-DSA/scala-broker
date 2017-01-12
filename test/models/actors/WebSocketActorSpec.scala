@@ -6,24 +6,35 @@ import akka.actor.{ ActorSystem, actorRef2Scala }
 import akka.testkit.TestKit
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import models._
 
 /**
  * WebSocket actor test suite.
  */
 class WebSocketActorSpec extends TestKit(ActorSystem()) with WordSpecLike with Matchers {
+  import StreamState._
 
   val wsActor = system.actorOf(WebSocketActor.props(testActor))
 
   "WebSocketActor" should {
-    "return 'allowed' response on empty msg" in {
-      wsActor ! Json.obj()
-      expectMsg(Json.obj("allowed" -> true, "salt" -> 1234))
+    "send 'allowed' message on startup" in expectMsg(AllowedMessage(true, 1234))
+    "return ack for a ping message" in {
+      wsActor ! PingMessage(101)
+      expectMsg(PingMessage(1, Some(101)))
+      wsActor ! PingMessage(102)
+      expectMsg(PingMessage(2, Some(102)))
     }
-    "return ack for a valid message" in {
-      wsActor ! Json.obj("msg" -> 101)
-      expectMsg(Json.obj("msg" -> 1, "ack" -> 101))
-      wsActor ! Json.obj("msg" -> 102)
-      expectMsg(Json.obj("msg" -> 2, "ack" -> 102))
+    "return ack for a request message" in {
+      wsActor ! RequestMessage(103, None, Nil)
+      expectMsg(PingMessage(3, Some(103)))
+      wsActor ! RequestMessage(104, None, List(ListRequest(111, "/link")))
+      expectMsg(PingMessage(4, Some(104)))
+    }
+    "return ack for a response message" in {
+      wsActor ! ResponseMessage(105, None, Nil)
+      expectMsg(PingMessage(5, Some(105)))
+      wsActor ! ResponseMessage(106, None, List(DSAResponse(111, StreamState.Closed)))
+      expectMsg(PingMessage(6, Some(106)))
     }
   }
 }

@@ -1,16 +1,18 @@
 package controllers
 
+import scala.annotation.implicitNotFound
+
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import javax.inject.{ Inject, Singleton }
+import models.{ DSAMessage, DSAMessageFormat }
 import models.actors.WebSocketActor
 import play.api.{ Configuration, Logger }
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import play.api.libs.json.{ JsError, JsValue, Json }
-import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import play.api.libs.json._
 import play.api.libs.json.Reads
 import play.api.libs.streams.ActorFlow
-import play.api.mvc.{ Action, BodyParsers, Controller, Request, WebSocket }
+import play.api.mvc._
 
 /**
  * DSA Client-Broker connection request.
@@ -38,6 +40,8 @@ class MainController @Inject() (implicit config: Configuration, actorSystem: Act
     "updateInterval" -> config.getInt("broker.updateInterval"),
     "format" -> config.getString("broker.format"))
 
+  private val transformer = WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer[DSAMessage, DSAMessage]
+
   def index = Action { implicit request =>
     Ok(views.html.index(config.underlying.root))
   }
@@ -53,10 +57,10 @@ class MainController @Inject() (implicit config: Configuration, actorSystem: Act
     Ok(json)
   }
 
-  def ws = WebSocket.accept[JsValue, JsValue] { request =>
+  def ws = WebSocket.accept[DSAMessage, DSAMessage] { request =>
     log.debug(s"WS request received: $request")
     ActorFlow.actorRef(WebSocketActor.props)
-  }
+  }(transformer)
 
   private def validateJson[A: Reads] = BodyParsers.parse.tolerantJson.validate {
     _.validate[A].asEither.left.map(e => BadRequest(JsError.toJson(e)))
