@@ -26,6 +26,7 @@ coverageFailOnMinimum := true
 
 // dependencies
 libraryDependencies ++= Seq(
+  cache,
   "org.apache.kafka"         % "kafka-streams"           % KAFKA_VERSION,
   "net.cakesolutions"       %% "scala-kafka-client"      % KAFKA_VERSION,
   "org.scalatest"           %% "scalatest"               % "2.2.1"         % "test",

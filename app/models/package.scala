@@ -180,7 +180,7 @@ package object models {
       case _ => JsError("Unrecognized message: " + json)
     }
   }
-
+  
   /* helpers */
 
   def binaryToString(data: Binary): String = BinaryPrefix + Base64.getEncoder.encodeToString(data)
