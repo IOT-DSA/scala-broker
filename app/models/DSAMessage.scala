@@ -21,6 +21,11 @@ case class AllowedMessage(allowed: Boolean, salt: Long) extends DSAMessage
 case class PingMessage(msg: Int, ack: Option[Int] = None) extends DSAMessage
 
 /**
+ * Ping acknowledgement. 
+ */
+case class PongMessage(ack: Int) extends DSAMessage
+
+/**
  * Encapsulates multiple DSA requests along with msg code and optional acknowledgement code.
  */
 case class RequestMessage(msg: Int, ack: Option[Int] = None, requests: List[DSARequest] = Nil) extends DSAMessage

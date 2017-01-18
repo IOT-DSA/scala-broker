@@ -149,9 +149,9 @@ package object models {
 
     val AllowedMessageFormat = Json.format[AllowedMessage]
 
-    val PingMessageFormat: Format[PingMessage] = (
-      (__ \ "msg").format[Int] ~
-      (__ \ "ack").formatNullable[Int])(PingMessage, unlift(PingMessage.unapply))
+    val PingMessageFormat = Json.format[PingMessage]
+    
+    val PongMessageFormat = Json.format[PongMessage]
 
     val RequestMessageFormat: Format[RequestMessage] = (
       (__ \ "msg").format[Int] ~
@@ -167,6 +167,7 @@ package object models {
       case EmptyMessage       => Json.obj()
       case m: AllowedMessage  => AllowedMessageFormat.writes(m)
       case m: PingMessage     => PingMessageFormat.writes(m)
+      case m: PongMessage     => PongMessageFormat.writes(m)
       case m: RequestMessage  => RequestMessageFormat.writes(m)
       case m: ResponseMessage => ResponseMessageFormat.writes(m)
     }
@@ -177,10 +178,11 @@ package object models {
       case JsObject(fields) if fields.contains("requests") => RequestMessageFormat.reads(json)
       case JsObject(fields) if fields.contains("responses") => ResponseMessageFormat.reads(json)
       case JsObject(fields) if fields.contains("msg") => PingMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("ack") => PongMessageFormat.reads(json)
       case _ => JsError("Unrecognized message: " + json)
     }
   }
-  
+
   /* helpers */
 
   def binaryToString(data: Binary): String = BinaryPrefix + Base64.getEncoder.encodeToString(data)

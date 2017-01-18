@@ -16,7 +16,7 @@ class DSAMessageSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
 
   val Rid = 123
   val Path = "/top/down"
-  
+
   "EmptyMessage" should {
     "serialize empty message to JSON" in {
       val json = Json.toJson(EmptyMessage)
@@ -33,7 +33,7 @@ class DSAMessageSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
       json.as[DSAMessage] mustBe msg
     }
   }
-  
+
   "PingMessage" should {
     "serialize messages without ack to JSON" in {
       val msg = PingMessage(10)
@@ -45,6 +45,15 @@ class DSAMessageSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
       val msg = PingMessage(1, Some(5))
       val json = Json.toJson(msg)
       json mustBe Json.obj("msg" -> 1, "ack" -> 5)
+      json.as[DSAMessage] mustBe msg
+    }
+  }
+
+  "PongMessage" should {
+    "serialize messages to JSON" in {
+      val msg = PongMessage(10)
+      val json = Json.toJson(msg)
+      json mustBe Json.obj("ack" -> 10)
       json.as[DSAMessage] mustBe msg
     }
   }
