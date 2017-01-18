@@ -28,5 +28,5 @@ case class ColumnInfo(colName: String, colType: String)
 /**
  * DSA Response.
  */
-case class DSAResponse(rid: Int, stream: StreamState = StreamState.Closed, updates: Option[List[DSAVal]] = None,
+case class DSAResponse(rid: Int, stream: Option[StreamState] = None, updates: Option[List[DSAVal]] = None,
                        columns: Option[List[ColumnInfo]] = None, error: Option[DSAError] = None)
