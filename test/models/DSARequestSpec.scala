@@ -97,20 +97,6 @@ class DSARequestSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
     "serialize to JSON" in testJson(CloseRequest(Rid), baseJson(Close))
   }
 
-  "RequestMessage" should {
-    "serialize empty messages to JSON" in {
-      val msg = RequestMessage(10)
-      val json = Json.toJson(msg)
-      json mustBe Json.obj("msg" -> 10)
-    }
-    "serialize multiple requests to JSON" in {
-      val msg = RequestMessage(101, Some(20), Some(ScalaList(ListRequest(Rid, Path), CloseRequest(Rid))))
-      val json = Json.toJson(msg)
-      json mustBe Json.obj("msg" -> 101, "ack" -> 20, "requests" -> Json.arr(baseJsonWithPath(List), baseJson(Close)))
-      json.as[RequestMessage] mustBe msg
-    }
-  }
-
   private def testJson(req: DSARequest, js: JsValue) = {
     val json = Json.toJson(req)
     json mustBe js

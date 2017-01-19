@@ -143,20 +143,45 @@ package object models {
   implicit val DSAResponseFormat: Format[DSAResponse] = Json.format[DSAResponse]
 
   /**
-   * RequestMessage <-> JSON
+   * DSAMessage <-> JSON
    */
-  implicit val RequestMessageFormat: Format[RequestMessage] = (
-    (__ \ "msg").format[Int] ~
-    (__ \ "ack").formatNullable[Int] ~
-    (__ \ "requests").formatNullable[List[DSARequest]])(RequestMessage, unlift(RequestMessage.unapply))
+  implicit val DSAMessageFormat: Format[DSAMessage] = new Format[DSAMessage] {
 
-  /**
-   * ResponseMessage <-> JSON
-   */
-  implicit val ResponseMessageFormat: Format[ResponseMessage] = (
-    (__ \ "msg").format[Int] ~
-    (__ \ "ack").formatNullable[Int] ~
-    (__ \ "responses").formatNullable[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
+    val AllowedMessageFormat = Json.format[AllowedMessage]
+
+    val PingMessageFormat = Json.format[PingMessage]
+    
+    val PongMessageFormat = Json.format[PongMessage]
+
+    val RequestMessageFormat: Format[RequestMessage] = (
+      (__ \ "msg").format[Int] ~
+      (__ \ "ack").formatNullable[Int] ~
+      (__ \ "requests").format[List[DSARequest]])(RequestMessage, unlift(RequestMessage.unapply))
+
+    val ResponseMessageFormat: Format[ResponseMessage] = (
+      (__ \ "msg").format[Int] ~
+      (__ \ "ack").formatNullable[Int] ~
+      (__ \ "responses").format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
+
+    def writes(msg: DSAMessage) = msg match {
+      case EmptyMessage       => Json.obj()
+      case m: AllowedMessage  => AllowedMessageFormat.writes(m)
+      case m: PingMessage     => PingMessageFormat.writes(m)
+      case m: PongMessage     => PongMessageFormat.writes(m)
+      case m: RequestMessage  => RequestMessageFormat.writes(m)
+      case m: ResponseMessage => ResponseMessageFormat.writes(m)
+    }
+
+    def reads(json: JsValue) = json match {
+      case JsObject(fields) if fields.isEmpty => JsSuccess(EmptyMessage)
+      case JsObject(fields) if fields.contains("allowed") => AllowedMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("requests") => RequestMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("responses") => ResponseMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("msg") => PingMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("ack") => PongMessageFormat.reads(json)
+      case _ => JsError("Unrecognized message: " + json)
+    }
+  }
 
   /* helpers */
 
