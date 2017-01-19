@@ -45,7 +45,7 @@ class MainControllerSpec extends PlaySpec with OneAppPerTest {
 
   "MainController /conn" should {
 
-    val connReq = ConnectionRequest("", true, true, None, "", Nil, true)
+    val connReq = ConnectionRequest("", true, true, None, "", None, true)
     val request = FakeRequest("POST", "/conn?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg").withBody(connReq)
 
     "render the connection response from the application" in {

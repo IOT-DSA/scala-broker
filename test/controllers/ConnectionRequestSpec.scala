@@ -26,7 +26,7 @@ class ConnectionRequestSpec extends PlaySpec {
           req.isResponder mustBe false
           req.linkData mustBe None
           req.version mustBe "1.1.2"
-          req.formats mustBe List("msgpack", "json")
+          req.formats mustBe Some(List("msgpack", "json"))
           req.enableWebSocketCompression mustBe true
         case JsError(errors) => fail(errors.mkString("\n"))
       }
@@ -49,7 +49,7 @@ class ConnectionRequestSpec extends PlaySpec {
           req.isResponder mustBe true
           req.linkData.value mustBe Json.obj("a" -> 1, "b" -> Json.arr(true, false), "c" -> Json.obj("d" -> 3.3))
           req.version mustBe "1.1.2"
-          req.formats mustBe List("msgpack", "json")
+          req.formats mustBe Some(List("msgpack", "json"))
           req.enableWebSocketCompression mustBe true
         case JsError(errors) => fail(errors.mkString("\n"))
       }

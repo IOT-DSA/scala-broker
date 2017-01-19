@@ -21,6 +21,7 @@ class RootNodeActor(cache: CacheApi) extends Actor {
    */
   override def preStart() = {
     cache.set(RootPath, self)
+    cache.set(DataPath, self)
     cache.set(DefsPath, self)
     cache.set(SysPath, self)
     cache.set(UsersPath, self)
@@ -36,7 +37,7 @@ class RootNodeActor(cache: CacheApi) extends Actor {
   def receive = {
     case env @ RequestEnvelope(ListRequest(rid, RootPath)) =>
       log.debug(s"Request received: $env")
-      val list = List(ArrayValue(List("data", 1)), ArrayValue(List("defs", 2)))
+      val list = List()
       sender ! ResponseEnvelope(DSAResponse(rid = rid, updates = Some(list)))
     case RequestEnvelope(req) =>
       log.warn(s"Unsupported request received: $req")
@@ -51,6 +52,7 @@ class RootNodeActor(cache: CacheApi) extends Actor {
  */
 object RootNodeActor {
   val RootPath = "/"
+  val DataPath = "/data"
   val DefsPath = "/defs"
   val SysPath = "/sys"
   val UsersPath = "/users"

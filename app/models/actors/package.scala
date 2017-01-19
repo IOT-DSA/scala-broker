@@ -6,6 +6,8 @@ import scala.util.matching.Regex
  * Types and utility functions for actors.
  */
 package object actors {
+  
+  val Salt = 1234
 
   /**
    * Interpolates strings to produce RegEx.
