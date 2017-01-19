@@ -108,7 +108,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
           (MapValue(v.value + ("sid" -> sourceSid)), source)
       }
       updates foreach {
-        case (update, source) => source ! ResponseEnvelope(response.copy(updates = Some(List(update))))
+        case (update, source) => route(ResponseEnvelope(response.copy(updates = Some(List(update)))), source)
       }
     case response if response.rid == 0 => log.warning(s"Cannot find route for response: $response")
   }
@@ -120,7 +120,15 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
     case response if response.rid != 0 =>
       val sourceRid = ridLookup.sourceId(response.rid)
       val source = sourcesByRid(sourceRid)
-      source ! ResponseEnvelope(response.copy(rid = sourceRid))
+      route(ResponseEnvelope(response.copy(rid = sourceRid)), source)
+  }
+
+  /**
+   * Sending the envelope to another actor.
+   */
+  private def route(envelope: ResponseEnvelope, ref: ActorRef) = {
+    ref ! envelope
+    log.debug(s"$ownId: routed $envelope to $ref")
   }
 
   /**
