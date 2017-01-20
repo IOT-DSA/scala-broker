@@ -47,8 +47,8 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
    */
   private def routeRequest(request: DSARequest) = Try(resolveTarget(request)) map { target =>
     cacheRequestTarget(request, target)
+    log.debug(s"$ownId: routing $request to $target")
     target ! RequestEnvelope(request)
-    log.debug(s"$ownId: routed $request to $target")
   } recover {
     case NonFatal(e) => log.error(s"$ownId: target not found for $request")
   }
