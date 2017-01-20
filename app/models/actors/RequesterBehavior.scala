@@ -47,14 +47,14 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
    */
   private def routeRequest(request: DSARequest) = Try(resolveTarget(request)) map { target =>
     cacheRequestTarget(request, target)
+    log.debug(s"$ownId: routing $request to $target")
     target ! RequestEnvelope(request)
-    log.debug(s"$ownId: routed $request to $target")
   } recover {
     case NonFatal(e) => log.error(s"$ownId: target not found for $request")
   }
 
   /**
-   * Saves the request's target indexed by its RID or SID.
+   * Saves the request's target actor indexed by its RID or SID.
    */
   private def cacheRequestTarget(request: DSARequest, target: ActorRef) = request match {
     case r @ (_: ListRequest | _: SetRequest | _: RemoveRequest | _: InvokeRequest) => targetsByRid.put(r.rid, target)
@@ -79,16 +79,17 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
   }
 
   /**
-   * Tries to resolve the request target first by path, then by cached RID or SID.
+   * Tries to resolve the request target by path or by cached RID/SID (for Close/Unsubscribe, and
+   * also removes the target from the cache after the look up).
    */
   private def resolveTarget(request: DSARequest) = {
 
     val resolveUnsubscribeTarget: PartialFunction[DSARequest, ActorRef] = {
-      case UnsubscribeRequest(_, sids) => targetsBySid(sids.head)
+      case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get
     }
 
     val resolveCloseTarget: PartialFunction[DSARequest, ActorRef] = {
-      case CloseRequest(rid) => targetsByRid(rid)
+      case CloseRequest(rid) => targetsByRid.remove(rid).get
     }
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)

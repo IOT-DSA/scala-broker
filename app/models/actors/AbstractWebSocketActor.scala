@@ -73,7 +73,7 @@ abstract class AbstractWebSocketActor(out: ActorRef, val connInfo: ConnectionInf
    * Sends a DSAMessage to a WebSocket connection.
    */
   private def send(msg: DSAMessage) = {
+    log.debug(s"$ownId: sending $msg to WebSocket")
     out ! msg
-    log.debug(s"$ownId: sent $msg to WebSocket")
   }
 }

@@ -1,5 +1,6 @@
 package models.actors
 
+import akka.actor.ActorRef
 import models.{ DSARequest, DSAResponse }
 
 /**
@@ -33,21 +34,68 @@ class IntCounter(init: Int = 0) {
 }
 
 /**
- * Keeps track of target IDs and manages the lookups between source and target ID.
+ * Used in call records to store the subscribers for future responses.
  */
-class IdLookup(next: Int = 1) {
-  private var nextTargetId = new IntCounter(next)
-  private val sourceIdLookup = collection.mutable.Map.empty[Int, Int]
-  private val targetIdLookup = collection.mutable.Map.empty[Int, Int]
+case class Origin(source: ActorRef, sourceId: Int)
 
-  def createTargetId(sourceId: Int) = {
-    val nextId = nextTargetId.inc
-    sourceIdLookup(nextId) = sourceId
-    targetIdLookup(sourceId) = nextId
-    nextId
+/**
+ * Encapsulates information about requests's subscribers and last received response.
+ */
+class CallRecord(val targetId: Int,
+                 val path: Option[String],
+                 private var _origins: Set[Origin],
+                 var lastResponse: Option[DSAResponse]) {
+
+  def addOrigin(origin: Origin) = _origins += origin
+
+  def removeOrigin(origin: Origin) = _origins -= origin
+
+  def origins = _origins
+}
+
+/**
+ * Stores lookups to retrieve request records by source and target RID/SID and paths,
+ * where appropriate.
+ */
+class CallRegistry(nextId: Int = 1) {
+  private var nextTargetId = new IntCounter(nextId)
+  private val callsByOrigin = collection.mutable.Map.empty[Origin, CallRecord]
+  private val callsByTargetId = collection.mutable.Map.empty[Int, CallRecord]
+  private val callsByPath = collection.mutable.Map.empty[String, CallRecord]
+
+  def createTargetId = nextTargetId.inc
+
+  def saveLookup(origin: Origin, path: Option[String] = None, lastResponse: Option[DSAResponse] = None) = {
+    val targetId = createTargetId
+    val record = new CallRecord(targetId, path, Set(origin), lastResponse)
+    callsByOrigin(origin) = record
+    callsByTargetId(targetId) = record
+    path foreach (callsByPath(_) = record)
+    targetId
   }
-  
-  def targetId(sourceId: Int) = targetIdLookup(sourceId)
-  
-  def sourceId(targetId: Int) = sourceIdLookup(targetId)
+
+  def saveEmpty() = {
+    val targetId = createTargetId
+    callsByTargetId(targetId) = new CallRecord(targetId, None, Set.empty, None)
+    targetId
+  }
+
+  def lookupByPath(path: String) = callsByPath.get(path)
+
+  def lookupByOrigin(origin: Origin) = callsByOrigin.get(origin)
+
+  def lookupByTargetId(targetId: Int) = callsByTargetId.get(targetId)
+
+  def addOrigin(origin: Origin, record: CallRecord) = {
+    record.addOrigin(origin)
+    callsByOrigin(origin) = record
+  }
+
+  def removeOrigin(origin: Origin) = callsByOrigin remove origin map { rec => rec.removeOrigin(origin); rec }
+
+  def removeLookup(record: CallRecord) = {
+    record.origins foreach callsByOrigin.remove
+    record.path foreach callsByPath.remove
+    callsByTargetId.remove(record.targetId)
+  }
 }

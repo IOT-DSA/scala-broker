@@ -6,7 +6,10 @@ import scala.util.matching.Regex
  * Types and utility functions for actors.
  */
 package object actors {
-  
+
+  /**
+   * Used in Allowed messages sent on handshake.
+   */
   val Salt = 1234
 
   /**
@@ -15,5 +18,4 @@ package object actors {
   implicit class RegexContext(val sc: StringContext) extends AnyVal {
     def r = new Regex(sc.parts.mkString, sc.parts.tail.map(_ => "x"): _*)
   }
-
 }
