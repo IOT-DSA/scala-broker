@@ -7,23 +7,26 @@ import akka.testkit.{ TestKit, TestProbe }
 import models._
 import net.sf.ehcache.CacheManager
 import play.api.cache.EhCacheApi
+import com.typesafe.config.ConfigFactory
+import play.api.Configuration
 
 /**
  * RequesterActor test suite.
  */
 class RequesterActorSpec extends TestKit(ActorSystem()) with WordSpecLike with MustMatchers {
 
+  val settings = new Settings(new Configuration(ConfigFactory.load))
   val connInfo = ConnectionInfo("testDsId", true, false, "/reqPath")
   val cache = new EhCacheApi(CacheManager.getInstance.addCacheIfAbsent("test"))
 
   val sysProbe = TestProbe()
   cache.set("/sys", sysProbe.ref)
 
-  val reqActor = system.actorOf(Props(new RequesterActor(testActor, connInfo, cache)))
+  val reqActor = system.actorOf(Props(new RequesterActor(testActor, settings, connInfo, cache)))
 
   "RequesterActor" should {
     "send 'allowed' message on startup" in {
-      expectMsg(AllowedMessage(true, Salt))
+      expectMsg(AllowedMessage(true, settings.Salt))
     }
     "return ack for a request message" in {
       reqActor ! RequestMessage(101, None, Nil)

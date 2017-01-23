@@ -1,11 +1,15 @@
 package models.actors
 
-import org.scalatest.{ Finders, MustMatchers, WordSpecLike }
+import org.scalatest.{ MustMatchers, WordSpecLike }
+
+import com.typesafe.config.ConfigFactory
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill, Props, actorRef2Scala }
 import akka.testkit.{ TestKit, TestProbe }
-import models.{ AllowedMessage, PingMessage }
+import javax.inject.{ Inject, Singleton }
+import models.{ AllowedMessage, PingMessage, Settings }
 import net.sf.ehcache.CacheManager
+import play.api.Configuration
 import play.api.cache.{ CacheApi, EhCacheApi }
 
 /**
@@ -14,13 +18,14 @@ import play.api.cache.{ CacheApi, EhCacheApi }
 class AbstractWebSocketActorSpec extends TestKit(ActorSystem()) with WordSpecLike with MustMatchers {
   import AbstractWebSocketActorSpec._
 
+  val settings = new Settings(new Configuration(ConfigFactory.load))
   val connInfo = ConnectionInfo("testDsId", true, true, "/path")
   val cache = new EhCacheApi(CacheManager.getInstance.addCacheIfAbsent("test"))
-  val wsActor = system.actorOf(Props(new TestWSActor(testActor, connInfo, cache)))
+  val wsActor = system.actorOf(Props(new TestWSActor(testActor, settings, connInfo, cache)))
 
   "AbstractWebSocketActor" should {
     "send 'allowed' message on startup" in {
-      expectMsg(AllowedMessage(true, Salt))
+      expectMsg(AllowedMessage(true, settings.Salt))
     }
     "save its reference to cache on startup" in {
       cache.get[ActorRef]("/path") mustBe Some(wsActor)
@@ -46,7 +51,7 @@ class AbstractWebSocketActorSpec extends TestKit(ActorSystem()) with WordSpecLik
  */
 object AbstractWebSocketActorSpec {
 
-  class TestWSActor(out: ActorRef, connInfo: ConnectionInfo, cache: CacheApi)
-    extends AbstractWebSocketActor(out, connInfo, cache)
+  class TestWSActor(out: ActorRef, settings: Settings, connInfo: ConnectionInfo, cache: CacheApi)
+    extends AbstractWebSocketActor(out, settings, connInfo, cache)
 
 }

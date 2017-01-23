@@ -99,13 +99,13 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
    * Resolves the target link path from the request path.
    */
   def resolveLinkPath(path: String) = path match {
-    case r"/data(/.*)?$_"                       => RootNodeActor.DataPath
-    case r"/defs(/.*)?$_"                       => RootNodeActor.DefsPath
-    case r"/sys(/.*)?$_"                        => RootNodeActor.SysPath
-    case r"/users(/.*)?$_"                      => RootNodeActor.UsersPath
-    case "/downstream"                          => RootNodeActor.DownstreamPath
+    case r"/data(/.*)?$_"                       => settings.Paths.Data
+    case r"/defs(/.*)?$_"                       => settings.Paths.Defs
+    case r"/sys(/.*)?$_"                        => settings.Paths.Sys
+    case r"/users(/.*)?$_"                      => settings.Paths.Users
+    case "/downstream"                          => settings.Paths.Downstream
     case r"/downstream/(\w+)$responder(/.*)?$_" => s"/downstream/$responder"
-    case "/upstream"                            => RootNodeActor.UpstreamPath
+    case "/upstream"                            => settings.Paths.Upstream
     case r"/upstream/(\w+)$broker(/.*)?$_"      => s"/upstream/$broker"
     case _                                      => path
   }

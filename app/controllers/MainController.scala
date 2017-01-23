@@ -5,14 +5,13 @@ import scala.concurrent.Future
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import javax.inject.{ Inject, Singleton }
-import models.{ DSAMessage, DSAMessageFormat }
+import models.{ DSAMessage, DSAMessageFormat, Settings }
 import models.actors.{ ConnectionInfo, DualActor, RequesterActor, ResponderActor, RootNodeActor }
-import play.api.{ Configuration, Logger }
+import play.api.Logger
 import play.api.cache.CacheApi
 import play.api.http.websocket.{ CloseCodes, CloseMessage, WebSocketCloseException }
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, JsValue, Json, Reads, Writes }
-import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.streams.ActorFlow
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer
@@ -27,24 +26,21 @@ case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponde
  * Handles main web requests.
  */
 @Singleton
-class MainController @Inject() (implicit config: Configuration, actorSystem: ActorSystem,
+class MainController @Inject() (implicit settings: Settings, actorSystem: ActorSystem,
                                 materializer: Materializer, cache: CacheApi) extends Controller {
-  import MainController._
 
   private val log = Logger(getClass)
-
-  private val serverConfig = buildServerConfig(config)
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
   // initialize main actors
-  actorSystem.actorOf(RootNodeActor.props(cache), "rootNode")
+  actorSystem.actorOf(RootNodeActor.props(settings, cache), "rootNode")
 
   /**
    * Displays the main app page.
    */
   def index = Action { implicit request =>
-    Ok(views.html.index(config.underlying.root))
+    Ok(views.html.index(settings.rootConfig.root))
   }
 
   /**
@@ -54,7 +50,7 @@ class MainController @Inject() (implicit config: Configuration, actorSystem: Act
     log.debug(s"Conn request received: $request")
 
     val linkPath = getLinkPath(request)
-    val json = serverConfig + ("path" -> Json.toJson(linkPath))
+    val json = settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
 
     val dsId = getDsId(request)
     val connReq = request.body
@@ -75,9 +71,9 @@ class MainController @Inject() (implicit config: Configuration, actorSystem: Act
     log.debug(s"Conn info retrieved for $dsId: $ci")
 
     val flow = ci map {
-      case ci @ ConnectionInfo(_, true, true, _)  => ActorFlow.actorRef(DualActor.props(_, ci, cache))
-      case ci @ ConnectionInfo(_, true, false, _) => ActorFlow.actorRef(RequesterActor.props(_, ci, cache))
-      case ci @ ConnectionInfo(_, false, true, _) => ActorFlow.actorRef(ResponderActor.props(_, ci, cache))
+      case ci @ ConnectionInfo(_, true, true, _)  => ActorFlow.actorRef(DualActor.props(_, settings, ci, cache))
+      case ci @ ConnectionInfo(_, true, false, _) => ActorFlow.actorRef(RequesterActor.props(_, settings, ci, cache))
+      case ci @ ConnectionInfo(_, false, true, _) => ActorFlow.actorRef(ResponderActor.props(_, settings, ci, cache))
     }
     Future.successful(flow.toRight {
       log.error("WS conn rejected: invalid or missing connection info")
@@ -119,26 +115,6 @@ class MainController @Inject() (implicit config: Configuration, actorSystem: Act
   private def getLinkPath(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val linkName = dsId.substring(0, dsId.length - 44)
-    "/downstream/" + linkName
+    settings.Paths.Downstream + "/" + linkName
   }
-}
-
-/**
- * Helper functions and constants for main application controller.
- */
-object MainController {
-
-  /**
-   * Builds Server Configuration JSON.
-   */
-  def buildServerConfig(config: Configuration) = Json.obj(
-    "dsId" -> config.getString("broker.dsId"),
-    "publicKey" -> config.getString("broker.publicKey"),
-    "wsUri" -> "/ws",
-    "httpUri" -> "/http",
-    "tempKey" -> config.getString("broker.tempKey"),
-    "salt" -> config.getString("broker.salt"),
-    "version" -> config.getString("broker.version"),
-    "updateInterval" -> config.getInt("broker.updateInterval"),
-    "format" -> config.getString("broker.format"))
 }

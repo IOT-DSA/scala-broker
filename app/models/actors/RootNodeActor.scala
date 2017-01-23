@@ -3,8 +3,9 @@ package models.actors
 import scala.collection.JavaConverters.asScalaBufferConverter
 
 import akka.actor.{ Actor, Props, actorRef2Scala }
+import javax.inject.Singleton
 import models._
-import models.DSAValue._
+import models.DSAValue.{ BooleanValue, DSAVal, StringValue, array, obj }
 import net.sf.ehcache.Ehcache
 import play.api.Logger
 import play.api.cache.{ CacheApi, EhCacheApi }
@@ -12,7 +13,7 @@ import play.api.cache.{ CacheApi, EhCacheApi }
 /**
  * Services requests that need to be handled by the broker.
  */
-class RootNodeActor(cache: CacheApi) extends Actor {
+class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
   import RootNodeActor._
   import StreamState._
 
@@ -30,13 +31,15 @@ class RootNodeActor(cache: CacheApi) extends Actor {
    * Registers to receive requests for multiple paths.
    */
   override def preStart() = {
-    cache.set(RootPath, self)
-    cache.set(DataPath, self)
-    cache.set(DefsPath, self)
-    cache.set(SysPath, self)
-    cache.set(UsersPath, self)
-    cache.set(DownstreamPath, self)
-    cache.set(UpstreamPath, self)
+    import settings.Paths._
+
+    cache.set(Root, self)
+    cache.set(Data, self)
+    cache.set(Defs, self)
+    cache.set(Sys, self)
+    cache.set(Users, self)
+    cache.set(Downstream, self)
+    cache.set(Upstream, self)
 
     log.debug("RootNode actor initialized")
   }
@@ -45,13 +48,13 @@ class RootNodeActor(cache: CacheApi) extends Actor {
    * Generates node list as a response for LIST request.
    */
   private val nodesForListPath: PartialFunction[String, List[DSAVal]] = {
-    case RootPath                   => rootNodes
-    case DownstreamPath             => listDownstreamNodes
-    case UpstreamPath               => listUpstreamNodes
-    case SysPath                    => listSysNodes
-    case DefsPath                   => listDefsNodes
-    case DataPath                   => listDataNodes
-    case UsersPath                  => listUsersNodes
+    case settings.Paths.Root        => rootNodes
+    case settings.Paths.Downstream  => listDownstreamNodes
+    case settings.Paths.Upstream    => listUpstreamNodes
+    case settings.Paths.Sys         => listSysNodes
+    case settings.Paths.Defs        => listDefsNodes
+    case settings.Paths.Data        => listDataNodes
+    case settings.Paths.Users       => listUsersNodes
     case "/defs/profile/dsa/broker" => rows(IsNode)
   }
 
@@ -83,7 +86,7 @@ class RootNodeActor(cache: CacheApi) extends Actor {
    * Static response for LIST / request.
    */
   private val rootNodes = {
-    val config = rows("$is" -> "dsa/broker", "$downstream" -> "/downstream")
+    val config = rows("$is" -> "dsa/broker", "$downstream" -> settings.Paths.Downstream)
     val children = rows(
       "defs" -> obj(IsNode),
       "data" -> obj("$is" -> "broker/dataRoot"),
@@ -101,10 +104,11 @@ class RootNodeActor(cache: CacheApi) extends Actor {
   private def listDownstreamNodes = {
     val configs = rows(IsNode, "downstream" -> true)
 
+    val downPrefix = settings.Paths.Downstream + "/"
+
     val linkNames = ehCache.getKeys.asScala.toList
     val children = linkNames collect {
-      case path: String if path.startsWith(DownstreamPath + "/") =>
-        array(path.drop(DownstreamPath.size + 1), obj(IsNode))
+      case path: String if path.startsWith(downPrefix) => array(path.drop(downPrefix.size), obj(IsNode))
     }
 
     configs ++ children
@@ -147,15 +151,8 @@ class RootNodeActor(cache: CacheApi) extends Actor {
  * Provides contants and factory methods.
  */
 object RootNodeActor {
-  val RootPath = "/"
-  val DataPath = "/data"
-  val DefsPath = "/defs"
-  val SysPath = "/sys"
-  val UsersPath = "/users"
-  val DownstreamPath = "/downstream"
-  val UpstreamPath = "/upstream"
 
   val IsNode = "$is" -> StringValue("node")
 
-  def props(cache: CacheApi) = Props(new RootNodeActor(cache))
+  def props(settings: Settings, cache: CacheApi) = Props(new RootNodeActor(settings, cache))
 }
