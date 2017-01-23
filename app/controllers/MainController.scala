@@ -88,10 +88,23 @@ class MainController @Inject() (implicit config: Configuration, actorSystem: Act
   /* misc */
 
   def jsonMessageFlowTransformer[In: Reads, Out: Writes]: MessageFlowTransformer[In, Out] = {
-    WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer.map(json => Json.fromJson[In](json).fold({ errors =>
-      log.error("Uncrecognized WS message: " + json)
-      throw WebSocketCloseException(CloseMessage(Some(CloseCodes.Unacceptable), Json.stringify(JsError.toJson(errors))))
-    }, identity), out => Json.toJson(out))
+
+    val fOut = (out: Out) => {
+      val json = Json.toJson(out)
+      log.trace("WS Out: " + json)
+      json
+    }
+
+    val fIn = (json: JsValue) => {
+      log.trace("WS In: " + json)
+      Json.fromJson[In](json).fold({ errors =>
+        val errorInfo = Json.stringify(JsError.toJson(errors))
+        log.error(s"Invalid WS message: $json. Errors: $errorInfo")
+        throw WebSocketCloseException(CloseMessage(Some(CloseCodes.Unacceptable), errorInfo))
+      }, identity)
+    }
+
+    WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer.map(fIn, fOut)
   }
 
   private def validateJson[A: Reads] = BodyParsers.parse.tolerantJson.validate { js =>
