@@ -41,6 +41,7 @@ package object models {
   implicit val DSAValueFormat: Format[DSAVal] = new Format[DSAVal] {
 
     def writes(dsa: DSAVal) = dsa match {
+      case null            => JsNull
       case v: NumericValue => Json.toJson(v.value)
       case v: StringValue  => Json.toJson(v.value)
       case v: BooleanValue => Json.toJson(v.value)
@@ -150,7 +151,7 @@ package object models {
     val AllowedMessageFormat = Json.format[AllowedMessage]
 
     val PingMessageFormat = Json.format[PingMessage]
-    
+
     val PongMessageFormat = Json.format[PongMessage]
 
     val RequestMessageFormat: Format[RequestMessage] = (

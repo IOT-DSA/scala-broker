@@ -41,4 +41,8 @@ object DSAValue {
   implicit class MapValue(val value: DSAMap) extends DSAValue[DSAMap]
 
   implicit class ArrayValue(val value: DSAArray) extends DSAValue[DSAArray]
+
+  def array(values: DSAVal*) = ArrayValue(values)
+
+  def obj(tuples: (String, DSAVal)*) = MapValue(tuples.toMap)
 }
