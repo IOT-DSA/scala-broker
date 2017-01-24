@@ -12,8 +12,8 @@ import models._
 trait RequesterBehavior { this: AbstractWebSocketActor =>
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
-  private val targetsByRid = collection.mutable.Map.empty[Int, ActorRef]
-  private val targetsBySid = collection.mutable.Map.empty[Int, ActorRef]
+  private val targetsByRid = collection.mutable.Map.empty[Int, String]
+  private val targetsBySid = collection.mutable.Map.empty[Int, String]
 
   /**
    * Processes incoming messages from Requester DSLink and dispatches responses to it.
@@ -45,25 +45,33 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
   /**
    * Routes a single request to its destination.
    */
-  private def routeRequest(request: DSARequest) = Try(resolveTarget(request)) map { target =>
+  private def routeRequest(request: DSARequest) = resolveTarget(request) flatMap { target =>
     cacheRequestTarget(request, target)
-    log.debug(s"$ownId: routing $request to $target")
-    target ! RequestEnvelope(request)
+    log.debug(s"$ownId: routing $request to [$target]")
+    routeWithAkka(request, target)
   } recover {
     case NonFatal(e) => log.error(s"$ownId: target not found for $request")
   }
+  
+  /**
+   * Uses Akka to route the request to its destination.
+   */
+  private def routeWithAkka(request: DSARequest, target: String) = Try {
+    val ref = cache.get[ActorRef](target).get
+    ref ! RequestEnvelope(request)
+  }
 
   /**
-   * Saves the request's target actor indexed by its RID or SID.
+   * Saves the request's target indexed by its RID or SID.
    */
-  private def cacheRequestTarget(request: DSARequest, target: ActorRef) = request match {
+  private def cacheRequestTarget(request: DSARequest, target: String) = request match {
     case r @ (_: ListRequest | _: SetRequest | _: RemoveRequest | _: InvokeRequest) => targetsByRid.put(r.rid, target)
     case r: SubscribeRequest => targetsBySid.put(r.path.sid, target)
     case _ => // do nothing
   }
 
   /**
-   * Resolves target ActorRef by analyzing the path.
+   * Resolves target link by analyzing the path.
    */
   private val resolveTargetByPath = {
 
@@ -75,20 +83,20 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       case SubscribeRequest(_, paths)   => paths.head.path // assuming one path after split
     }
 
-    extractPath andThen resolveLinkPath andThen cache.get[ActorRef] andThen (_.get)
+    extractPath andThen resolveLinkPath
   }
 
   /**
    * Tries to resolve the request target by path or by cached RID/SID (for Close/Unsubscribe, and
    * also removes the target from the cache after the look up).
    */
-  private def resolveTarget(request: DSARequest) = {
+  private def resolveTarget(request: DSARequest): Try[String] = Try {
 
-    val resolveUnsubscribeTarget: PartialFunction[DSARequest, ActorRef] = {
+    val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
       case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get
     }
 
-    val resolveCloseTarget: PartialFunction[DSARequest, ActorRef] = {
+    val resolveCloseTarget: PartialFunction[DSARequest, String] = {
       case CloseRequest(rid) => targetsByRid.remove(rid).get
     }
 
