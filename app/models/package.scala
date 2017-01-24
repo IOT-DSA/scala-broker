@@ -57,6 +57,7 @@ package object models {
     }
 
     private def json2dsa: PartialFunction[JsValue, DSAVal] = {
+      case JsNull                                    => null
       case JsNumber(x)                               => new NumericValue(x)
       case JsString(x) if x.startsWith(BinaryPrefix) => BinaryValue(stringToBinary(x))
       case JsString(x)                               => new StringValue(x)
