@@ -3,9 +3,9 @@ package models.actors
 import scala.collection.JavaConverters.asScalaBufferConverter
 
 import akka.actor.{ Actor, Props, actorRef2Scala }
-import javax.inject.Singleton
-import models._
-import models.DSAValue.{ BooleanValue, DSAVal, StringValue, array, obj }
+import models.Settings
+import models.rpc._
+import models.rpc.DSAValue.{ BooleanValue, DSAVal, StringValue, array, obj }
 import net.sf.ehcache.Ehcache
 import play.api.Logger
 import play.api.cache.{ CacheApi, EhCacheApi }

@@ -1,8 +1,8 @@
 package models.kafka
 
 import org.apache.kafka.streams.state.KeyValueStore
-import models.DSARequest
-import models.DSAResponse
+
+import models.rpc.{ DSARequest, DSAResponse }
 
 /**
  * Envelope for Kafka request routing.

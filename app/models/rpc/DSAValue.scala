@@ -1,4 +1,4 @@
-package models
+package models.rpc
 
 /**
  * Base trait for DSA-compatible values.

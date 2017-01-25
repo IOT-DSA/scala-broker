@@ -1,6 +1,6 @@
 package models.kafka
 
-import models._
+import models.rpc._
 import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.KeyValue
 

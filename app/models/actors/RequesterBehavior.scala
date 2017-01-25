@@ -5,8 +5,8 @@ import scala.util.control.NonFatal
 
 import akka.actor.{ ActorRef, actorRef2Scala }
 import cakesolutions.kafka.KafkaProducerRecord
-import models._
 import models.kafka._
+import models.rpc._
 
 /**
  * Handles communication with a remote DSLink in Requester mode.

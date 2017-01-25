@@ -1,3 +1,5 @@
+package models
+
 import java.util.Base64
 
 import play.api.data.validation.ValidationError
@@ -7,7 +9,7 @@ import play.api.libs.json._
 /**
  * Types and utility functions for models.
  */
-package object models {
+package object rpc {
   import DSAValue._
 
   val BinaryPrefix = "\u001Bbytes:"
@@ -125,18 +127,18 @@ package object models {
    * DSAError <-> JSON
    */
   implicit val DSAErrorFormat: Format[DSAError] = (
-    (__ \ "msg").formatNullable[String] ~
-    (__ \ "type").formatNullable[String] ~
-    (__ \ "phase").formatNullable[String] ~
-    (__ \ "path").formatNullable[String] ~
-    (__ \ "detail").formatNullable[String])(DSAError, unlift(DSAError.unapply))
+    (__ \ 'msg).formatNullable[String] ~
+    (__ \ 'type).formatNullable[String] ~
+    (__ \ 'phase).formatNullable[String] ~
+    (__ \ 'path).formatNullable[String] ~
+    (__ \ 'detail).formatNullable[String])(DSAError, unlift(DSAError.unapply))
 
   /**
    * ColumnInfo <-> JSON
    */
   implicit val ColumnInfoFormat: Format[ColumnInfo] = (
-    (__ \ "name").format[String] ~
-    (__ \ "type").format[String])(ColumnInfo, unlift(ColumnInfo.unapply))
+    (__ \ 'name).format[String] ~
+    (__ \ 'type).format[String])(ColumnInfo, unlift(ColumnInfo.unapply))
 
   /**
    * DSAResponse <-> JSON
@@ -156,14 +158,14 @@ package object models {
     val PongMessageFormat = Json.format[PongMessage]
 
     val RequestMessageFormat: Format[RequestMessage] = (
-      (__ \ "msg").format[Int] ~
-      (__ \ "ack").formatNullable[Int] ~
-      (__ \ "requests").format[List[DSARequest]])(RequestMessage, unlift(RequestMessage.unapply))
+      (__ \ 'msg).format[Int] ~
+      (__ \ 'ack).formatNullable[Int] ~
+      (__ \ 'requests).format[List[DSARequest]])(RequestMessage, unlift(RequestMessage.unapply))
 
     val ResponseMessageFormat: Format[ResponseMessage] = (
-      (__ \ "msg").format[Int] ~
-      (__ \ "ack").formatNullable[Int] ~
-      (__ \ "responses").format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
+      (__ \ 'msg).format[Int] ~
+      (__ \ 'ack).formatNullable[Int] ~
+      (__ \ 'responses).format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
 
     def writes(msg: DSAMessage) = msg match {
       case EmptyMessage       => Json.obj()
@@ -197,5 +199,5 @@ package object models {
 
   def valueMapToJson(fields: Map[String, DSAVal]) = fields map { case (a, b) => (a -> Json.toJson(b)) }
 
-  def valueListToJson(items: Iterable[DSAVal]) = items map (Json.toJson(_))
+  def valueListToJson(items: Iterable[DSAVal]) = items map (Json.toJson(_))  
 }

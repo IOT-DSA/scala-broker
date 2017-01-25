@@ -1,4 +1,4 @@
-package models
+package models.rpc
 
 import DSAValue._
 

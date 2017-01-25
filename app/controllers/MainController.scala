@@ -5,8 +5,9 @@ import scala.concurrent.Future
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import javax.inject.{ Inject, Singleton }
-import models.{ DSAMessage, DSAMessageFormat, Settings }
+import models.Settings
 import models.actors.{ ConnectionInfo, DualActor, RequesterActor, ResponderActor, RootNodeActor }
+import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
 import play.api.http.websocket.{ CloseCodes, CloseMessage, WebSocketCloseException }

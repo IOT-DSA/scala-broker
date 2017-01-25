@@ -2,13 +2,15 @@ package models.actors
 
 import org.scalatest.{ MustMatchers, WordSpecLike }
 
+import com.typesafe.config.ConfigFactory
+
 import akka.actor.{ ActorSystem, Props, actorRef2Scala }
 import akka.testkit.TestKit
-import models._
+import models.Settings
+import models.rpc.{ AllowedMessage, InvokeRequest, PingMessage, RequestMessage, ResponseMessage }
 import net.sf.ehcache.CacheManager
-import play.api.cache.EhCacheApi
 import play.api.Configuration
-import com.typesafe.config.ConfigFactory
+import play.api.cache.EhCacheApi
 
 /**
  * ResponderActor test suite.

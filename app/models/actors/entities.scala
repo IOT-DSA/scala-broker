@@ -1,7 +1,7 @@
 package models.actors
 
 import akka.actor.ActorRef
-import models.{ DSARequest, DSAResponse }
+import models.rpc.{ DSARequest, DSAResponse }
 
 /**
  * Encapsulates DSLink information for WebSocket connection.

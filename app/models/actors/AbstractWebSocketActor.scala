@@ -1,7 +1,8 @@
 package models.actors
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, actorRef2Scala }
-import models._
+import models.Settings
+import models.rpc._
 import play.api.cache.CacheApi
 
 /**

@@ -1,14 +1,16 @@
 package models.actors
 
-import org.scalatest.{ Finders, MustMatchers, WordSpecLike }
+import org.scalatest.{ MustMatchers, WordSpecLike }
+
+import com.typesafe.config.ConfigFactory
 
 import akka.actor.{ ActorSystem, Props, actorRef2Scala }
 import akka.testkit.{ TestKit, TestProbe }
-import models._
+import models.Settings
+import models.rpc._
 import net.sf.ehcache.CacheManager
-import play.api.cache.EhCacheApi
-import com.typesafe.config.ConfigFactory
 import play.api.Configuration
+import play.api.cache.EhCacheApi
 
 /**
  * RequesterActor test suite.

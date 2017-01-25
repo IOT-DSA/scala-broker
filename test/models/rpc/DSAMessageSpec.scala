@@ -1,4 +1,4 @@
-package models
+package models.rpc
 
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatestplus.play.PlaySpec

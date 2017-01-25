@@ -4,7 +4,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 import akka.actor.{ ActorRef, actorRef2Scala }
-import models._
+import models.rpc._
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
