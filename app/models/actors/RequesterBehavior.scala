@@ -4,16 +4,28 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 import akka.actor.{ ActorRef, actorRef2Scala }
+import cakesolutions.kafka.KafkaProducerRecord
 import models._
+import models.kafka._
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
 trait RequesterBehavior { this: AbstractWebSocketActor =>
+  import settings._
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
-  private val targetsByRid = collection.mutable.Map.empty[Int, ActorRef]
-  private val targetsBySid = collection.mutable.Map.empty[Int, ActorRef]
+  private val targetsByRid = collection.mutable.Map.empty[Int, String]
+  private val targetsBySid = collection.mutable.Map.empty[Int, String]
+
+  private val router = if (Kafka.Enabled)
+    routeWithKafka _
+  else
+    routeWithAkka _
+
+  private val producer = if (Kafka.Enabled)
+    createProducer[String, KafkaRequestEnvelope](Kafka.BrokerUrl, Kafka.Producer)
+  else null
 
   /**
    * Processes incoming messages from Requester DSLink and dispatches responses to it.
@@ -45,25 +57,42 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
   /**
    * Routes a single request to its destination.
    */
-  private def routeRequest(request: DSARequest) = Try(resolveTarget(request)) map { target =>
+  private def routeRequest(request: DSARequest) = resolveTarget(request) flatMap { target =>
     cacheRequestTarget(request, target)
-    log.debug(s"$ownId: routing $request to $target")
-    target ! RequestEnvelope(request)
+    log.debug(s"$ownId: routing $request to [$target]")
+    router(request, target)
   } recover {
-    case NonFatal(e) => log.error(s"$ownId: target not found for $request")
+    case e: NoSuchElementException => log.error(s"$ownId: RID/SID not found for $request")
+    case NonFatal(e) => log.error(s"$ownId: cannot route $request: {}", e)
   }
 
   /**
-   * Saves the request's target actor indexed by its RID or SID.
+   * Uses Akka to route the request to its destination.
    */
-  private def cacheRequestTarget(request: DSARequest, target: ActorRef) = request match {
+  private def routeWithAkka(request: DSARequest, target: String) = Try {
+    val ref = cache.get[ActorRef](target).get
+    ref ! RequestEnvelope(request)
+  }
+
+  /**
+   * Uses Kafka to route the request to its destination.
+   */
+  private def routeWithKafka(request: DSARequest, target: String) = Try {
+    val record = KafkaProducerRecord(Kafka.Topics.ReqEnvelopeIn, target, KafkaRequestEnvelope(request, connInfo.linkPath))
+    producer.send(record)
+  }
+
+  /**
+   * Saves the request's target indexed by its RID or SID.
+   */
+  private def cacheRequestTarget(request: DSARequest, target: String) = request match {
     case r @ (_: ListRequest | _: SetRequest | _: RemoveRequest | _: InvokeRequest) => targetsByRid.put(r.rid, target)
     case r: SubscribeRequest => targetsBySid.put(r.path.sid, target)
     case _ => // do nothing
   }
 
   /**
-   * Resolves target ActorRef by analyzing the path.
+   * Resolves target link by analyzing the path.
    */
   private val resolveTargetByPath = {
 
@@ -75,20 +104,20 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       case SubscribeRequest(_, paths)   => paths.head.path // assuming one path after split
     }
 
-    extractPath andThen resolveLinkPath andThen cache.get[ActorRef] andThen (_.get)
+    extractPath andThen resolveLinkPath
   }
 
   /**
    * Tries to resolve the request target by path or by cached RID/SID (for Close/Unsubscribe, and
    * also removes the target from the cache after the look up).
    */
-  private def resolveTarget(request: DSARequest) = {
+  private def resolveTarget(request: DSARequest): Try[String] = Try {
 
-    val resolveUnsubscribeTarget: PartialFunction[DSARequest, ActorRef] = {
+    val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
       case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get
     }
 
-    val resolveCloseTarget: PartialFunction[DSARequest, ActorRef] = {
+    val resolveCloseTarget: PartialFunction[DSARequest, String] = {
       case CloseRequest(rid) => targetsByRid.remove(rid).get
     }
 
@@ -99,13 +128,13 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
    * Resolves the target link path from the request path.
    */
   def resolveLinkPath(path: String) = path match {
-    case r"/data(/.*)?$_"                       => RootNodeActor.DataPath
-    case r"/defs(/.*)?$_"                       => RootNodeActor.DefsPath
-    case r"/sys(/.*)?$_"                        => RootNodeActor.SysPath
-    case r"/users(/.*)?$_"                      => RootNodeActor.UsersPath
-    case "/downstream"                          => RootNodeActor.DownstreamPath
+    case r"/data(/.*)?$_"                       => Paths.Data
+    case r"/defs(/.*)?$_"                       => Paths.Defs
+    case r"/sys(/.*)?$_"                        => Paths.Sys
+    case r"/users(/.*)?$_"                      => Paths.Users
+    case "/downstream"                          => Paths.Downstream
     case r"/downstream/(\w+)$responder(/.*)?$_" => s"/downstream/$responder"
-    case "/upstream"                            => RootNodeActor.UpstreamPath
+    case "/upstream"                            => Paths.Upstream
     case r"/upstream/(\w+)$broker(/.*)?$_"      => s"/upstream/$broker"
     case _                                      => path
   }

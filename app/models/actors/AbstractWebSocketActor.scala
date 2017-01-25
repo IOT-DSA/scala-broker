@@ -8,7 +8,7 @@ import play.api.cache.CacheApi
  * Base abstract class for DSA WebSocket actors, implements essential lifecycle hooks and basic helper methods
  * for communicating with the WebSocket remote.
  */
-abstract class AbstractWebSocketActor(out: ActorRef, val connInfo: ConnectionInfo, val cache: CacheApi)
+abstract class AbstractWebSocketActor(out: ActorRef, val settings: Settings, val connInfo: ConnectionInfo, val cache: CacheApi)
     extends Actor with ActorLogging {
 
   protected val ownId = s"Link[${connInfo.linkPath}]"
@@ -21,7 +21,7 @@ abstract class AbstractWebSocketActor(out: ActorRef, val connInfo: ConnectionInf
   override def preStart() = {
     cache.set(connInfo.linkPath, self)
     log.info(s"$ownId: initialized, sending 'allowed' to client")
-    sendAllowed(Salt)
+    sendAllowed(settings.Salt)
   }
 
   /**

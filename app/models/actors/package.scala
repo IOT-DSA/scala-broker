@@ -8,11 +8,6 @@ import scala.util.matching.Regex
 package object actors {
 
   /**
-   * Used in Allowed messages sent on handshake.
-   */
-  val Salt = 1234
-
-  /**
    * Interpolates strings to produce RegEx.
    */
   implicit class RegexContext(val sc: StringContext) extends AnyVal {
