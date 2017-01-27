@@ -1,21 +1,18 @@
 package models
 
-import scala.reflect.{ ClassTag, classTag }
+import scala.concurrent.duration.Duration
 
 import org.apache.kafka.common.serialization._
+import org.apache.kafka.streams.KeyValue
+import org.apache.kafka.streams.kstream.{ KStream, KStreamBuilder }
+import org.apache.kafka.streams.processor.{ ProcessorContext, TopologyBuilder }
+import org.apache.kafka.streams.state.{ KeyValueStore, Stores }
 
 import com.typesafe.config.Config
 
 import cakesolutions.kafka.KafkaProducer
+import models.kafka.KafkaRequestEnvelope
 import play.api.libs.json.{ Json, Reads, Writes }
-import org.apache.kafka.streams.kstream.KStreamBuilder
-import org.apache.kafka.streams.kstream.KStream
-import org.apache.kafka.streams.processor.TopologyBuilder
-import org.apache.kafka.streams.state.Stores
-import org.apache.kafka.streams.processor.ProcessorContext
-import org.apache.kafka.streams.state.KeyValueStore
-import scala.concurrent.duration.Duration
-import org.apache.kafka.streams.KeyValue
 
 /**
  * Types and utility functions for Kafka.
@@ -27,16 +24,18 @@ package object kafka {
   private val utf8 = java.nio.charset.StandardCharsets.UTF_8
 
   /**
-   * RequestEnvelope <-> JSON
-   */
-  implicit val RequestEnvelopeFormat = Json.format[KafkaRequestEnvelope]
-
-  /**
    * RequestEnvelope <-> Kafka
    */
-  implicit val RequestEnvelopeSerializer = serializer[KafkaRequestEnvelope]
-  implicit val RequestEnvelopeDeserializer = deserializer[KafkaRequestEnvelope]
+  implicit val RequestEnvelopeSerializer = serializer[RequestEnvelope]
+  implicit val RequestEnvelopeDeserializer = deserializer[RequestEnvelope]
   implicit val ReqEnvSerde = Serdes.serdeFrom(RequestEnvelopeSerializer, RequestEnvelopeDeserializer)
+
+  /**
+   * ResponseEnvelope <-> Kafka
+   */
+  implicit val ResponseEnvelopeSerializer = serializer[ResponseEnvelope]
+  implicit val ResponseEnvelopeDeserializer = deserializer[ResponseEnvelope]
+  implicit val RspEnvSerde = Serdes.serdeFrom(ResponseEnvelopeSerializer, ResponseEnvelopeDeserializer)
 
   /**
    * String <-> Kafka

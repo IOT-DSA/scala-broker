@@ -52,6 +52,5 @@ class AbstractWebSocketActorSpec extends TestKit(ActorSystem()) with WordSpecLik
 object AbstractWebSocketActorSpec {
 
   class TestWSActor(out: ActorRef, settings: Settings, connInfo: ConnectionInfo, cache: CacheApi)
-    extends AbstractWebSocketActor(out, settings, connInfo, cache)
-
+    extends AbstractWebSocketActor(out, WebSocketActorConfig(connInfo, settings, cache))
 }

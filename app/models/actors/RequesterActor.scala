@@ -1,14 +1,13 @@
 package models.actors
 
 import akka.actor.{ ActorRef, Props }
-import play.api.cache.CacheApi
-import models.Settings
+import models.MessageRouter
 
 /**
  * WebSocket actor connected to DSLink in REQUESTER mode.
  */
-class RequesterActor(out: ActorRef, settings: Settings, connInfo: ConnectionInfo, cache: CacheApi)
-    extends AbstractWebSocketActor(out, settings, connInfo, cache) with RequesterBehavior {
+class RequesterActor(out: ActorRef, config: WebSocketActorConfig, val router: MessageRouter)
+    extends AbstractWebSocketActor(out, config) with RequesterBehavior {
 
   override def receive = super.receive orElse requesterBehavior
 }
@@ -21,6 +20,6 @@ object RequesterActor {
   /**
    * Creates a new Props instance for RequesterActor.
    */
-  def props(out: ActorRef, settings: Settings, connInfo: ConnectionInfo, cache: CacheApi) =
-    Props(new RequesterActor(out, settings, connInfo, cache))
+  def props(out: ActorRef, config: WebSocketActorConfig, router: MessageRouter) =
+    Props(new RequesterActor(out, config, router))
 }

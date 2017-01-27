@@ -6,11 +6,21 @@ import models.rpc._
 import play.api.cache.CacheApi
 
 /**
- * Base abstract class for DSA WebSocket actors, implements essential lifecycle hooks and basic helper methods
- * for communicating with the WebSocket remote.
+ * Basic WebSocket actor configuration, which includes actor's connection information,
+ * application settings and app-wide cache.
  */
-abstract class AbstractWebSocketActor(out: ActorRef, val settings: Settings, val connInfo: ConnectionInfo, val cache: CacheApi)
+case class WebSocketActorConfig(connInfo: ConnectionInfo, settings: Settings, cache: CacheApi)
+
+/**
+ * Base abstract class for DSA WebSocket actors, implements essential lifecycle hooks and basic
+ * helper methods for communicating with the WebSocket remote.
+ */
+abstract class AbstractWebSocketActor(out: ActorRef, config: WebSocketActorConfig)
     extends Actor with ActorLogging {
+
+  protected val connInfo = config.connInfo
+  protected val cache = config.cache
+  protected val settings = config.settings
 
   protected val ownId = s"Link[${connInfo.linkPath}]"
 

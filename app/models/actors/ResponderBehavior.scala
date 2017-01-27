@@ -5,6 +5,8 @@ import scala.util.control.NonFatal
 
 import akka.actor.{ ActorRef, actorRef2Scala }
 import models.rpc._
+import models.RequestEnvelope
+import models.ResponseEnvelope
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
@@ -20,9 +22,9 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
    * Processes incoming messages from Responder DSLink and dispatches requests to it.
    */
   val responderBehavior: Receive = {
-    case e @ RequestEnvelope(request) =>
+    case e @ RequestEnvelope(from, to, requests) =>
       log.debug(s"$ownId: received $e")
-      handleRequest(request)
+      requests foreach handleRequest
     case m @ ResponseMessage(msg, ack, responses) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
@@ -42,7 +44,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
         case Some(rec) =>
           ridRegistry.addOrigin(origin, rec)
           rec.lastResponse foreach { rsp =>
-            val envelope = ResponseEnvelope(rsp.copy(rid = origin.sourceId))
+            val envelope = ResponseEnvelope(connInfo.linkPath, null, List(rsp.copy(rid = origin.sourceId)))
             route(envelope, origin.source)
           }
       }
@@ -68,7 +70,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
    */
   private val handleSubscribeRequest: PartialFunction[DSARequest, Unit] = {
     case req @ SubscribeRequest(rid, _) =>
-      route(ResponseEnvelope(DSAResponse(rid, Some(StreamState.Closed))), sender)
+      route(ResponseEnvelope(connInfo.linkPath, null, List(DSAResponse(rid, Some(StreamState.Closed)))), sender)
       val srcPath = req.path // to ensure there's only one path (see requester actor)
       val origin = Origin(sender, srcPath.sid)
       sidRegistry.lookupByPath(srcPath.path) match {
@@ -81,7 +83,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
           rec.lastResponse foreach { rsp =>
             val sourceRow = replaceSid(rsp.updates.get.head, origin.sourceId)
             val response = DSAResponse(0, rsp.stream, Some(List(sourceRow)), rsp.columns, rsp.error)
-            route(ResponseEnvelope(response), origin.source)
+            route(ResponseEnvelope(connInfo.linkPath, null, List(response)), origin.source)
           }
       }
   }
@@ -95,7 +97,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
       sidRegistry.removeOrigin(origin) map { rec =>
         if (rec.origins.isEmpty)
           sendRequest(UnsubscribeRequest(ridRegistry.saveEmpty, rec.targetId))
-        route(ResponseEnvelope(DSAResponse(rid, Some(StreamState.Closed))), sender)
+        route(ResponseEnvelope(connInfo.linkPath, null, List(DSAResponse(rid, Some(StreamState.Closed)))), sender)
       } getOrElse
         log.warning(s"$ownId: did not find the original Subscribe for SID=${req.sid}")
   }
@@ -110,7 +112,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
       record match {
         case None                             => log.warning(s"$ownId: did not find the original request for Close($rid)")
         case Some(rec) if rec.origins.isEmpty => sendRequest(CloseRequest(rec.targetId))
-        case Some(rec) if rec.path.isDefined  => route(ResponseEnvelope(DSAResponse(rid, Some(StreamState.Closed))), sender)
+        case Some(rec) if rec.path.isDefined  => route(ResponseEnvelope(connInfo.linkPath, null, List(DSAResponse(rid, Some(StreamState.Closed)))), sender)
         case _                                => // do nothing
       }
   }
@@ -154,7 +156,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
           rec.origins foreach { origin =>
             val sourceRow = replaceSid(row, origin.sourceId)
             val response = DSAResponse(0, stream, Some(List(sourceRow)), columns, error)
-            route(ResponseEnvelope(response), origin.source)
+            route(ResponseEnvelope(connInfo.linkPath, null, List(response)), origin.source)
           }
           rec.lastResponse = Some(DSAResponse(0, stream, Some(List(row)), columns, error))
           if (stream == StreamState.Closed)
@@ -190,7 +192,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
         case None => log.warning(s"$ownId: did not find the route for $response")
         case Some(rec) =>
           rec.origins foreach { origin =>
-            val envelope = ResponseEnvelope(response.copy(rid = origin.sourceId))
+            val envelope = ResponseEnvelope(connInfo.linkPath, null, List(response.copy(rid = origin.sourceId)))
             route(envelope, origin.source)
           }
           rec.lastResponse = Some(response)

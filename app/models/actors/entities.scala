@@ -1,22 +1,12 @@
 package models.actors
 
 import akka.actor.ActorRef
-import models.rpc.{ DSARequest, DSAResponse }
+import models.rpc.DSAResponse
 
 /**
  * Encapsulates DSLink information for WebSocket connection.
  */
 case class ConnectionInfo(dsId: String, isRequester: Boolean, isResponder: Boolean, linkPath: String)
-
-/**
- * Envelope for internal request routing.
- */
-case class RequestEnvelope(request: DSARequest)
-
-/**
- * Envelope for internal response routing.
- */
-case class ResponseEnvelope(response: DSAResponse)
 
 /**
  * Similar to [[java.util.concurrent.atomic.AtomicInteger]], but not thread safe,
