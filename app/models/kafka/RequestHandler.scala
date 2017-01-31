@@ -1,10 +1,11 @@
 package models.kafka
 
 import models._
+import models.rpc._
 import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.KeyValue
 
-class RequestHandler extends AbstractTransformer[String, KafkaRequestEnvelope, String, KafkaRequestEnvelope] {
+class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String, RequestEnvelope] {
 
   var ridGen: IdGenerator = null
   var sidGen: IdGenerator = null
@@ -29,9 +30,13 @@ class RequestHandler extends AbstractTransformer[String, KafkaRequestEnvelope, S
       (target, ListRequest(targetRid, translatePath(path, target)))
   }
 
-  def transform(target: String, env: KafkaRequestEnvelope) = {
-    val result = handlePassthroughRequest((env.request, target))
-    (result._1, KafkaRequestEnvelope(result._2, env.source))
+  def transform(target: String, env: RequestEnvelope) = {
+    val results = env.requests map { req =>
+      val tuple = (req, target)
+      handlePassthroughRequest(tuple)
+    }
+    // TODO temporary, just to make it compile
+    (results.head._1, RequestEnvelope(env.from, results.head._1, List(results.head._2)))
   }
 
   /**
@@ -43,6 +48,6 @@ class RequestHandler extends AbstractTransformer[String, KafkaRequestEnvelope, S
   }
 }
 
-object RequestHandler extends AbstractTransformerSupplier[String, KafkaRequestEnvelope, String, KafkaRequestEnvelope] {
+object RequestHandler extends AbstractTransformerSupplier[String, RequestEnvelope, String, RequestEnvelope] {
   def get = new RequestHandler
 }

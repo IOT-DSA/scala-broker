@@ -5,8 +5,10 @@ import scala.concurrent.Future
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import javax.inject.{ Inject, Singleton }
-import models.{ DSAMessage, DSAMessageFormat, Settings }
-import models.actors.{ ConnectionInfo, DualActor, RequesterActor, ResponderActor, RootNodeActor }
+import models.Settings
+import models.actors._
+import models.kafka.KafkaRouter
+import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
 import play.api.http.websocket.{ CloseCodes, CloseMessage, WebSocketCloseException }
@@ -28,10 +30,16 @@ case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponde
 @Singleton
 class MainController @Inject() (implicit settings: Settings, actorSystem: ActorSystem,
                                 materializer: Materializer, cache: CacheApi) extends Controller {
+  import settings._
 
   private val log = Logger(getClass)
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
+
+  private val router = if (settings.Kafka.Enabled)
+    new KafkaRouter(Kafka.BrokerUrl, Kafka.Producer, Kafka.Topics.ReqEnvelopeIn)
+  else
+    new AkkaRouter(cache)
 
   // initialize main actors
   actorSystem.actorOf(RootNodeActor.props(settings, cache), "rootNode")
@@ -67,13 +75,15 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
   def ws = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
     log.debug(s"WS request received: $request")
     val dsId = getDsId(request)
-    val ci = cache.get[ConnectionInfo](dsId)
-    log.debug(s"Conn info retrieved for $dsId: $ci")
+    val connInfo = cache.get[ConnectionInfo](dsId)
+    log.debug(s"Conn info retrieved for $dsId: $connInfo")
 
-    val flow = ci map {
-      case ci @ ConnectionInfo(_, true, true, _)  => ActorFlow.actorRef(DualActor.props(_, settings, ci, cache))
-      case ci @ ConnectionInfo(_, true, false, _) => ActorFlow.actorRef(RequesterActor.props(_, settings, ci, cache))
-      case ci @ ConnectionInfo(_, false, true, _) => ActorFlow.actorRef(ResponderActor.props(_, settings, ci, cache))
+    val flow = connInfo map { ci =>
+      (ci.isRequester, ci.isResponder, WebSocketActorConfig(ci, settings, cache))
+    } collect {
+      case (true, true, cfg)  => ActorFlow.actorRef(DualActor.props(_, cfg, router))
+      case (true, false, cfg) => ActorFlow.actorRef(RequesterActor.props(_, cfg, router))
+      case (false, true, cfg) => ActorFlow.actorRef(ResponderActor.props(_, cfg, router))
     }
     Future.successful(flow.toRight {
       log.error("WS conn rejected: invalid or missing connection info")
@@ -83,6 +93,9 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
 
   /* misc */
 
+  /**
+   * Performs transformations JsValue->In and Out->JsValue.
+   */
   def jsonMessageFlowTransformer[In: Reads, Out: Writes]: MessageFlowTransformer[In, Out] = {
 
     val fOut = (out: Out) => {
@@ -103,6 +116,9 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
     WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer.map(fIn, fOut)
   }
 
+  /**
+   * Validates the JSON and extracts a request message.
+   */
   private def validateJson[A: Reads] = BodyParsers.parse.tolerantJson.validate { js =>
     js.validate[A].asEither.left.map { e =>
       log.error(s"Cannot parse connection request JSON: $js. Error info: ${JsError.toJson(e)}")
@@ -110,8 +126,14 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
     }
   }
 
+  /**
+   * Extracts `dsId` from the request's query string.
+   */
   private def getDsId(request: RequestHeader) = request.queryString("dsId").head
 
+  /**
+   * Constructs a link path from the connection request.
+   */
   private def getLinkPath(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val linkName = dsId.substring(0, dsId.length - 44)

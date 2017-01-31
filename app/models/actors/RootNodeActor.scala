@@ -1,11 +1,13 @@
 package models.actors
 
 import scala.collection.JavaConverters.asScalaBufferConverter
+import scala.util.Try
+import scala.util.control.NonFatal
 
-import akka.actor.{ Actor, Props, actorRef2Scala }
-import javax.inject.Singleton
-import models._
-import models.DSAValue.{ BooleanValue, DSAVal, StringValue, array, obj }
+import akka.actor.{ Actor, ActorRef, Props, actorRef2Scala }
+import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest, StreamState }
+import models.rpc.DSAValue.{ BooleanValue, DSAVal, StringValue, array, obj }
 import net.sf.ehcache.Ehcache
 import play.api.Logger
 import play.api.cache.{ CacheApi, EhCacheApi }
@@ -78,8 +80,15 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
    * Handles broker requests.
    */
   def receive = {
-    case RequestEnvelope(req) => sender ! ResponseEnvelope(processDSARequest(req))
-    case msg @ _              => log.error(s"Invalid message received: $msg")
+    case env @ RequestEnvelope(from, to, reqs) => Try {
+      log.debug(s"Received $env")
+      val responses = reqs map processDSARequest
+      val target = cache.get[ActorRef](from).get
+      target ! ResponseEnvelope(settings.Paths.Root, from, responses)
+    } recover {
+      case NonFatal(e) => log.error("Cannot send the response {}", e)
+    }
+    case msg @ _ => log.error(s"Invalid message received: $msg")
   }
 
   /**

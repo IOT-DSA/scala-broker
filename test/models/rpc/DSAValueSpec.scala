@@ -1,4 +1,4 @@
-package models
+package models.rpc
 
 import scala.math.BigDecimal.{ double2bigDecimal, int2bigDecimal, long2bigDecimal }
 

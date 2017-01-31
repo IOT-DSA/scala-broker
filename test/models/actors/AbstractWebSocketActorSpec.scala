@@ -6,8 +6,8 @@ import com.typesafe.config.ConfigFactory
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill, Props, actorRef2Scala }
 import akka.testkit.{ TestKit, TestProbe }
-import javax.inject.{ Inject, Singleton }
-import models.{ AllowedMessage, PingMessage, Settings }
+import models.Settings
+import models.rpc.{ AllowedMessage, PingMessage }
 import net.sf.ehcache.CacheManager
 import play.api.Configuration
 import play.api.cache.{ CacheApi, EhCacheApi }
@@ -52,6 +52,5 @@ class AbstractWebSocketActorSpec extends TestKit(ActorSystem()) with WordSpecLik
 object AbstractWebSocketActorSpec {
 
   class TestWSActor(out: ActorRef, settings: Settings, connInfo: ConnectionInfo, cache: CacheApi)
-    extends AbstractWebSocketActor(out, settings, connInfo, cache)
-
+    extends AbstractWebSocketActor(out, WebSocketActorConfig(connInfo, settings, cache))
 }

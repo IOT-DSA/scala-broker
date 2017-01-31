@@ -1,15 +1,26 @@
 package models.actors
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, actorRef2Scala }
-import models._
+import models.Settings
+import models.rpc._
 import play.api.cache.CacheApi
 
 /**
- * Base abstract class for DSA WebSocket actors, implements essential lifecycle hooks and basic helper methods
- * for communicating with the WebSocket remote.
+ * Basic WebSocket actor configuration, which includes actor's connection information,
+ * application settings and app-wide cache.
  */
-abstract class AbstractWebSocketActor(out: ActorRef, val settings: Settings, val connInfo: ConnectionInfo, val cache: CacheApi)
+case class WebSocketActorConfig(connInfo: ConnectionInfo, settings: Settings, cache: CacheApi)
+
+/**
+ * Base abstract class for DSA WebSocket actors, implements essential lifecycle hooks and basic
+ * helper methods for communicating with the WebSocket remote.
+ */
+abstract class AbstractWebSocketActor(out: ActorRef, config: WebSocketActorConfig)
     extends Actor with ActorLogging {
+
+  protected val connInfo = config.connInfo
+  protected val cache = config.cache
+  protected val settings = config.settings
 
   protected val ownId = s"Link[${connInfo.linkPath}]"
 
@@ -62,12 +73,14 @@ abstract class AbstractWebSocketActor(out: ActorRef, val settings: Settings, val
   /**
    * Sends the response message to the client.
    */
-  protected def sendResponse(responses: DSAResponse*) = send(ResponseMessage(localMsgId.inc, None, responses.toList))
+  protected def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty)
+    send(ResponseMessage(localMsgId.inc, None, responses.toList))
 
   /**
    * Sends the request message back to the client.
    */
-  protected def sendRequest(requests: DSARequest*) = send(RequestMessage(localMsgId.inc, None, requests.toList))
+  protected def sendRequests(requests: DSARequest*) = if (!requests.isEmpty)
+    send(RequestMessage(localMsgId.inc, None, requests.toList))
 
   /**
    * Sends a DSAMessage to a WebSocket connection.

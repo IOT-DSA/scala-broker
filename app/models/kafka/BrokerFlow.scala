@@ -7,10 +7,10 @@ import org.slf4j.LoggerFactory
 import com.typesafe.config.ConfigFactory
 
 import models.Settings
-import models.actors.RequestEnvelope
 import play.api.Configuration
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.processor.ProcessorContext
+import models.RequestEnvelope
 
 object BrokerFlow extends App {
   val settings = new Settings(new Configuration(ConfigFactory.load))
@@ -45,7 +45,7 @@ object BrokerFlow extends App {
    * creates request flow
    */
   private def createRequestFlow(builder: KStreamBuilder) = {
-    val input = builder.newStream[String, KafkaRequestEnvelope](Kafka.Topics.ReqEnvelopeIn)
+    val input = builder.newStream[String, RequestEnvelope](Kafka.Topics.ReqEnvelopeIn)
     val output = input.transform(RequestHandler, "RidGenerator", "SidGenerator")
     output.materialize(Kafka.Topics.ReqEnvelopeOut)
   }

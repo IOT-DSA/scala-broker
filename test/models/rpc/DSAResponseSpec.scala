@@ -1,11 +1,9 @@
-package models
+package models.rpc
 
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatestplus.play.PlaySpec
-
 import play.api.libs.json._
 import play.api.libs.json.Json._
-import collection.immutable.{ List => ScalaList }
 
 /**
  * DSAResponse test suite.
