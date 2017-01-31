@@ -29,7 +29,7 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       routeRequests(requests)
     case e @ ResponseEnvelope(from, to, responses) =>
       log.debug(s"$ownId: received $e")
-      sendResponse(responses: _*)
+      sendResponses(responses: _*)
   }
 
   /**

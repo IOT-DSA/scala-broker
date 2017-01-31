@@ -10,7 +10,7 @@ import com.typesafe.config.Config
 import akka.actor.{ Actor, ActorRef }
 import cakesolutions.kafka.{ KafkaProducer, KafkaProducerRecord }
 import models.{ MessageRouter, RequestEnvelope }
-import models.rpc.DSARequest
+import models.rpc.{ DSARequest, DSAResponse }
 
 /**
  * Kafka-based implementation of the router. It uses the target as the key when posting message
@@ -25,12 +25,20 @@ class KafkaRouter(brokerUrl: String, config: Config, requestTopic: String) exten
   /**
    * Posts the request as a single message using target as the message key.
    */
-  def routeRequests(source: String, target: String,
+  def routeRequests(from: String, to: String,
                     requests: DSARequest*)(implicit sender: ActorRef = Actor.noSender) = Try {
-    val envelope = RequestEnvelope(source, target, requests)
-    log.trace(s"Posting $envelope from [$source] to [$target] via topic $requestTopic")
-    val record = KafkaProducerRecord(requestTopic, target, envelope)
+    val envelope = RequestEnvelope(from, to, requests)
+    log.trace(s"Posting $envelope from [$from] to [$to] via topic $requestTopic")
+    val record = KafkaProducerRecord(requestTopic, to, envelope)
     reqProducer.send(record)
+  }
+
+  /**
+   * Posts the request as a single message using target as the message key.
+   */
+  def routeResponses(from: String, to: String,
+                     responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) = Try {
+    ???
   }
 
   /**

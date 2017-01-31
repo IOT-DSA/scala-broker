@@ -1,6 +1,6 @@
 package models.actors
 
-import akka.actor.ActorRef
+import models.Origin
 import models.rpc.DSAResponse
 
 /**
@@ -22,11 +22,6 @@ class IntCounter(init: Int = 0) {
     result
   }
 }
-
-/**
- * Used in call records to store the subscribers for future responses.
- */
-case class Origin(source: ActorRef, sourceId: Int)
 
 /**
  * Encapsulates information about requests's subscribers and last received response.
@@ -88,4 +83,6 @@ class CallRegistry(nextId: Int = 1) {
     record.path foreach callsByPath.remove
     callsByTargetId.remove(record.targetId)
   }
+
+  def info = s"Origin Lookups: ${callsByOrigin.size}, Target Lookups: ${callsByTargetId.size} Path Lookups: ${callsByPath.size}"
 }

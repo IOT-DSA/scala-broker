@@ -73,12 +73,14 @@ abstract class AbstractWebSocketActor(out: ActorRef, config: WebSocketActorConfi
   /**
    * Sends the response message to the client.
    */
-  protected def sendResponse(responses: DSAResponse*) = send(ResponseMessage(localMsgId.inc, None, responses.toList))
+  protected def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty)
+    send(ResponseMessage(localMsgId.inc, None, responses.toList))
 
   /**
    * Sends the request message back to the client.
    */
-  protected def sendRequest(requests: DSARequest*) = send(RequestMessage(localMsgId.inc, None, requests.toList))
+  protected def sendRequests(requests: DSARequest*) = if (!requests.isEmpty)
+    send(RequestMessage(localMsgId.inc, None, requests.toList))
 
   /**
    * Sends a DSAMessage to a WebSocket connection.

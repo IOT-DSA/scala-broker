@@ -50,7 +50,7 @@ case class ResponseMessage(msg: Int, ack: Option[Int] = None, responses: List[DS
    * Outputs only the first response for compact logging.
    */
   override def toString = if (responses.size < 2)
-    s"RequestMessage($msg,$ack,$responses)"
+    s"ResponseMessage($msg,$ack,$responses)"
   else
     s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more))"
 }

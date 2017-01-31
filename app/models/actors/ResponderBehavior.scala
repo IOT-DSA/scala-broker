@@ -1,18 +1,41 @@
 package models.actors
 
-import scala.util.Try
+import scala.annotation.migration
 import scala.util.control.NonFatal
 
-import akka.actor.{ ActorRef, actorRef2Scala }
+import models.{ MessageRouter, Origin, RequestEnvelope }
 import models.rpc._
-import models.RequestEnvelope
-import models.ResponseEnvelope
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
 trait ResponderBehavior { this: AbstractWebSocketActor =>
   import DSAValue._
+
+  /**
+   * Combines the requests that need to be dispatched to the WebSocket and
+   * responses that need to be sent back to the requester's actor.
+   */
+  case class HandlerResult(requests: Seq[DSARequest], responses: Seq[DSAResponse])
+
+  /**
+   * Factory for [[HandlerResult]] instances.
+   */
+  object HandlerResult {
+
+    val Empty = HandlerResult(Nil, Nil)
+
+    def apply(request: DSARequest): HandlerResult = apply(List(request), Nil)
+
+    def apply(response: DSAResponse): HandlerResult = apply(Nil, List(response))
+
+    def apply(request: DSARequest, response: DSAResponse): HandlerResult = apply(List(request), List(response))
+  }
+
+  type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
+
+  // for request routing
+  def router: MessageRouter
 
   // lookup registries for SID (Subscribe/Unsubscribe) and RID (all other) requests
   private val ridRegistry = new CallRegistry(1)
@@ -22,145 +45,175 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
    * Processes incoming messages from Responder DSLink and dispatches requests to it.
    */
   val responderBehavior: Receive = {
-    case e @ RequestEnvelope(from, to, requests) =>
+    case e @ RequestEnvelope(from, _, requests) =>
       log.debug(s"$ownId: received $e")
-      requests foreach handleRequest
+      processRequests(from, requests)
     case m @ ResponseMessage(msg, ack, responses) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
-      routeResponses(responses)
+      processResponses(responses)
+  }
+
+  /**
+   * Processes the requests: forwards appropriate messages to the WebSocket and routes the responses
+   * back to the originator.
+   */
+  private def processRequests(from: String, requests: Seq[DSARequest]) = {
+    val handler = handleListRequest orElse handlePassthroughRequest orElse
+      handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
+
+    val results = requests map (request => try {
+      handler(Tuple2(from, request))
+    } catch {
+      case NonFatal(e) =>
+        log.error(s"$ownId: error handling request $request - {}", e)
+        HandlerResult.Empty
+    })
+
+    log.debug("RID lookups: " + ridRegistry.info)
+    log.debug("SID lookups: " + sidRegistry.info)
+
+    sendRequests(results.flatMap(_.requests): _*)
+
+    router.routeResponses(connInfo.linkPath, from, results.flatMap(_.responses): _*) recover {
+      case NonFatal(e) => log.error(s"$ownId: error routing the response {}", e)
+    }
+  }
+
+  /**
+   * Processes the responses and routes them to their destinations.
+   */
+  private def processResponses(responses: Iterable[DSAResponse]) = {
+
+    val handler = routeSubscribeResponse orElse routeNonSubscribeResponse
+
+    val results = responses flatMap handler
+
+    log.debug("RID lookups: " + ridRegistry.info)
+    log.debug("SID lookups: " + sidRegistry.info)
+
+    results groupBy (_._1) mapValues (_.map(_._2)) foreach {
+      case (to, rsps) => router.routeResponses(connInfo.linkPath, to, rsps.toSeq: _*) recover {
+        case NonFatal(e) => log.error(s"$ownId: error routing the response {}", e)
+      }
+    }
   }
 
   /**
    * Handles List request.
    */
-  private val handleListRequest: PartialFunction[DSARequest, Unit] = {
-    case ListRequest(rid, path) =>
-      val origin = Origin(sender, rid)
+  private val handleListRequest: RequestHandler = {
+    case (from, ListRequest(rid, path)) =>
+      val origin = Origin(from, rid)
       ridRegistry.lookupByPath(path) match {
         case None =>
-          val targetRid = ridRegistry.saveLookup(origin, Some(path), None)
-          sendRequest(ListRequest(targetRid, translatePath(path)))
+          val targetRid = ridRegistry.saveLookup(origin, Some(path))
+          HandlerResult(ListRequest(targetRid, translatePath(path)))
         case Some(rec) =>
           ridRegistry.addOrigin(origin, rec)
-          rec.lastResponse foreach { rsp =>
-            val envelope = ResponseEnvelope(connInfo.linkPath, null, List(rsp.copy(rid = origin.sourceId)))
-            route(envelope, origin.source)
-          }
+          rec.lastResponse map { rsp =>
+            HandlerResult(rsp.copy(rid = origin.sourceId))
+          } getOrElse HandlerResult.Empty
       }
   }
 
   /**
    * Handles Set, Remove and Invoke requests.
    */
-  private val handlePassthroughRequest: PartialFunction[DSARequest, Unit] = {
-    case SetRequest(rid, path, value, permit) =>
-      val targetRid = ridRegistry.saveLookup(Origin(sender, rid), None, None)
-      sendRequest(SetRequest(targetRid, translatePath(path), value, permit))
-    case RemoveRequest(rid, path) =>
-      val targetRid = ridRegistry.saveLookup(Origin(sender, rid), None, None)
-      sendRequest(RemoveRequest(targetRid, translatePath(path)))
-    case InvokeRequest(rid, path, params, permit) =>
-      val targetRid = ridRegistry.saveLookup(Origin(sender, rid), None, None)
-      sendRequest(InvokeRequest(targetRid, translatePath(path), params, permit))
+  private val handlePassthroughRequest: RequestHandler = {
+
+    def tgtId(from: String, srcId: Int) = ridRegistry.saveLookup(Origin(from, srcId))
+
+    val pass: PartialFunction[(String, DSARequest), DSARequest] = {
+      case (from, SetRequest(rid, path, value, permit))     => SetRequest(tgtId(from, rid), translatePath(path), value, permit)
+      case (from, RemoveRequest(rid, path))                 => RemoveRequest(tgtId(from, rid), translatePath(path))
+      case (from, InvokeRequest(rid, path, params, permit)) => InvokeRequest(tgtId(from, rid), translatePath(path), params, permit)
+    }
+
+    pass andThen HandlerResult.apply
   }
 
   /**
    * Handles Subscribe request.
    */
-  private val handleSubscribeRequest: PartialFunction[DSARequest, Unit] = {
-    case req @ SubscribeRequest(rid, _) =>
-      route(ResponseEnvelope(connInfo.linkPath, null, List(DSAResponse(rid, Some(StreamState.Closed)))), sender)
+  private val handleSubscribeRequest: RequestHandler = {
+    case (from, req @ SubscribeRequest(rid, _)) =>
       val srcPath = req.path // to ensure there's only one path (see requester actor)
-      val origin = Origin(sender, srcPath.sid)
-      sidRegistry.lookupByPath(srcPath.path) match {
+      val sidOrigin = Origin(from, srcPath.sid)
+      val result = sidRegistry.lookupByPath(srcPath.path) match {
         case None =>
-          val targetSid = sidRegistry.saveLookup(origin, Some(srcPath.path), None)
+          val targetSid = sidRegistry.saveLookup(sidOrigin, Some(srcPath.path), None)
+          val targetRid = ridRegistry.saveEmpty
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = targetSid)
-          sendRequest(SubscribeRequest(ridRegistry.saveEmpty, tgtPath))
+          HandlerResult(SubscribeRequest(targetRid, tgtPath))
         case Some(rec) =>
-          sidRegistry.addOrigin(origin, rec)
-          rec.lastResponse foreach { rsp =>
-            val sourceRow = replaceSid(rsp.updates.get.head, origin.sourceId)
-            val response = DSAResponse(0, rsp.stream, Some(List(sourceRow)), rsp.columns, rsp.error)
-            route(ResponseEnvelope(connInfo.linkPath, null, List(response)), origin.source)
-          }
+          sidRegistry.addOrigin(sidOrigin, rec)
+          rec.lastResponse map { rsp =>
+            val sourceRow = replaceSid(rsp.updates.get.head, sidOrigin.sourceId)
+            val update = DSAResponse(0, rsp.stream, Some(List(sourceRow)), rsp.columns, rsp.error)
+            HandlerResult(update)
+          } getOrElse HandlerResult.Empty
       }
+      result.copy(responses = DSAResponse(rid, Some(StreamState.Closed)) +: result.responses)
   }
 
   /**
    * Handles Unsubscribe request.
    */
-  private val handleUnsubscribeRequest: PartialFunction[DSARequest, Unit] = {
-    case req @ UnsubscribeRequest(rid, _) =>
-      val origin = Origin(sender, req.sid) // to ensure there's only one sid (see requester actor)
+  private val handleUnsubscribeRequest: RequestHandler = {
+    case (from, req @ UnsubscribeRequest(rid, _)) =>
+      val origin = Origin(from, req.sid) // to ensure there's only one sid (see requester actor)
       sidRegistry.removeOrigin(origin) map { rec =>
-        if (rec.origins.isEmpty)
-          sendRequest(UnsubscribeRequest(ridRegistry.saveEmpty, rec.targetId))
-        route(ResponseEnvelope(connInfo.linkPath, null, List(DSAResponse(rid, Some(StreamState.Closed)))), sender)
-      } getOrElse
+        val wsReqs = if (rec.origins.isEmpty) {
+          sidRegistry.removeLookup(rec)
+          List(UnsubscribeRequest(ridRegistry.saveEmpty, rec.targetId))
+        }
+        else Nil
+        HandlerResult(wsReqs, List(DSAResponse(rid, Some(StreamState.Closed))))
+      } getOrElse {
         log.warning(s"$ownId: did not find the original Subscribe for SID=${req.sid}")
+        HandlerResult.Empty
+      }
   }
 
   /**
    * Handles Close request.
    */
-  private val handleCloseRequest: PartialFunction[DSARequest, Unit] = {
-    case CloseRequest(rid) =>
-      val origin = Origin(sender, rid)
+  private val handleCloseRequest: RequestHandler = {
+    case (from, CloseRequest(rid)) =>
+      val origin = Origin(from, rid)
       val record = ridRegistry.removeOrigin(origin)
       record match {
-        case None                             => log.warning(s"$ownId: did not find the original request for Close($rid)")
-        case Some(rec) if rec.origins.isEmpty => sendRequest(CloseRequest(rec.targetId))
-        case Some(rec) if rec.path.isDefined  => route(ResponseEnvelope(connInfo.linkPath, null, List(DSAResponse(rid, Some(StreamState.Closed)))), sender)
-        case _                                => // do nothing
+        case None =>
+          log.warning(s"$ownId: did not find the original request for Close($rid)")
+          HandlerResult.Empty
+        case Some(rec) =>
+          val reqs = if (rec.origins.isEmpty) List(CloseRequest(rec.targetId)) else Nil
+          val rsps = if (rec.path.isDefined) List(DSAResponse(rid, Some(StreamState.Closed))) else Nil
+          HandlerResult(reqs, rsps)
       }
   }
-
-  /**
-   * Handles a request coming from another actor.
-   */
-  private def handleRequest(request: DSARequest) = {
-    val handler = handleListRequest orElse
-      handlePassthroughRequest orElse
-      handleSubscribeRequest orElse
-      handleUnsubscribeRequest orElse
-      handleCloseRequest
-
-    try {
-      handler(request)
-    } catch {
-      case NonFatal(e) => log.error(s"$ownId: error handling request $request", e)
-    }
-  }
-
-  /**
-   * Routes multiple responses.
-   */
-  private def routeResponses(responses: Iterable[DSAResponse]) =
-    responses foreach (routeSubscribeResponse orElse routeNonSubscribeResponse)
 
   /**
    * Splits the response updates in individual row, translates each update's SID into
    * (potentially) multiple source SIDs and routes one response per source SID.
    */
-  private def routeSubscribeResponse: PartialFunction[DSAResponse, Unit] = {
+  private def routeSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
     case rsp @ DSAResponse(0, stream, updates, columns, error) =>
       val list = updates.getOrElse(Nil)
-      if (list.isEmpty)
+      if (list.isEmpty) {
         log.warning(s"Cannot find updates in Subscribe response $rsp")
-      else {
-        list.foreach { row =>
-          val targetSid = extractSid(row)
-          val rec = sidRegistry.lookupByTargetId(targetSid).get
-          rec.origins foreach { origin =>
-            val sourceRow = replaceSid(row, origin.sourceId)
-            val response = DSAResponse(0, stream, Some(List(sourceRow)), columns, error)
-            route(ResponseEnvelope(connInfo.linkPath, null, List(response)), origin.source)
-          }
-          rec.lastResponse = Some(DSAResponse(0, stream, Some(List(row)), columns, error))
-          if (stream == StreamState.Closed)
-            sidRegistry.removeLookup(rec)
+        Nil
+      } else list flatMap { row =>
+        val targetSid = extractSid(row)
+        val rec = sidRegistry.lookupByTargetId(targetSid).get
+        rec.lastResponse = Some(DSAResponse(0, stream, Some(List(row)), columns, error))
+        if (stream == Some(StreamState.Closed))
+          sidRegistry.removeLookup(rec)
+        rec.origins map { origin =>
+          val sourceRow = replaceSid(row, origin.sourceId)
+          val response = DSAResponse(0, stream, Some(List(sourceRow)), columns, error)
+          (origin.source, response)
         }
       }
   }
@@ -185,28 +238,21 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
   /**
    * Routes a non-Subscribe response.
    */
-  private val routeNonSubscribeResponse: PartialFunction[DSAResponse, Unit] = {
+  private val routeNonSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
     case response if response.rid != 0 =>
       val record = ridRegistry.lookupByTargetId(response.rid)
       record match {
-        case None => log.warning(s"$ownId: did not find the route for $response")
+        case None =>
+          log.warning(s"$ownId: did not find the route for $response")
+          Nil
         case Some(rec) =>
-          rec.origins foreach { origin =>
-            val envelope = ResponseEnvelope(connInfo.linkPath, null, List(response.copy(rid = origin.sourceId)))
-            route(envelope, origin.source)
-          }
           rec.lastResponse = Some(response)
-          if (response.stream == StreamState.Closed)
+          if (response.stream == Some(StreamState.Closed))
             ridRegistry.removeLookup(rec)
+          rec.origins map { origin =>
+            (origin.source, response.copy(rid = origin.sourceId))
+          } toSeq
       }
-  }
-
-  /**
-   * Sending the envelope to another actor.
-   */
-  private def route(envelope: ResponseEnvelope, ref: ActorRef) = {
-    log.debug(s"$ownId: routing $envelope to $ref")
-    ref ! envelope
   }
 
   /**

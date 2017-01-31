@@ -29,3 +29,8 @@ case class ResponseEnvelope(from: String, to: String, responses: Seq[DSAResponse
   else
     s"ResponseEnvelope($from,$to,List(${responses.head},...${responses.size - 1} more))"
 }
+
+/**
+ * Used in call records to store the subscribers for future responses.
+ */
+case class Origin(source: String, sourceId: Int)
