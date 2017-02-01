@@ -48,7 +48,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
     case e @ RequestEnvelope(from, _, requests) =>
       log.debug(s"$ownId: received $e")
       processRequests(from, requests)
-    case m @ ResponseMessage(msg, ack, responses) =>
+    case m @ ResponseMessage(msg, _, responses) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
       processResponses(responses)
@@ -63,11 +63,9 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
       handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
     val results = requests map (request => try {
-      handler(Tuple2(from, request))
+      handler(from -> request)
     } catch {
-      case NonFatal(e) =>
-        log.error(s"$ownId: error handling request $request - {}", e)
-        HandlerResult.Empty
+      case NonFatal(e) => log.error(s"$ownId: error handling request $request - {}", e); HandlerResult.Empty
     })
 
     log.debug("RID lookups: " + ridRegistry.info)
@@ -94,7 +92,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
 
     results groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, rsps) => router.routeResponses(connInfo.linkPath, to, rsps.toSeq: _*) recover {
-        case NonFatal(e) => log.error(s"$ownId: error routing the response {}", e)
+        case NonFatal(e) => log.error(s"$ownId: error routing the responses {}", e)
       }
     }
   }
@@ -167,8 +165,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
         val wsReqs = if (rec.origins.isEmpty) {
           sidRegistry.removeLookup(rec)
           List(UnsubscribeRequest(ridRegistry.saveEmpty, rec.targetId))
-        }
-        else Nil
+        } else Nil
         HandlerResult(wsReqs, List(DSAResponse(rid, Some(StreamState.Closed))))
       } getOrElse {
         log.warning(s"$ownId: did not find the original Subscribe for SID=${req.sid}")
@@ -188,6 +185,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
           log.warning(s"$ownId: did not find the original request for Close($rid)")
           HandlerResult.Empty
         case Some(rec) =>
+          if (rec.origins.isEmpty) ridRegistry.removeLookup(rec)
           val reqs = if (rec.origins.isEmpty) List(CloseRequest(rec.targetId)) else Nil
           val rsps = if (rec.path.isDefined) List(DSAResponse(rid, Some(StreamState.Closed))) else Nil
           HandlerResult(reqs, rsps)
