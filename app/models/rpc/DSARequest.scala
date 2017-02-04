@@ -63,6 +63,14 @@ case class SubscribeRequest(rid: Int, paths: List[SubscriptionPath]) extends DSA
   val method = Subscribe
   lazy val path = paths.head.ensuring(paths.size == 1)
   def split = paths.map(SubscribeRequest(rid, _))
+
+  /**
+   * Outputs only the first three paths for compact logging.
+   */
+  override def toString = {
+    val more = Option(paths.size - 3) filter (_ > 0) map (n => s"...$n more") getOrElse ""
+    s"SubscribeRequest($rid,List(${paths.take(3).mkString(",")}$more))"
+  }
 }
 object SubscribeRequest {
   def apply(rid: Int, paths: SubscriptionPath*): SubscribeRequest = apply(rid, paths.toList)
@@ -75,6 +83,14 @@ case class UnsubscribeRequest(rid: Int, sids: List[Int]) extends DSARequest {
   val method = Unsubscribe
   lazy val sid = sids.head.ensuring(sids.size == 1)
   def split = sids.map(UnsubscribeRequest(rid, _))
+
+  /**
+   * Outputs only the first ten sids for compact logging.
+   */
+  override def toString = {
+    val more = Option(sids.size - 10) filter (_ > 0) map (n => s"...$n more") getOrElse ""
+    s"UnsubscribeRequest($rid,List(${sids.take(10).mkString(",")}$more))"
+  }
 }
 object UnsubscribeRequest {
   def apply(rid: Int, sids: Int*): UnsubscribeRequest = apply(rid, sids.toList)

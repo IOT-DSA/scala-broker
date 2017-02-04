@@ -55,6 +55,16 @@ class DSAResponseSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
       testJson(rsp, Json.obj("rid" -> Rid, "stream" -> "initialize", "error" ->
         Json.obj("msg" -> "msg", "type" -> "type", "phase" -> "phase", "path" -> "path", "detail" -> "detail")))
     }
+    "output only first ten paths for compact logging" in {
+      val updates = List(obj("a" -> 1, "b" -> 2), obj("c" -> 3, "d" -> 4),
+        obj("e" -> 5, "f" -> 6), obj("g" -> 7, "h" -> 8))
+      DSAResponse(Rid, None, Some(updates), None, None).toString mustBe
+        "DSAResponse(123,None,Some(List(Map(a -> 1, b -> 2),Map(c -> 3, d -> 4),Map(e -> 5, f -> 6)...1 more)),None,None)"
+      DSAResponse(Rid, None, Some(updates.take(1)), None, None).toString mustBe
+        "DSAResponse(123,None,Some(List(Map(a -> 1, b -> 2))),None,None)"
+      DSAResponse(Rid, None, None, None, None).toString mustBe
+        "DSAResponse(123,None,None,None,None)"
+    }
   }
 
   private def testJson[T: Reads: Writes](req: T, js: JsValue) = {
