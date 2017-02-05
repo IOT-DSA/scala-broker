@@ -7,19 +7,18 @@ import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.kstream.{ KStream, KStreamBuilder }
 import org.apache.kafka.streams.processor.{ ProcessorContext, TopologyBuilder }
 import org.apache.kafka.streams.state.{ KeyValueStore, Stores }
+import org.slf4j.Logger
 
 import com.typesafe.config.Config
 
 import cakesolutions.kafka.KafkaProducer
-import models.kafka.KafkaRequestEnvelope
+import models.kafka.CallRecord
 import play.api.libs.json.{ Json, Reads, Writes }
 
 /**
  * Types and utility functions for Kafka.
  */
 package object kafka {
-
-  type KRE = KafkaRequestEnvelope
 
   private val utf8 = java.nio.charset.StandardCharsets.UTF_8
 
@@ -38,6 +37,18 @@ package object kafka {
   implicit val RspEnvSerde = Serdes.serdeFrom(ResponseEnvelopeSerializer, ResponseEnvelopeDeserializer)
 
   /**
+   * Origin <-> Kafka
+   */
+  implicit val OriginFormat = Json.format[Origin]
+  implicit val OriginSerde = Serdes.serdeFrom(serializer[Origin], deserializer[Origin])
+
+  /**
+   * CallRecord <-> Kafka
+   */
+  implicit val CallRecordFormat = Json.format[CallRecord]
+  implicit val CallRecordSerde = Serdes.serdeFrom(serializer[CallRecord], deserializer[CallRecord])
+
+  /**
    * String <-> Kafka
    */
   implicit val StringSerializer = new StringSerializer
@@ -53,7 +64,7 @@ package object kafka {
    * Creates a Kafka serializer for a class that already has JSON Writes defined.
    */
   def serializer[T: Writes]: Serializer[T] = new Serializer[T] {
-    override def serialize(topic: String, data: T): Array[Byte] = {
+    override def serialize(topic: String, data: T): Array[Byte] = if (data == null) null else {
       val js = Json.toJson(data)
       js.toString.getBytes(utf8)
     }
@@ -120,6 +131,10 @@ package object kafka {
    */
   implicit class RichKStream[K, V](val stream: KStream[K, V])(implicit ks: Serde[K], vs: Serde[V]) {
     def materialize(topic: String): KStream[K, V] = stream.through(ks, vs, topic)
+    def filterValues(predicate: V => Boolean) = stream.filter((_, v) => predicate(v))
+    def filterNotValues(predicate: V => Boolean) = stream.filterNot((_, v) => predicate(v))
+    def extractKey[K1](f: V => K1) = stream.selectKey((_, v) => f(v))
+    def debug(log: Logger, name: String) = stream.foreach { (k, v) => log.debug(s"[$name]: $k -> $v") }
   }
 
   /**

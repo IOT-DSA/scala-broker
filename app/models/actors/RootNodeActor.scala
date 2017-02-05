@@ -80,7 +80,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
    * Handles broker requests.
    */
   def receive = {
-    case env @ RequestEnvelope(from, to, reqs) => Try {
+    case env @ RequestEnvelope(from, to, _, reqs) => Try {
       log.debug(s"Received $env")
       val responses = reqs map processDSARequest
       val target = cache.get[ActorRef](from).get

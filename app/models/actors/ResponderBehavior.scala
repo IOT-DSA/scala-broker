@@ -1,36 +1,14 @@
 package models.actors
 
-import scala.annotation.migration
 import scala.util.control.NonFatal
 
-import models.{ MessageRouter, Origin, RequestEnvelope }
+import models.{ HandlerResult, MessageRouter, Origin, RequestEnvelope }
 import models.rpc._
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
 trait ResponderBehavior { this: AbstractWebSocketActor =>
-  import DSAValue._
-
-  /**
-   * Combines the requests that need to be dispatched to the WebSocket and
-   * responses that need to be sent back to the requester's actor.
-   */
-  case class HandlerResult(requests: Seq[DSARequest], responses: Seq[DSAResponse])
-
-  /**
-   * Factory for [[HandlerResult]] instances.
-   */
-  object HandlerResult {
-
-    val Empty = HandlerResult(Nil, Nil)
-
-    def apply(request: DSARequest): HandlerResult = apply(List(request), Nil)
-
-    def apply(response: DSAResponse): HandlerResult = apply(Nil, List(response))
-
-    def apply(request: DSARequest, response: DSAResponse): HandlerResult = apply(List(request), List(response))
-  }
 
   type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
 
@@ -45,9 +23,12 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
    * Processes incoming messages from Responder DSLink and dispatches requests to it.
    */
   val responderBehavior: Receive = {
-    case e @ RequestEnvelope(from, _, requests) =>
-      log.debug(s"$ownId: received $e")
+    case e @ RequestEnvelope(from, _, false, requests) =>
+      log.debug(s"$ownId: received unconfirmed $e")
       processRequests(from, requests)
+    case e @ RequestEnvelope(_, _, true, requests) =>
+      log.debug(s"$ownId: received confirmed $e")
+      sendRequests(requests: _*)
     case m @ ResponseMessage(msg, _, responses) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
@@ -73,7 +54,7 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
 
     sendRequests(results.flatMap(_.requests): _*)
 
-    router.routeResponses(connInfo.linkPath, from, results.flatMap(_.responses): _*) recover {
+    router.routeHandledResponses(connInfo.linkPath, from, results.flatMap(_.responses): _*) recover {
       case NonFatal(e) => log.error(s"$ownId: error routing the response {}", e)
     }
   }
@@ -81,21 +62,23 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
   /**
    * Processes the responses and routes them to their destinations.
    */
-  private def processResponses(responses: Iterable[DSAResponse]) = {
+  private def processResponses(responses: Iterable[DSAResponse]) =
+    if (router.delegateResponseHandling)
+      router.routeUnhandledResponses(connInfo.linkPath, responses.toSeq: _*)
+    else {
+      val handler = handleSubscribeResponse orElse handleNonSubscribeResponse
 
-    val handler = routeSubscribeResponse orElse routeNonSubscribeResponse
+      val results = responses flatMap handler
 
-    val results = responses flatMap handler
+      log.debug("RID lookups: " + ridRegistry.info)
+      log.debug("SID lookups: " + sidRegistry.info)
 
-    log.debug("RID lookups: " + ridRegistry.info)
-    log.debug("SID lookups: " + sidRegistry.info)
-
-    results groupBy (_._1) mapValues (_.map(_._2)) foreach {
-      case (to, rsps) => router.routeResponses(connInfo.linkPath, to, rsps.toSeq: _*) recover {
-        case NonFatal(e) => log.error(s"$ownId: error routing the responses {}", e)
+      results groupBy (_._1) mapValues (_.map(_._2)) foreach {
+        case (to, rsps) => router.routeHandledResponses(connInfo.linkPath, to, rsps.toSeq: _*) recover {
+          case NonFatal(e) => log.error(s"$ownId: error routing the responses {}", e)
+        }
       }
     }
-  }
 
   /**
    * Handles List request.
@@ -194,9 +177,9 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
 
   /**
    * Splits the response updates in individual row, translates each update's SID into
-   * (potentially) multiple source SIDs and routes one response per source SID.
+   * (potentially) multiple source SIDs and creates one response per source SID.
    */
-  private def routeSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
+  private def handleSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
     case rsp @ DSAResponse(0, stream, updates, columns, error) =>
       val list = updates.getOrElse(Nil)
       if (list.isEmpty) {
@@ -217,26 +200,9 @@ trait ResponderBehavior { this: AbstractWebSocketActor =>
   }
 
   /**
-   * Extracts SID from an update row.
+   * Handles a non-Subscribe response.
    */
-  private val extractSid: PartialFunction[DSAVal, Int] = {
-    case v: ArrayValue => v.value.head.asInstanceOf[NumericValue].value.intValue
-    case v: MapValue   => v.value("sid").asInstanceOf[NumericValue].value.intValue
-  }
-
-  /**
-   * Replaces SID in an update row.
-   */
-  private def replaceSid(row: DSAVal, sid: Int) = row match {
-    case v: ArrayValue => ArrayValue(sid :: v.value.tail.toList)
-    case v: MapValue   => MapValue(v.value + ("sid" -> sid))
-    case v             => v
-  }
-
-  /**
-   * Routes a non-Subscribe response.
-   */
-  private val routeNonSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
+  private val handleNonSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
     case response if response.rid != 0 =>
       val record = ridRegistry.lookupByTargetId(response.rid)
       record match {

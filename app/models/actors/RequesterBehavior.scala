@@ -52,7 +52,7 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
     })
 
     results groupBy (_._1) mapValues (_.map(_._2)) foreach {
-      case (to, reqs) => router.routeRequests(connInfo.linkPath, to, reqs.toSeq: _*) recover {
+      case (to, reqs) => router.routeRequests(connInfo.linkPath, to, false, reqs.toSeq: _*) recover {
         case NonFatal(e) => log.error(s"$ownId: error routing the requests {}", e)
       }
     }

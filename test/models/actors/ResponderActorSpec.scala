@@ -35,7 +35,7 @@ class ResponderActorSpec extends TestKit(ActorSystem()) with WordSpecLike with M
       expectMsg(PingMessage(1, Some(101)))
     }
     "route requests to socket" in {
-      rspActor ! RequestEnvelope("", "", List(InvokeRequest(102, "/downstream/link/abc")))
+      rspActor ! RequestEnvelope("", "", false, List(InvokeRequest(102, "/downstream/link/abc")))
       expectMsg(RequestMessage(2, None, List(InvokeRequest(1, "/abc"))))
     }
   }

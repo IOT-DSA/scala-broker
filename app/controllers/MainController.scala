@@ -17,6 +17,8 @@ import play.api.libs.json.{ JsError, JsValue, Json, Reads, Writes }
 import play.api.libs.streams.ActorFlow
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer
+import models.kafka.KafkaReader
+import play.api.inject.ApplicationLifecycle
 
 /**
  * DSA Client-Broker connection request.
@@ -29,17 +31,21 @@ case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponde
  */
 @Singleton
 class MainController @Inject() (implicit settings: Settings, actorSystem: ActorSystem,
-                                materializer: Materializer, cache: CacheApi) extends Controller {
-  import settings._
+                                materializer: Materializer, cache: CacheApi,
+                                life: ApplicationLifecycle) extends Controller {
+  import settings.Kafka._
 
   private val log = Logger(getClass)
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
-  private val router = if (settings.Kafka.Enabled)
-    new KafkaRouter(Kafka.BrokerUrl, Kafka.Producer, Kafka.Topics.ReqEnvelopeIn)
-  else
-    new AkkaRouter(cache)
+  private val router = createRouter
+
+  if (settings.Kafka.Enabled) {
+    val kr = new KafkaReader(cache, settings)
+    life.addStopHook(() => Future.successful { kr.stop; router.close })
+    kr.start
+  }
 
   // initialize main actors
   actorSystem.actorOf(RootNodeActor.props(settings, cache), "rootNode")
@@ -139,4 +145,12 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
     val linkName = dsId.substring(0, dsId.length - 44)
     settings.Paths.Downstream + "/" + linkName
   }
+
+  /**
+   * Depending on the settings, creates either Akka router or Kafka router.
+   */
+  private def createRouter = if (settings.Kafka.Enabled)
+    new KafkaRouter(BrokerUrl, Producer, Topics.ReqEnvelopeIn, Topics.RspEnvelopeIn)
+  else
+    new AkkaRouter(cache)
 }
