@@ -1,6 +1,5 @@
 package models.actors
 
-import scala.util.Try
 import scala.util.control.NonFatal
 
 import models.{ MessageRouter, ResponseEnvelope }
@@ -10,14 +9,15 @@ import models.rpc._
  * Handles communication with a remote DSLink in Requester mode.
  */
 trait RequesterBehavior { this: AbstractWebSocketActor =>
-  import settings._
-  
+
   // for request routing
   def router: MessageRouter
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
   private val targetsBySid = collection.mutable.Map.empty[Int, String]
+
+  private val resolveLink = resolveLinkPath(settings) _
 
   /**
    * Processes incoming messages from Requester DSLink and dispatches responses to it.
@@ -43,19 +43,19 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       case req @ _                 => req :: Nil
     }
 
-    requests flatMap splitRequest foreach routeRequest
-  }
+    val results = requests flatMap splitRequest flatMap (request => try {
+      val target = resolveTarget(request)
+      cacheRequestTarget(request, target)
+      List(target -> request)
+    } catch {
+      case NonFatal(e) => log.error(s"$ownId: RID/SID not found for $request"); Nil
+    })
 
-  /**
-   * Routes a single request to its destination.
-   */
-  private def routeRequest(request: DSARequest) = resolveTarget(request) flatMap { target =>
-    cacheRequestTarget(request, target)
-    log.debug(s"$ownId: routing $request to [$target]")
-    router.routeRequests(connInfo.linkPath, target, request)
-  } recover {
-    case e: NoSuchElementException => log.error(s"$ownId: RID/SID not found for $request")
-    case NonFatal(e) => log.error(s"$ownId: cannot route $request: {}", e)
+    results groupBy (_._1) mapValues (_.map(_._2)) foreach {
+      case (to, reqs) => router.routeRequests(connInfo.linkPath, to, false, reqs.toSeq: _*) recover {
+        case NonFatal(e) => log.error(s"$ownId: error routing the requests {}", e)
+      }
+    }
   }
 
   /**
@@ -80,14 +80,14 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       case SubscribeRequest(_, paths)   => paths.head.path // assuming one path after split
     }
 
-    extractPath andThen resolveLinkPath
+    extractPath andThen resolveLink
   }
 
   /**
    * Tries to resolve the request target by path or by cached RID/SID (for Close/Unsubscribe, and
    * also removes the target from the cache after the look up).
    */
-  private def resolveTarget(request: DSARequest): Try[String] = Try {
+  private def resolveTarget(request: DSARequest) = {
 
     val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
       case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get
@@ -98,20 +98,5 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
     }
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)
-  }
-
-  /**
-   * Resolves the target link path from the request path.
-   */
-  def resolveLinkPath(path: String) = path match {
-    case r"/data(/.*)?$_"                       => Paths.Data
-    case r"/defs(/.*)?$_"                       => Paths.Defs
-    case r"/sys(/.*)?$_"                        => Paths.Sys
-    case r"/users(/.*)?$_"                      => Paths.Users
-    case "/downstream"                          => Paths.Downstream
-    case r"/downstream/(\w+)$responder(/.*)?$_" => s"/downstream/$responder"
-    case "/upstream"                            => Paths.Upstream
-    case r"/upstream/(\w+)$broker(/.*)?$_"      => s"/upstream/$broker"
-    case _                                      => path
   }
 }

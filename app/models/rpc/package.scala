@@ -199,5 +199,22 @@ package object rpc {
 
   def valueMapToJson(fields: Map[String, DSAVal]) = fields map { case (a, b) => (a -> Json.toJson(b)) }
 
-  def valueListToJson(items: Iterable[DSAVal]) = items map (Json.toJson(_))  
+  def valueListToJson(items: Iterable[DSAVal]) = items map (Json.toJson(_))
+  
+  /**
+   * Extracts SID from an update row.
+   */
+  val extractSid: PartialFunction[DSAVal, Int] = {
+    case v: ArrayValue => v.value.head.asInstanceOf[NumericValue].value.intValue
+    case v: MapValue   => v.value("sid").asInstanceOf[NumericValue].value.intValue
+  }
+
+  /**
+   * Replaces SID in an update row.
+   */
+  def replaceSid(row: DSAVal, sid: Int) = row match {
+    case v: ArrayValue => ArrayValue(sid :: v.value.tail.toList)
+    case v: MapValue   => MapValue(v.value + ("sid" -> sid))
+    case v             => v
+  }
 }

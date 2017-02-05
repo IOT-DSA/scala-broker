@@ -1,6 +1,6 @@
 package models.actors
 
-import scala.util.{ Success, Try }
+import scala.util.{ Failure, Success, Try }
 
 import org.slf4j.LoggerFactory
 
@@ -18,12 +18,17 @@ class AkkaRouter(cache: CacheApi) extends MessageRouter {
   private val log = LoggerFactory.getLogger(getClass)
 
   /**
+   * Reponses are handled by the sender.
+   */
+  val delegateResponseHandling = false
+
+  /**
    * Retrieves the target ActorRef from the cache and sends all requests as a single envelope.
    */
-  def routeRequests(from: String, to: String,
+  def routeRequests(from: String, to: String, confirmed: Boolean,
                     requests: DSARequest*)(implicit sender: ActorRef = Actor.noSender) = {
     if (!requests.isEmpty)
-      route(RequestEnvelope(from, to, requests), from, to)
+      route(RequestEnvelope(from, to, confirmed, requests), from, to)
     else
       nothingToDo
   }
@@ -31,13 +36,19 @@ class AkkaRouter(cache: CacheApi) extends MessageRouter {
   /**
    * Retrieves the target ActorRef from the cache and sends all responses as a single envelope.
    */
-  def routeResponses(from: String, to: String,
-                     responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) = {
+  def routeHandledResponses(from: String, to: String,
+                            responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) = {
     if (!responses.isEmpty)
       route(ResponseEnvelope(from, to, responses), from, to)
     else
       nothingToDo
   }
+
+  /**
+   * Raises an error, since Akka router should only send handled response.
+   */
+  def routeUnhandledResponses(from: String, responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) =
+    Failure(new UnsupportedOperationException("AkkaRouter should only route handled responses"))
 
   /**
    * Resolves the `to` actor and sends the message to its mailbox.
@@ -49,4 +60,9 @@ class AkkaRouter(cache: CacheApi) extends MessageRouter {
   } recover {
     case e: NoSuchElementException => throw new IllegalArgumentException(s"Actor not found for path [$to]")
   }
+
+  /**
+   * Does nothing.
+   */
+  def close() = {}
 }

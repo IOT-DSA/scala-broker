@@ -86,11 +86,34 @@ class DSARequestSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
         Json.obj("path" -> "path2", "sid" -> 2, "qos" -> 2),
         Json.obj("path" -> "path3", "sid" -> 3, "qos" -> 3))))
     }
+    "output only first three paths for compact logging" in {
+      val paths = ScalaList(SubscriptionPath("path1", 1), SubscriptionPath("path2", 2, Some(2)),
+        SubscriptionPath("path3", 3, Some(1)), SubscriptionPath("path4", 4, Some(1)),
+        SubscriptionPath("path5", 5, None))
+      SubscribeRequest(Rid, paths).toString mustBe
+        "SubscribeRequest(123,List(SubscriptionPath(path1,1,None),SubscriptionPath(path2,2,Some(2)),SubscriptionPath(path3,3,Some(1))...2 more))"
+      SubscribeRequest(Rid, paths.take(3)).toString mustBe
+        "SubscribeRequest(123,List(SubscriptionPath(path1,1,None),SubscriptionPath(path2,2,Some(2)),SubscriptionPath(path3,3,Some(1))))"
+      SubscribeRequest(Rid, paths.take(1)).toString mustBe
+        "SubscribeRequest(123,List(SubscriptionPath(path1,1,None)))"
+      SubscribeRequest(Rid, Nil).toString mustBe "SubscribeRequest(123,List())"
+    }
   }
 
   "UnsubscribeRequest" should {
     "serialize to JSON" in testJson(UnsubscribeRequest(Rid, ScalaList(1, 2, 3)),
       baseJson(Unsubscribe) ++ Json.obj("sids" -> Json.arr(1, 2, 3)))
+    "output only first ten paths for compact logging" in {
+      val sids = ScalaList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+      UnsubscribeRequest(Rid, sids).toString mustBe
+        "UnsubscribeRequest(123,List(1,2,3,4,5,6,7,8,9,10...5 more))"
+      UnsubscribeRequest(Rid, sids.take(10)).toString mustBe
+        "UnsubscribeRequest(123,List(1,2,3,4,5,6,7,8,9,10))"
+      UnsubscribeRequest(Rid, sids.take(5)).toString mustBe
+        "UnsubscribeRequest(123,List(1,2,3,4,5))"
+      UnsubscribeRequest(Rid, Nil).toString mustBe
+        "UnsubscribeRequest(123,List())"
+    }
   }
 
   "CloseRequest" should {
