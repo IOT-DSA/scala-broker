@@ -10,6 +10,11 @@ class RequesterActor(out: ActorRef, config: WebSocketActorConfig, val router: Me
     extends AbstractWebSocketActor(out, config) with RequesterBehavior {
 
   override def receive = super.receive orElse requesterBehavior
+  
+  override def postStop() = {
+    stopRequester
+    super.postStop
+  }
 }
 
 /**

@@ -8,7 +8,7 @@ import models.rpc._
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
-trait RequesterBehavior { this: AbstractWebSocketActor =>
+trait RequesterBehavior { me: AbstractWebSocketActor =>
 
   // for request routing
   def router: MessageRouter
@@ -19,6 +19,8 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
 
   private val resolveLink = resolveLinkPath(settings) _
 
+  private var lastRid: Int = 0
+
   /**
    * Processes incoming messages from Requester DSLink and dispatches responses to it.
    */
@@ -27,9 +29,20 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
       routeRequests(requests)
+      requests.lastOption foreach (req => lastRid = req.rid)
     case e @ ResponseEnvelope(from, to, responses) =>
       log.debug(s"$ownId: received $e")
       sendResponses(responses: _*)
+  }
+
+  /**
+   * Sends Unsubscribe for all open subscriptions and Close for List commands.
+   */
+  def stopRequester() = {
+    batchAndRoute(targetsByRid map { case (rid, target) => target -> CloseRequest(rid) })
+    batchAndRoute(targetsBySid.zipWithIndex map {
+      case ((sid, target), index) => target -> UnsubscribeRequest(lastRid + index + 1, sid)
+    })
   }
 
   /**
@@ -51,7 +64,14 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       case NonFatal(e) => log.error(s"$ownId: RID/SID not found for $request"); Nil
     })
 
-    results groupBy (_._1) mapValues (_.map(_._2)) foreach {
+    batchAndRoute(results)
+  }
+
+  /**
+   * Groups the requests by their target and routes each batch as one envelope.
+   */
+  private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
+    requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) => router.routeRequests(connInfo.linkPath, to, false, reqs.toSeq: _*) recover {
         case NonFatal(e) => log.error(s"$ownId: error routing the requests {}", e)
       }
