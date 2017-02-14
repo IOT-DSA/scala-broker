@@ -4,11 +4,12 @@ import scala.util.control.NonFatal
 
 import models.{ MessageRouter, ResponseEnvelope }
 import models.rpc._
+import models.rpc.DSAValue.DSAVal
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
-trait RequesterBehavior { this: AbstractWebSocketActor =>
+trait RequesterBehavior { me: AbstractWebSocketActor =>
 
   // for request routing
   def router: MessageRouter
@@ -19,6 +20,8 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
 
   private val resolveLink = resolveLinkPath(settings) _
 
+  private var lastRid: Int = 0
+
   /**
    * Processes incoming messages from Requester DSLink and dispatches responses to it.
    */
@@ -26,16 +29,27 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
     case m @ RequestMessage(msg, ack, requests) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
-      routeRequests(requests)
+      processRequests(requests)
+      requests.lastOption foreach (req => lastRid = req.rid)
     case e @ ResponseEnvelope(from, to, responses) =>
       log.debug(s"$ownId: received $e")
-      sendResponses(responses: _*)
+      processResponses(responses)
   }
 
   /**
-   * Routes multiple requests.
+   * Sends Unsubscribe for all open subscriptions and Close for List commands.
    */
-  private def routeRequests(requests: Iterable[DSARequest]) = {
+  def stopRequester() = {
+    batchAndRoute(targetsByRid map { case (rid, target) => target -> CloseRequest(rid) })
+    batchAndRoute(targetsBySid.zipWithIndex map {
+      case ((sid, target), index) => target -> UnsubscribeRequest(lastRid + index + 1, sid)
+    })
+  }
+
+  /**
+   * Processes and routes requests.
+   */
+  private def processRequests(requests: Iterable[DSARequest]) = {
 
     def splitRequest(request: DSARequest) = request match {
       case req: SubscribeRequest   => req.split
@@ -51,7 +65,37 @@ trait RequesterBehavior { this: AbstractWebSocketActor =>
       case NonFatal(e) => log.error(s"$ownId: RID/SID not found for $request"); Nil
     })
 
-    results groupBy (_._1) mapValues (_.map(_._2)) foreach {
+    log.debug(s"RID targets: ${targetsByRid.size}, SID targets: ${targetsBySid.size}")
+
+    batchAndRoute(results)
+  }
+
+  /**
+   * Sends responses to Web Socket.
+   */
+  private def processResponses(responses: Seq[DSAResponse]) = {
+
+    def cleanupSids(rows: Seq[DSAVal]) = try {
+      rows collect extractSid foreach targetsBySid.remove
+    } catch {
+      case NonFatal(e) => log.error("Subscribe response does not have a valid SID")
+    }
+
+    responses filter (_.stream == Some(StreamState.Closed)) foreach {
+      case DSAResponse(0, _, Some(updates), _, _)   => cleanupSids(updates)
+      case DSAResponse(rid, _, _, _, _) if rid != 0 => targetsByRid.remove(rid)
+    }
+
+    log.debug(s"RID targets: ${targetsByRid.size}, SID targets: ${targetsBySid.size}")
+
+    sendResponses(responses: _*)
+  }
+
+  /**
+   * Groups the requests by their target and routes each batch as one envelope.
+   */
+  private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
+    requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) => router.routeRequests(connInfo.linkPath, to, false, reqs.toSeq: _*) recover {
         case NonFatal(e) => log.error(s"$ownId: error routing the requests {}", e)
       }

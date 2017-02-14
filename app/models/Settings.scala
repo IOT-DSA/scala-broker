@@ -56,6 +56,7 @@ class Settings @Inject() (val playConfig: Configuration) {
     private val cfg = rootConfig.getConfig("broker.kafka")
 
     val Enabled = cfg.getBoolean("enabled")
+    val RouterAutoStart = cfg.getBoolean("router.autostart")
     val ApplicationId = cfg.getString("applicationId")
     val BrokerUrl = cfg.getString("brokerUrl")
     val ZookeeperUrl = cfg.getString("zookeeperUrl")

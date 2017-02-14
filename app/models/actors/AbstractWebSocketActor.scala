@@ -39,8 +39,7 @@ abstract class AbstractWebSocketActor(out: ActorRef, config: WebSocketActorConfi
    * Cleans up after the actor stops.
    */
   override def postStop() = {
-    if (connInfo != null)
-      cache.remove(connInfo.linkPath)
+    cache.remove(connInfo.linkPath)
     log.info(s"$ownId: stopped")
   }
 
