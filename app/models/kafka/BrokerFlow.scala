@@ -10,40 +10,85 @@ import com.typesafe.config.ConfigFactory
 
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
 import play.api.Configuration
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * The request/response processor. Handles requests coming from Requester actors and responses
  * coming from Responder actors.
  */
-object BrokerFlow extends App {
+object BrokerFlow {
   val settings = new Settings(new Configuration(ConfigFactory.load))
   import settings._
 
+  val RidManager = CallRegistry("RID")
+  val SidManager = CallRegistry("SID")
+
   private val log = LoggerFactory.getLogger(getClass)
 
-  private val builder = new KStreamBuilder
+  private var _stream: Option[KafkaStreams] = None
 
-  lazy val RidManager = CallRegistry("RID")
-  lazy val SidManager = CallRegistry("SID")
+  /**
+   * Application entry point.
+   */
+  def main(args: Array[String]): Unit = {
+    start
 
-  createStores(builder)
-  createRequestFlow(builder)
-  createResponseFlow(builder)
+    println("\nPress ENTER to stop")
+    System.in.read
 
-  val stream = new KafkaStreams(builder, Kafka.Streams)
-  stream.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler {
-    def uncaughtException(thread: Thread, e: Throwable) = {
-      log.error("Exception thrown, Kafka Streams terminated", e)
+    stop
+  }
+
+  /**
+   * Returns `true` if the streaming has started, `false` otherwise.
+   */
+  def isStarted = synchronized { _stream.isDefined }
+
+  /**
+   * Creates the flows and starts streaming.
+   */
+  def start() = synchronized {
+    _stream match {
+      case None =>
+        val stream = createStreams; stream.cleanUp; _stream = Some(stream)
+        Future { stream.start }
+        log.info("Broker flow started")
+      case Some(_) => log.warn("Broker flow has already been started")
     }
-  })
-  sys.addShutdownHook(stream.close)
-  stream.cleanUp
-  stream.start
+  }
 
-  println("\nPress ENTER to continue")
-  System.in.read
+  /**
+   * Stops streaming.
+   */
+  def stop() = synchronized {
+    _stream match {
+      case Some(stream) =>
+        stream.close; _stream = None; log.info("Broker flow stopped")
+      case None => log.warn("Broker flow has not been started")
+    }
+  }
 
-  stream.close
+  /**
+   * Creates streams.
+   */
+  private def createStreams() = {
+    val builder = new KStreamBuilder
+
+    createStores(builder)
+    createRequestFlow(builder)
+    createResponseFlow(builder)
+
+    val stream = new KafkaStreams(builder, Kafka.Streams)
+    stream.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler {
+      def uncaughtException(thread: Thread, e: Throwable) = {
+        log.error("Exception thrown, Kafka Streams terminated", e)
+      }
+    })
+    sys.addShutdownHook(stream.close)
+
+    stream
+  }
 
   /**
    * creates stores

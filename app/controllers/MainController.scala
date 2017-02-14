@@ -7,7 +7,7 @@ import akka.stream.Materializer
 import javax.inject.{ Inject, Singleton }
 import models.Settings
 import models.actors._
-import models.kafka.KafkaRouter
+import models.kafka._
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
@@ -17,7 +17,6 @@ import play.api.libs.json.{ JsError, JsValue, Json, Reads, Writes }
 import play.api.libs.streams.ActorFlow
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer
-import models.kafka.KafkaReader
 import play.api.inject.ApplicationLifecycle
 
 /**
@@ -41,10 +40,15 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
 
   private val router = createRouter
 
-  if (settings.Kafka.Enabled) {
+  if (Enabled) {
     val kr = new KafkaReader(cache, settings)
     life.addStopHook(() => Future.successful { kr.stop; router.close })
     kr.start
+  }
+
+  if (Enabled && RouterAutoStart) {
+    life.addStopHook(() => Future.successful { BrokerFlow.stop })
+    BrokerFlow.start
   }
 
   // initialize main actors
