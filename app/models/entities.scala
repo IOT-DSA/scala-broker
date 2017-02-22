@@ -55,4 +55,6 @@ object HandlerResult {
   def apply(response: DSAResponse): HandlerResult = apply(Nil, List(response))
 
   def apply(request: DSARequest, response: DSAResponse): HandlerResult = apply(List(request), List(response))
+  
+  def flatten(seq: Seq[HandlerResult]): HandlerResult = apply(seq.flatMap(_.requests), seq.flatMap(_.responses))
 }
