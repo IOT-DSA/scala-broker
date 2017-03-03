@@ -2,7 +2,7 @@ package models.actors
 
 import scala.util.control.NonFatal
 
-import akka.actor.ActorLogging
+import akka.event.LoggingAdapter
 import models.{ HandlerResult, Origin }
 import models.rpc._
 
@@ -13,11 +13,12 @@ import models.rpc._
  * - for responses: returns the responses grouped by originator, so that they could be delivered to
  *                  the requesters in batches.
  */
-trait RPCProcessor { this: ActorLogging =>
+trait RPCProcessor {
 
   type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
 
   // for logging
+  protected def log: LoggingAdapter
   protected def ownId: String
 
   // for translating the request path
