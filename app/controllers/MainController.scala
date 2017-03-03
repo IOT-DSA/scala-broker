@@ -52,7 +52,7 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
   }
 
   // initialize main actors
-  actorSystem.actorOf(RootNodeActor.props(settings, cache), "rootNode")
+  actorSystem.actorOf(RootNodeActor.props(settings, cache, router), "root")
 
   /**
    * Displays the main app page.

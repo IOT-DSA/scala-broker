@@ -1,12 +1,14 @@
 package models.actors
 
 import scala.collection.JavaConverters.asScalaBufferConverter
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
 import scala.util.control.NonFatal
 
-import akka.actor.{ Actor, ActorRef, Props, actorRef2Scala }
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
-import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest, StreamState }
+import akka.actor.{ Actor, ActorRef, Props, TypedActor, actorRef2Scala }
+import models.{ MessageRouter, RequestEnvelope, ResponseEnvelope, Settings }
+import models.api.{ DSAAction, DSANode }
+import models.rpc._
 import models.rpc.DSAValue.{ BooleanValue, DSAVal, StringValue, array, obj }
 import net.sf.ehcache.Ehcache
 import play.api.Logger
@@ -15,9 +17,9 @@ import play.api.cache.{ CacheApi, EhCacheApi }
 /**
  * Services requests that need to be handled by the broker.
  */
-class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
+class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) extends Actor {
   import RootNodeActor._
-  import StreamState._
+  import models.rpc.StreamState._
 
   private val log = Logger(getClass)
 
@@ -29,6 +31,8 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
     cacheField.get(cache).asInstanceOf[Ehcache]
   }
 
+  private val dataNode = createDataNode
+
   /**
    * Registers to receive requests for multiple paths.
    */
@@ -36,7 +40,6 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
     import settings.Paths._
 
     cache.set(Root, self)
-    cache.set(Data, self)
     cache.set(Defs, self)
     cache.set(Sys, self)
     cache.set(Users, self)
@@ -50,14 +53,15 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
    * Generates node list as a response for LIST request.
    */
   private val nodesForListPath: PartialFunction[String, List[DSAVal]] = {
-    case settings.Paths.Root        => rootNodes
-    case settings.Paths.Downstream  => listDownstreamNodes
-    case settings.Paths.Upstream    => listUpstreamNodes
-    case settings.Paths.Sys         => listSysNodes
-    case settings.Paths.Defs        => listDefsNodes
-    case settings.Paths.Data        => listDataNodes
-    case settings.Paths.Users       => listUsersNodes
-    case "/defs/profile/dsa/broker" => rows(IsNode)
+    case settings.Paths.Root             => rootNodes
+    case settings.Paths.Downstream       => listDownstreamNodes
+    case settings.Paths.Upstream         => listUpstreamNodes
+    case settings.Paths.Sys              => listSysNodes
+    case settings.Paths.Defs             => listDefsNodes
+    case settings.Paths.Data             => listDataNodes
+    case settings.Paths.Users            => listUsersNodes
+    case "/defs/profile/dsa/broker"      => rows(IsNode)
+    case "/defs/profile/broker/dataRoot" => rows(IsNode)
   }
 
   /**
@@ -68,7 +72,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
       nodesForListPath andThen { rows =>
         DSAResponse(rid = rid, stream = Some(Closed), updates = Some(rows))
       } applyOrElse (path, (path: String) => {
-        log.error(s"Invalid path specified: path")
+        log.error(s"Invalid path specified: $path")
         DSAResponse(rid = rid, error = Some(DSAError(msg = Some(s"Invalid path: $path"))))
       })
     case req @ _ =>
@@ -95,7 +99,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
    * Static response for LIST / request.
    */
   private val rootNodes = {
-    val config = rows("$is" -> "dsa/broker", "$downstream" -> settings.Paths.Downstream)
+    val config = rows(is("dsa/broker"), "$downstream" -> settings.Paths.Downstream)
     val children = rows(
       "defs" -> obj(IsNode),
       "data" -> obj("$is" -> "broker/dataRoot"),
@@ -141,7 +145,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
   /**
    * Generates response for LIST /data request.
    */
-  private def listDataNodes = rows(IsNode)
+  private def listDataNodes = rows(is("broker/dataRoot"))
 
   /**
    * Generates response for LIST /users request.
@@ -149,19 +153,58 @@ class RootNodeActor(settings: Settings, cache: CacheApi) extends Actor {
   private def listUsersNodes = rows(IsNode)
 
   /**
-   * Builds a list of rows, each containing two values.
+   * Creates a /data node.
    */
-  private def rows(pairs: (String, DSAVal)*) = pairs map {
-    case (key, value) => array(key, value)
-  } toList
+  private def createDataNode() = {
+    val dataNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "data")
+    dataNode.profile = "broker/dataRoot"
+
+    dataNode.addChild("add") foreach { node =>
+      node.action = AddChild
+      node.displayName = "Add Child"
+    }
+
+    dataNode
+  }
 }
 
 /**
  * Provides contants and factory methods.
  */
 object RootNodeActor {
+  import models.api.DSAValueType._
 
-  val IsNode = "$is" -> StringValue("node")
+  val IsNode = is("node")
 
-  def props(settings: Settings, cache: CacheApi) = Props(new RootNodeActor(settings, cache))
+  def is(str: String): (String, StringValue) = "$is" -> StringValue(str)
+
+  /**
+   * Builds a list of rows, each containing two values.
+   */
+  def rows(pairs: (String, DSAVal)*) = pairs map {
+    case (key, value) => array(key, value)
+  } toList
+
+  /**
+   * Creates an instance of RootNodeActor.
+   */
+  def props(settings: Settings, cache: CacheApi, router: MessageRouter) = Props(new RootNodeActor(settings, cache, router))
+
+  // common actions
+
+  /**
+   * Add child to the node.
+   */
+  val AddChild: DSAAction = DSAAction(ctx => {
+    val parent = ctx.node.parent.get
+    val name = ctx.args("name").value.toString
+
+    parent.addChild(name) foreach { node =>
+      node.profile = "broker/dataNode"
+      node.addChild("add") foreach { a =>
+        a.action = AddChild
+        a.displayName = "Add Child"
+      }
+    }
+  }, "name" -> DSAString)
 }
