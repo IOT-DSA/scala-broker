@@ -62,6 +62,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
     case settings.Paths.Users            => listUsersNodes
     case "/defs/profile/dsa/broker"      => rows(IsNode)
     case "/defs/profile/broker/dataRoot" => rows(IsNode)
+    case "/defs/profile/broker/dataNode" => rows(IsNode)
   }
 
   /**
@@ -158,12 +159,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
   private def createDataNode() = {
     val dataNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "data")
     dataNode.profile = "broker/dataRoot"
-
-    dataNode.addChild("add") foreach { node =>
-      node.action = AddChild
-      node.displayName = "Add Child"
-    }
-
+    StandardActions.bindDataRootActions(dataNode)
     dataNode
   }
 }
@@ -189,22 +185,4 @@ object RootNodeActor {
    * Creates an instance of RootNodeActor.
    */
   def props(settings: Settings, cache: CacheApi, router: MessageRouter) = Props(new RootNodeActor(settings, cache, router))
-
-  // common actions
-
-  /**
-   * Add child to the node.
-   */
-  val AddChild: DSAAction = DSAAction(ctx => {
-    val parent = ctx.node.parent.get
-    val name = ctx.args("name").value.toString
-
-    parent.addChild(name) foreach { node =>
-      node.profile = "broker/dataNode"
-      node.addChild("add") foreach { a =>
-        a.action = AddChild
-        a.displayName = "Add Child"
-      }
-    }
-  }, "name" -> DSAString)
 }
