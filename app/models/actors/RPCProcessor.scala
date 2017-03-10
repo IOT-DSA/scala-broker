@@ -14,6 +14,7 @@ import models.rpc._
  *                  the requesters in batches.
  */
 trait RPCProcessor {
+  import RPCProcessor._
 
   type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
 
@@ -88,9 +89,21 @@ trait RPCProcessor {
     def tgtId(from: String, srcId: Int) = ridRegistry.saveLookup(Origin(from, srcId))
 
     val pass: PartialFunction[(String, DSARequest), DSARequest] = {
-      case (from, SetRequest(rid, path, value, permit))     => SetRequest(tgtId(from, rid), translatePath(path), value, permit)
-      case (from, RemoveRequest(rid, path))                 => RemoveRequest(tgtId(from, rid), translatePath(path))
-      case (from, InvokeRequest(rid, path, params, permit)) => InvokeRequest(tgtId(from, rid), translatePath(path), params, permit)
+      case (from, SetRequest(rid, path, value, permit)) =>
+        SetRequest(tgtId(from, rid), translatePath(path), value, permit)
+      case (from, RemoveRequest(rid, path)) =>
+        RemoveRequest(tgtId(from, rid), translatePath(path))
+      case (from, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + AddAttributeAction) =>
+        val attrName = params("name").value.toString
+        val attrPath = path.dropRight(AddAttributeAction.size) + attrName
+        val attrValue = params("value")
+        SetRequest(tgtId(from, rid), translatePath(attrPath), attrValue, permit)
+      case (from, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + SetValueAction) =>
+        val attrPath = path.dropRight(SetValueAction.size + 1)
+        val attrValue = params("value")
+        SetRequest(tgtId(from, rid), translatePath(attrPath), attrValue, permit)
+      case (from, InvokeRequest(rid, path, params, permit)) =>
+        InvokeRequest(tgtId(from, rid), translatePath(path), params, permit)
     }
 
     pass andThen HandlerResult.apply
@@ -208,4 +221,12 @@ trait RPCProcessor {
     val chopped = path.drop(ownPath.size)
     if (chopped.isEmpty) "/" else chopped
   }
+}
+
+/**
+ * Contains constants and helper functions for RPCProcessor.
+ */
+object RPCProcessor {
+  val AddAttributeAction = "addAttribute"
+  val SetValueAction = "setValue"
 }

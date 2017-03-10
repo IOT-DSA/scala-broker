@@ -20,6 +20,9 @@ object StandardActions {
   def bindDataNodeActions(node: DSANode) = bindActions(node,
     ("addNode", "Add Node", AddNode),
     ("addValue", "Add Value", AddValue),
+    ("setValue", "Set Value", SetValue),
+    ("setAttribute", "Set Attribute", SetAttribute),
+    ("setConfig", "Set Config", SetConfig),
     ("deleteNode", "Delete Node", DeleteNode))
 
   /**
@@ -59,6 +62,38 @@ object StandardActions {
       bindDataNodeActions(node)
     }
   }, "name" -> DSAString, "type" -> DSAString)
+
+  /**
+   * Sets the node value.
+   */
+  val SetValue: DSAAction = DSAAction(ctx => {
+    val node = ctx.node.parent.get
+    val value = ctx.args("value")
+
+    node.value = value
+  }, "value" -> DSADynamic)
+
+  /**
+   * Sets a node attibute.
+   */
+  val SetAttribute: DSAAction = DSAAction(ctx => {
+    val node = ctx.node.parent.get
+    val name = ctx.args("name").value.toString
+    val value = ctx.args("value")
+
+    node.addAttributes(name -> value)
+  }, "name" -> DSAString, "value" -> DSADynamic)
+  
+  /**
+   * Sets a node config.
+   */
+  val SetConfig: DSAAction = DSAAction(ctx => {
+    val node = ctx.node.parent.get
+    val name = ctx.args("name").value.toString
+    val value = ctx.args("value")
+
+    node.addConfigs(name -> value)
+  }, "name" -> DSAString, "value" -> DSADynamic)
 
   /**
    * Deletes node.

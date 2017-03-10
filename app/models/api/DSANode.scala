@@ -103,7 +103,10 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
   private val _configs = collection.mutable.Map.empty[String, DSAVal]
   def configs = Future.successful(_configs.toMap)
   def config(name: String) = configs map (_.get(name))
-  def addConfigs(cfg: (String, DSAVal)*) = {
+  def addConfigs(configs: (String, DSAVal)*) = {
+    val cfg = configs map {
+      case (name, value) => (if (name.startsWith("$")) name else "$" + name) -> value
+    }
     _configs ++= cfg
     log.debug(s"$ownId: added configs $cfg")
     notifyListActors(cfg map (c => array(c._1, c._2)): _*)
@@ -117,7 +120,10 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
   private val _attributes = collection.mutable.Map.empty[String, DSAVal]
   def attributes = Future.successful(_attributes.toMap)
   def attribute(name: String) = attributes map (_.get(name))
-  def addAttributes(attrs: (String, DSAVal)*) = {
+  def addAttributes(attributes: (String, DSAVal)*) = {
+    val attrs = attributes map {
+      case (name, value) => (if (name.startsWith("@")) name else "@" + name) -> value
+    }
     _attributes ++= attrs
     log.debug(s"$ownId: added attributes $attrs")
     notifyListActors(attrs map (a => array(a._1, a._2)): _*)
@@ -131,7 +137,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
   private val _children = collection.mutable.Map.empty[String, DSANode]
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
-  def addChild(name: String) = {
+  def addChild(name: String) = synchronized {
     val props = DSANode.props(router, cache, Some(this))
     val child = TypedActor(TypedActor.context).typedActorOf(props, name)
     _children += name -> child
