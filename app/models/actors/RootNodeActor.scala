@@ -32,6 +32,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
   }
 
   private val dataNode = createDataNode
+  private val defsNode = createDefsNode
 
   /**
    * Registers to receive requests for multiple paths.
@@ -40,7 +41,6 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
     import settings.Paths._
 
     cache.set(Root, self)
-    cache.set(Defs, self)
     cache.set(Sys, self)
     cache.set(Users, self)
     cache.set(Downstream, self)
@@ -53,16 +53,12 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
    * Generates node list as a response for LIST request.
    */
   private val nodesForListPath: PartialFunction[String, List[DSAVal]] = {
-    case settings.Paths.Root             => rootNodes
-    case settings.Paths.Downstream       => listDownstreamNodes
-    case settings.Paths.Upstream         => listUpstreamNodes
-    case settings.Paths.Sys              => listSysNodes
-    case settings.Paths.Defs             => listDefsNodes
-    case settings.Paths.Data             => listDataNodes
-    case settings.Paths.Users            => listUsersNodes
-    case "/defs/profile/dsa/broker"      => rows(IsNode)
-    case "/defs/profile/broker/dataRoot" => rows(IsNode)
-    case "/defs/profile/broker/dataNode" => rows(IsNode)
+    case settings.Paths.Root        => rootNodes
+    case settings.Paths.Downstream  => listDownstreamNodes
+    case settings.Paths.Upstream    => listUpstreamNodes
+    case settings.Paths.Sys         => listSysNodes
+    case settings.Paths.Users       => listUsersNodes
+    case "/defs/profile/dsa/broker" => rows(IsNode)
   }
 
   /**
@@ -139,16 +135,6 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
   private def listSysNodes = rows(IsNode)
 
   /**
-   * Generates response for LIST /defs request.
-   */
-  private def listDefsNodes = rows(IsNode)
-
-  /**
-   * Generates response for LIST /data request.
-   */
-  private def listDataNodes = rows(is("broker/dataRoot"))
-
-  /**
    * Generates response for LIST /users request.
    */
   private def listUsersNodes = rows(IsNode)
@@ -156,11 +142,32 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
   /**
    * Creates a /data node.
    */
-  private def createDataNode() = {
+  private def createDataNode = {
     val dataNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "data")
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode
+  }
+
+  /**
+   * Creates a /defs node hierarchy.
+   */
+  private def createDefsNode = {
+    val defsNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "defs")
+    defsNode.profile = "node"
+    defsNode.addChild("profile").foreach { node =>
+      node.profile = "static"
+      node.addChild("node")
+      node.addChild("static")
+      node.addChild("dsa").foreach { _.addChild("broker") }
+      node.addChild("broker").foreach { node =>
+        node.addChild("userNode")
+        node.addChild("userRoot")
+        node.addChild("dataNode") foreach StandardActions.bindDataNodeActions
+        node.addChild("dataRoot") foreach StandardActions.bindDataRootActions
+      }
+    }
+    defsNode
   }
 }
 
