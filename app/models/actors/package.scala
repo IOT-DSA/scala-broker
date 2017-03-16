@@ -18,7 +18,6 @@ package object actors {
    * Resolves the target link path from the request path.
    */
   def resolveLinkPath(cfg: Settings)(path: String) = path match {
-    case r"/defs(/.*)?$_"                       => cfg.Paths.Defs
     case r"/sys(/.*)?$_"                        => cfg.Paths.Sys
     case r"/users(/.*)?$_"                      => cfg.Paths.Users
     case "/downstream"                          => cfg.Paths.Downstream

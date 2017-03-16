@@ -1,12 +1,15 @@
 package models.api
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 
+import DSAValueType.DSAValueType
 import akka.actor.{ ActorRef, TypedActor, TypedProps }
 import akka.event.Logging
 import models.{ MessageRouter, RequestEnvelope }
@@ -14,6 +17,7 @@ import models.actors.RPCProcessor
 import models.rpc._
 import models.rpc.DSAValue._
 import play.api.cache.CacheApi
+import DSAValueType._
 
 /**
  * A structural unit in Node API.
@@ -25,6 +29,9 @@ trait DSANode {
 
   def value: Future[DSAVal]
   def value_=(v: DSAVal): Unit
+
+  def valueType: Future[DSAValueType]
+  def valueType_=(vt: DSAValueType): Unit
 
   def displayName: Future[String]
   def displayName_=(name: String): Unit
@@ -84,18 +91,22 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
     notifySubscribeActors(v)
   }
 
-  private var _displayName: String = name
-  def displayName = Future.successful(_displayName)
-  def displayName_=(name: String) = _displayName = name
+  def valueType = config("$type").map(_.map(s => DSAValueType.withName(s.value.toString)).getOrElse(DSADynamic))
+  def valueType_=(vt: DSAValueType) = addConfigs("$type" -> vt.toString)
 
-  private var _profile: String = "node"
-  def profile = _profile
-  def profile_=(p: String) = _profile = p
+  def displayName = config("$name").map(_.map(_.value.toString).getOrElse(name))
+  def displayName_=(name: String) = addConfigs("$name" -> name)
+
+  def profile = Await.result(config("$is").map(_.map(_.value.toString).getOrElse("node")), Duration.Inf)
+  def profile_=(p: String) = addConfigs("$is" -> p)
 
   private val _configs = collection.mutable.Map.empty[String, DSAVal]
   def configs = Future.successful(_configs.toMap)
   def config(name: String) = configs map (_.get(name))
-  def addConfigs(cfg: (String, DSAVal)*) = {
+  def addConfigs(configs: (String, DSAVal)*) = {
+    val cfg = configs map {
+      case (name, value) => (if (name.startsWith("$")) name else "$" + name) -> value
+    }
     _configs ++= cfg
     log.debug(s"$ownId: added configs $cfg")
     notifyListActors(cfg map (c => array(c._1, c._2)): _*)
@@ -109,7 +120,10 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
   private val _attributes = collection.mutable.Map.empty[String, DSAVal]
   def attributes = Future.successful(_attributes.toMap)
   def attribute(name: String) = attributes map (_.get(name))
-  def addAttributes(attrs: (String, DSAVal)*) = {
+  def addAttributes(attributes: (String, DSAVal)*) = {
+    val attrs = attributes map {
+      case (name, value) => (if (name.startsWith("@")) name else "@" + name) -> value
+    }
     _attributes ++= attrs
     log.debug(s"$ownId: added attributes $attrs")
     notifyListActors(attrs map (a => array(a._1, a._2)): _*)
@@ -123,7 +137,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
   private val _children = collection.mutable.Map.empty[String, DSANode]
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
-  def addChild(name: String) = {
+  def addChild(name: String) = synchronized {
     val props = DSANode.props(router, cache, Some(this))
     val child = TypedActor(TypedActor.context).typedActorOf(props, name)
     _children += name -> child
@@ -239,7 +253,9 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
     case ListRequest(rid, _) =>
       val cfgUpdates = _configs map (cfg => array(cfg._1, cfg._2))
       val attrUpdates = _attributes map (attr => array(attr._1, attr._2))
-      val childUpdates = _children map (c => array(c._1, obj("$is" -> c._2.profile)))
+      val childUpdates = _children map (c => array(c._1,
+        obj("$is" -> c._2.profile, "$name" -> Await.result(c._2.displayName, Duration.Inf),
+          "$type" -> Await.result(c._2.valueType.map(_.toString), Duration.Inf))))
       val updates = Nil ++ cfgUpdates ++ attrUpdates ++ childUpdates
       TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Open), Some(updates))
 
