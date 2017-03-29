@@ -1,8 +1,8 @@
 package models
 
-import scala.util.Try
+import scala.util.{ Success, Try }
 
-import akka.actor.{ Actor, ActorRef }
+import akka.actor.ActorRef
 import models.rpc.{ DSARequest, DSAResponse }
 
 /**
@@ -10,28 +10,43 @@ import models.rpc.{ DSARequest, DSAResponse }
  */
 trait MessageRouter {
 
-  /**
-   * Indicates whether the responses are handled downstream, i.e. the sender should send
-   * unprocessed responses to the router.
-   */
-  def delegateResponseHandling: Boolean
+  protected val nothingToDo = Success({})
 
   /**
-   * Routes the requests from source to destination.
+   * Routes the requests from origin to destination. The router implementation may use various
+   * mechanisms for delivering the messages: akka routing, pushing to a Kafka topic, etc.
    */
-  def routeRequests(from: String, to: String, confirmed: Boolean,
-                    requests: DSARequest*)(implicit sender: ActorRef = Actor.noSender): Try[Unit]
+  def routeRequestEnvelope(envelope: RequestEnvelope)(implicit sender: ActorRef): Try[Unit]
 
   /**
-   * Routes pre-processed responses from source to destination.
+   * Routes the responses from origin to destination. The router implementation may use various
+   * mechanisms for delivering the messages: akka routing, pushing to a Kafka topic, etc.
    */
-  def routeHandledResponses(from: String, to: String,
-                            responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender): Try[Unit]
+  def routeResponseEnvelope(envelope: ResponseEnvelope)(implicit sender: ActorRef): Try[Unit]
 
   /**
-   * Routes unprocessed responses from source to destination.
+   * Creates a request envelope and delegates to `routeRequestEnvelope(envelope)` if the request
+   * list is not empty.
    */
-  def routeUnhandledResponses(from: String, responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender): Try[Unit]
+  def routeRequests(from: String, to: String,
+                    requests: DSARequest*)(implicit sender: ActorRef): Try[Unit] = {
+    if (!requests.isEmpty)
+      routeRequestEnvelope(RequestEnvelope(from, to, false, requests))
+    else
+      nothingToDo
+  }
+
+  /**
+   * Creates a response envelope and delegates to `routeResponseEnvelope(envelope)` if the response
+   * list is not empty.
+   */
+  def routeResponses(from: String, to: String,
+                     responses: DSAResponse*)(implicit sender: ActorRef): Try[Unit] = {
+    if (!responses.isEmpty)
+      routeResponseEnvelope(ResponseEnvelope(from, to, responses))
+    else
+      nothingToDo
+  }
 
   /**
    * Cleans up the resources.

@@ -1,16 +1,15 @@
 package models.kafka
 
-import scala.util.{ Failure, Try }
+import scala.util.Try
 
 import org.apache.kafka.common.serialization.Serializer
 import org.slf4j.LoggerFactory
 
 import com.typesafe.config.Config
 
-import akka.actor.{ Actor, ActorRef }
+import akka.actor.ActorRef
 import cakesolutions.kafka.{ KafkaProducer, KafkaProducerRecord }
 import models.{ MessageRouter, RequestEnvelope, ResponseEnvelope }
-import models.rpc.{ DSARequest, DSAResponse }
 
 /**
  * Kafka-based implementation of the router. It uses the target as the key when posting message
@@ -21,53 +20,41 @@ class KafkaRouter(brokerUrl: String, config: Config, requestTopic: String, respo
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  private val reqProducer = {
+  implicit private val reqProducer = {
     val clientId = "dsa_router_req" + hashCode
     createProducer[String, RequestEnvelope](brokerUrl, clientId, config)
   }
-  private val rspProducer = {
+  implicit private val rspProducer = {
     val clientId = "dsa_router_rsp" + hashCode
     createProducer[String, ResponseEnvelope](brokerUrl, clientId, config)
   }
 
   /**
-   * Reponses are handled by the downstream Kafka process.
+   * Posts the envelope to a Kafka topic using envelope destination as the message key.
    */
-  val delegateResponseHandling = true
+  def routeRequestEnvelope(envelope: RequestEnvelope)(implicit sender: ActorRef) =
+    route(requestTopic, envelope, envelope.to)
 
   /**
-   * Posts the requests as a single message using target as the message key.
+   * Posts the envelope to a Kafka topic using envelope origin as the message key.
    */
-  def routeRequests(from: String, to: String, confirmed: Boolean,
-                    requests: DSARequest*)(implicit sender: ActorRef = Actor.noSender) = Try {
-    val envelope = RequestEnvelope(from, to, confirmed, requests)
-    log.trace(s"Posting $envelope to topic $requestTopic")
-    val record = KafkaProducerRecord(requestTopic, to, envelope)
-    reqProducer.send(record)
-  }
+  def routeResponseEnvelope(envelope: ResponseEnvelope)(implicit sender: ActorRef) =
+    route(responseTopic, envelope, envelope.from)
 
   /**
-   * Raises an error, since Kafka router should only send unhandled response.
+   * Posts a message with the key to a Kafka topic.
    */
-  def routeHandledResponses(from: String, to: String,
-                            responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) =
-    Failure(new UnsupportedOperationException("KafkaRouter should only route handled responses"))
-
-  /**
-   * Posts the responses as a single message using target as the message key.
-   */
-  def routeUnhandledResponses(from: String, responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) = Try {
-    val to = "???"
-    val envelope = ResponseEnvelope(from, to, responses)
-    log.trace(s"Posting $envelope to topic $responseTopic")
-    val record = KafkaProducerRecord(responseTopic, from, envelope)
-    rspProducer.send(record)
-  }
+  private def route[T](topic: String, msg: T, key: String)(implicit producer: KafkaProducer[String, T]) = Try {
+    log.debug(s"Posting $msg to topic $topic under key $key")
+    val record = KafkaProducerRecord(topic, key, msg)
+    producer.send(record)
+  } map (_ => {})
 
   /**
    * Creates a new Kafka producer.
    */
-  private def createProducer[K: Serializer, V: Serializer](brokerUrl: String, clientId: String, config: Config) = {
+  private def createProducer[K: Serializer, V: Serializer](brokerUrl: String, clientId: String,
+                                                           config: Config): KafkaProducer[K, V] = {
     import org.apache.kafka.clients.producer.ProducerConfig._
 
     val kser = implicitly[Serializer[K]]

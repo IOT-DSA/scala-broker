@@ -1,68 +1,50 @@
 package models.actors
 
-import scala.util.{ Failure, Success, Try }
+import scala.util.Try
 
 import org.slf4j.LoggerFactory
 
-import akka.actor.{ Actor, ActorRef, actorRef2Scala }
+import akka.actor.{ ActorRef, actorRef2Scala }
 import models.{ MessageRouter, RequestEnvelope, ResponseEnvelope }
-import models.rpc.{ DSARequest, DSAResponse }
 import play.api.cache.CacheApi
 
 /**
- * Akka-based implementation of the router. It uses the provided cache to locate the target actor.
+ * Akka-based implementation of the router. It delivers requests between the Requester and RRProcessor
+ * and responses between Responder and RRProcessor, using the provided cache to locate the processor.
  */
 class AkkaRouter(cache: CacheApi) extends MessageRouter {
-  private val nothingToDo = Success({})
 
   private val log = LoggerFactory.getLogger(getClass)
 
   /**
-   * Reponses are handled by the sender.
+   * Sends the envelope to the `processor` actor for the envelope's destination.
+   * The lookup name of the processor actor is obtained by concatenating the destination
+   * with [[RRProcessorActor.Suffix]].
    */
-  val delegateResponseHandling = false
+  def routeRequestEnvelope(envelope: RequestEnvelope)(implicit sender: ActorRef) =
+    route(envelope, envelope.from, envelope.to + RRProcessorActor.Suffix)
 
   /**
-   * Retrieves the target ActorRef from the cache and sends all requests as a single envelope.
+   * Sends the envelope to the `processor` actor for the envelope's origin.
+   * The lookup name of the processor actor is obtained by concatenating the origin
+   * with [[RRProcessorActor.Suffix]].
    */
-  def routeRequests(from: String, to: String, confirmed: Boolean,
-                    requests: DSARequest*)(implicit sender: ActorRef = Actor.noSender) = {
-    if (!requests.isEmpty)
-      route(RequestEnvelope(from, to, confirmed, requests), from, to)
-    else
-      nothingToDo
-  }
-
-  /**
-   * Retrieves the target ActorRef from the cache and sends all responses as a single envelope.
-   */
-  def routeHandledResponses(from: String, to: String,
-                            responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) = {
-    if (!responses.isEmpty)
-      route(ResponseEnvelope(from, to, responses), from, to)
-    else
-      nothingToDo
-  }
-
-  /**
-   * Raises an error, since Akka router should only send handled response.
-   */
-  def routeUnhandledResponses(from: String, responses: DSAResponse*)(implicit sender: ActorRef = Actor.noSender) =
-    Failure(new UnsupportedOperationException("AkkaRouter should only route handled responses"))
-
-  /**
-   * Resolves the `to` actor and sends the message to its mailbox.
-   */
-  private def route(msg: Any, from: String, to: String)(implicit sender: ActorRef = Actor.noSender) = Try {
-    val ref = cache.get[ActorRef](to).get
-    log.trace(s"Sending $msg from [$from] to [$to] as actor $ref")
-    ref ! msg
-  } recover {
-    case e: NoSuchElementException => throw new IllegalArgumentException(s"Actor not found for path [$to]")
-  }
+  def routeResponseEnvelope(envelope: ResponseEnvelope)(implicit sender: ActorRef) =
+    route(envelope, envelope.from, envelope.from + RRProcessorActor.Suffix)
 
   /**
    * Does nothing.
    */
   def close() = {}
+
+  /**
+   * Routes a message resolving the target actor by the cache lookup.
+   */
+  private def route(msg: Any, from: String, to: String) = Try {
+    val ref = cache.get[ActorRef](to).get
+    log.debug(s"Sending $msg from [$from] to [$to]")
+    ref ! msg
+  } recover {
+    case e: NoSuchElementException => throw new IllegalArgumentException(s"Actor not found for [$to]", e)
+  }
 }

@@ -23,6 +23,8 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
 
   private val log = Logger(getClass)
 
+  private val processor = context.actorOf(RRProcessorActor.props("/", cache))
+
   // a hack to retrieve underlying EhCache until another cache plugin is implemented
   private val ehCache = {
     val ehCacheApiClass = cache.asInstanceOf[EhCacheApi].getClass
@@ -191,5 +193,6 @@ object RootNodeActor {
   /**
    * Creates an instance of RootNodeActor.
    */
-  def props(settings: Settings, cache: CacheApi, router: MessageRouter) = Props(new RootNodeActor(settings, cache, router))
+  def props(settings: Settings, cache: CacheApi, router: MessageRouter) =
+    Props(new RootNodeActor(settings, cache, router))
 }
