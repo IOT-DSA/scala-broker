@@ -17,7 +17,7 @@ trait ResponderBehavior { me: AbstractWebSocketActor =>
    * Processes incoming messages from Responder DSLink and dispatches requests to it.
    */
   val responderBehavior: Receive = {
-    case e @ RequestEnvelope(_, _, _, requests) =>
+    case e @ RequestEnvelope(_, _, requests) =>
       log.debug(s"$ownId: received $e")
       sendRequests(requests: _*)
 

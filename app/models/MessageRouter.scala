@@ -31,7 +31,7 @@ trait MessageRouter {
   def routeRequests(from: String, to: String,
                     requests: DSARequest*)(implicit sender: ActorRef): Try[Unit] = {
     if (!requests.isEmpty)
-      routeRequestEnvelope(RequestEnvelope(from, to, false, requests))
+      routeRequestEnvelope(RequestEnvelope(from, to, requests))
     else
       nothingToDo
   }

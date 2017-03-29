@@ -169,7 +169,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
    */
   def onReceive(message: Any, sender: ActorRef) = message match {
 
-    case e @ RequestEnvelope(_, _, _, requests) =>
+    case e @ RequestEnvelope(_, _, requests) =>
       log.info(s"$ownId: received confirmed $e")
       requests foreach handleRequest
 

@@ -42,10 +42,10 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
    * Upon processing, it delivers the messages to either the original Requester or the Responder.
    */
   def receive = {
-    case re @ RequestEnvelope(from, to, _, requests) =>
+    case re @ RequestEnvelope(from, to, requests) =>
       log.debug(s"$ownId: received $re")
       val result = processRequests(from, requests)
-      route(RequestEnvelope(from, to, false, result.requests), ownPath, to)
+      route(RequestEnvelope(from, to, result.requests), ownPath, to)
       route(ResponseEnvelope(to, from, result.responses), ownPath, from)
 
     case re @ ResponseEnvelope(from, to, responses) =>

@@ -134,7 +134,7 @@ class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String
 
     // send to WebSocket
     val wsReqs = results flatMap (_.requests)
-    val reqEnvelope = RequestEnvelope(env.from, env.to, true, wsReqs)
+    val reqEnvelope = RequestEnvelope(env.from, env.to, wsReqs)
 
     // route back to requester
     val rsps = results flatMap (_.responses)
