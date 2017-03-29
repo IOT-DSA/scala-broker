@@ -175,7 +175,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
 
     case e @ DSAResponse(rid, stream, updates, columns, error) =>
       log.info(s"$ownId: received $e")
-      router.routeResponses(path, "n/a", e)(ActorRef.noSender)
+      router.routeResponses(path, "n/a", e)
 
     case msg @ _ => log.error("Unknown message: " + msg)
   }

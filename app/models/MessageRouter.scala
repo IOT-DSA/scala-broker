@@ -2,7 +2,6 @@ package models
 
 import scala.util.{ Success, Try }
 
-import akka.actor.ActorRef
 import models.rpc.{ DSARequest, DSAResponse }
 
 /**
@@ -16,20 +15,19 @@ trait MessageRouter {
    * Routes the requests from origin to destination. The router implementation may use various
    * mechanisms for delivering the messages: akka routing, pushing to a Kafka topic, etc.
    */
-  def routeRequestEnvelope(envelope: RequestEnvelope)(implicit sender: ActorRef): Try[Unit]
+  def routeRequestEnvelope(envelope: RequestEnvelope): Try[Unit]
 
   /**
    * Routes the responses from origin to destination. The router implementation may use various
    * mechanisms for delivering the messages: akka routing, pushing to a Kafka topic, etc.
    */
-  def routeResponseEnvelope(envelope: ResponseEnvelope)(implicit sender: ActorRef): Try[Unit]
+  def routeResponseEnvelope(envelope: ResponseEnvelope): Try[Unit]
 
   /**
    * Creates a request envelope and delegates to `routeRequestEnvelope(envelope)` if the request
    * list is not empty.
    */
-  def routeRequests(from: String, to: String,
-                    requests: DSARequest*)(implicit sender: ActorRef): Try[Unit] = {
+  def routeRequests(from: String, to: String, requests: DSARequest*): Try[Unit] = {
     if (!requests.isEmpty)
       routeRequestEnvelope(RequestEnvelope(from, to, requests))
     else
@@ -40,8 +38,7 @@ trait MessageRouter {
    * Creates a response envelope and delegates to `routeResponseEnvelope(envelope)` if the response
    * list is not empty.
    */
-  def routeResponses(from: String, to: String,
-                     responses: DSAResponse*)(implicit sender: ActorRef): Try[Unit] = {
+  def routeResponses(from: String, to: String, responses: DSAResponse*): Try[Unit] = {
     if (!responses.isEmpty)
       routeResponseEnvelope(ResponseEnvelope(from, to, responses))
     else

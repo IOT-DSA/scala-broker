@@ -32,14 +32,12 @@ class KafkaRouter(brokerUrl: String, config: Config, requestTopic: String, respo
   /**
    * Posts the envelope to a Kafka topic using envelope destination as the message key.
    */
-  def routeRequestEnvelope(envelope: RequestEnvelope)(implicit sender: ActorRef) =
-    route(requestTopic, envelope, envelope.to)
+  def routeRequestEnvelope(envelope: RequestEnvelope) = route(requestTopic, envelope, envelope.to)
 
   /**
    * Posts the envelope to a Kafka topic using envelope origin as the message key.
    */
-  def routeResponseEnvelope(envelope: ResponseEnvelope)(implicit sender: ActorRef) =
-    route(responseTopic, envelope, envelope.from)
+  def routeResponseEnvelope(envelope: ResponseEnvelope) = route(responseTopic, envelope, envelope.from)
 
   /**
    * Posts a message with the key to a Kafka topic.

@@ -21,7 +21,7 @@ class AkkaRouter(cache: CacheApi) extends MessageRouter {
    * The lookup name of the processor actor is obtained by concatenating the destination
    * with [[RRProcessorActor.Suffix]].
    */
-  def routeRequestEnvelope(envelope: RequestEnvelope)(implicit sender: ActorRef) =
+  def routeRequestEnvelope(envelope: RequestEnvelope) =
     route(envelope, envelope.from, envelope.to + RRProcessorActor.Suffix)
 
   /**
@@ -29,7 +29,7 @@ class AkkaRouter(cache: CacheApi) extends MessageRouter {
    * The lookup name of the processor actor is obtained by concatenating the origin
    * with [[RRProcessorActor.Suffix]].
    */
-  def routeResponseEnvelope(envelope: ResponseEnvelope)(implicit sender: ActorRef) =
+  def routeResponseEnvelope(envelope: ResponseEnvelope) =
     route(envelope, envelope.from, envelope.from + RRProcessorActor.Suffix)
 
   /**
