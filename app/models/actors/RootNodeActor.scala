@@ -20,10 +20,11 @@ import play.api.cache.{ CacheApi, EhCacheApi }
 class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) extends Actor {
   import RootNodeActor._
   import models.rpc.StreamState._
+  import settings.Paths._
 
   private val log = Logger(getClass)
 
-  private val processor = context.actorOf(RRProcessorActor.props("/", cache))
+  private val processor = context.actorOf(RRProcessorActor.props(Root, cache))
 
   // a hack to retrieve underlying EhCache until another cache plugin is implemented
   private val ehCache = {
@@ -33,47 +34,33 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
     cacheField.get(cache).asInstanceOf[Ehcache]
   }
 
+  // create children
   private val dataNode = createDataNode
   private val defsNode = createDefsNode
+  private val usersNode = createUsersNode
+  private val sysNode = createSysNode
 
   /**
    * Registers to receive requests for multiple paths.
    */
   override def preStart() = {
-    import settings.Paths._
-
     cache.set(Root, self)
-    cache.set(Sys, self)
-    cache.set(Users, self)
-    cache.set(Downstream, self)
-    cache.set(Upstream, self)
-
     log.debug("RootNode actor initialized")
   }
 
   /**
-   * Generates node list as a response for LIST request.
-   */
-  private val nodesForListPath: PartialFunction[String, List[DSAVal]] = {
-    case settings.Paths.Root        => rootNodes
-    case settings.Paths.Downstream  => listDownstreamNodes
-    case settings.Paths.Upstream    => listUpstreamNodes
-    case settings.Paths.Sys         => listSysNodes
-    case settings.Paths.Users       => listUsersNodes
-    case "/defs/profile/dsa/broker" => rows(IsNode)
-  }
-
-  /**
-   * Processes the DSA request and returns a response.
+   * Processes the DSA request and returns a response. Currently supports only LIST command.
    */
   def processDSARequest(request: DSARequest): DSAResponse = request match {
-    case ListRequest(rid, path) =>
-      nodesForListPath andThen { rows =>
-        DSAResponse(rid = rid, stream = Some(Closed), updates = Some(rows))
-      } applyOrElse (path, (path: String) => {
-        log.error(s"Invalid path specified: $path")
-        DSAResponse(rid = rid, error = Some(DSAError(msg = Some(s"Invalid path: $path"))))
-      })
+    case ListRequest(rid, Root) =>
+      DSAResponse(rid = rid, stream = Some(Closed), updates = Some(rootNodes))
+
+    case ListRequest(rid, Downstream) =>
+      DSAResponse(rid = rid, stream = Some(Closed), updates = Some(listDownstreamNodes))
+
+    case ListRequest(rid, Upstream) =>
+      DSAResponse(rid = rid, stream = Some(Closed), updates = Some(listUpstreamNodes))
+
     case req @ _ =>
       log.warn(s"Unsupported request received: $req")
       DSAResponse(rid = req.rid, error = Some(DSAError(msg = Some("Unsupported"))))
@@ -83,31 +70,27 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
    * Handles broker requests.
    */
   def receive = {
-    case env @ RequestEnvelope(from, to, reqs) => Try {
-      log.debug(s"Received $env")
+    case env @ RequestEnvelope(_, _, reqs) =>
+      log.info(s"Received: $env")
       val responses = reqs map processDSARequest
-      val target = cache.get[ActorRef](from).get
-      target ! ResponseEnvelope(settings.Paths.Root, from, responses)
-    } recover {
-      case NonFatal(e) => log.error("Cannot send the response {}", e)
-    }
-    case msg @ _ => log.error(s"Invalid message received: $msg")
+      router.routeResponses(Root, "n/a", responses: _*) recover {
+        case NonFatal(e) => log.error(s"Error routing the responses: ${e.getMessage}")
+      }
+
+    case msg @ _ => log.error(s"Unknown message received: $msg")
   }
 
   /**
    * Static response for LIST / request.
    */
   private val rootNodes = {
-    val config = rows(is("dsa/broker"), "$downstream" -> settings.Paths.Downstream)
-    val children = rows(
-      "defs" -> obj(IsNode),
-      "data" -> obj("$is" -> "broker/dataRoot"),
-      "users" -> obj(IsNode),
-      "sys" -> obj(IsNode),
-      "upstream" -> obj(IsNode),
-      "downstream" -> obj(IsNode))
+    val config = rows(is("dsa/broker"), "$downstream" -> Downstream)
+    val children = List(defsNode, dataNode, usersNode, sysNode) map { node =>
+      array(node.name, obj(is(node.profile)))
+    }
+    val stream = rows("upstream" -> obj(IsNode), "downstream" -> obj(IsNode))
 
-    config ++ children
+    config ++ children ++ stream
   }
 
   /**
@@ -116,7 +99,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
   private def listDownstreamNodes = {
     val configs = rows(IsNode, "downstream" -> true)
 
-    val downPrefix = settings.Paths.Downstream + "/"
+    val downPrefix = Downstream + "/"
 
     val linkNames = ehCache.getKeys.asScala.toList
     val children = linkNames collect {
@@ -130,16 +113,6 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
    * Generates response for LIST /upstream request.
    */
   private def listUpstreamNodes = rows(IsNode)
-
-  /**
-   * Generates response for LIST /sys request.
-   */
-  private def listSysNodes = rows(IsNode)
-
-  /**
-   * Generates response for LIST /users request.
-   */
-  private def listUsersNodes = rows(IsNode)
 
   /**
    * Creates a /data node.
@@ -171,6 +144,24 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
     }
     defsNode
   }
+
+  /**
+   * Creates a /users node.
+   */
+  private def createUsersNode = {
+    val usersNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "users")
+    usersNode.profile = "node"
+    usersNode
+  }
+
+  /**
+   * Creates a /sys node.
+   */
+  private def createSysNode = {
+    val sysNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "sys")
+    sysNode.profile = "node"
+    sysNode
+  }
 }
 
 /**
@@ -179,8 +170,14 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
 object RootNodeActor {
   import models.api.DSAValueType._
 
+  /**
+   * A tuple for $is->"node" config.
+   */
   val IsNode = is("node")
 
+  /**
+   * Creates a tuple for `$is` config.
+   */
   def is(str: String): (String, StringValue) = "$is" -> StringValue(str)
 
   /**

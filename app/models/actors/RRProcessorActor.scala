@@ -245,7 +245,7 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
    */
   private def translatePath(path: String) = {
     val chopped = path.drop(linkPath.size)
-    if (chopped.isEmpty) "/" else chopped
+    if (!chopped.startsWith("/")) "/" + chopped else chopped
   }
 
   /**

@@ -15,6 +15,7 @@ import models.actors.RRProcessorActor
 import models.rpc._
 import models.rpc.DSAValue.{ DSAMap, DSAVal, StringValue, array, longToNumericValue, obj }
 import play.api.cache.CacheApi
+import scala.util.control.NonFatal
 
 /**
  * A structural unit in Node API.
@@ -67,8 +68,7 @@ trait DSANode {
  * DSA Node actor-based implementation.
  */
 class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSANode])
-    extends DSANode /*with RPCProcessor*/
-    with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
+    extends DSANode with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
 
   protected val log = Logging(TypedActor.context.system, getClass)
 
@@ -79,8 +79,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
 
   private val processor = TypedActor.context.actorOf(RRProcessorActor.props(path, cache))
 
-  protected def ownPath = path
-  protected def ownId = s"[$ownPath]"
+  protected def ownId = s"[$path]"
 
   private var _value: DSAVal = _
   def value = Future.successful(_value)
@@ -175,7 +174,9 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
 
     case e @ DSAResponse(rid, stream, updates, columns, error) =>
       log.info(s"$ownId: received $e")
-      router.routeResponses(path, "n/a", e)
+      router.routeResponses(path, "n/a", e) recover {
+        case NonFatal(e) => log.error(s"$ownId: error routing the responses: {}", e.getMessage)
+      }
 
     case msg @ _ => log.error("Unknown message: " + msg)
   }

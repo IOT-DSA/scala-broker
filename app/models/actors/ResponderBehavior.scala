@@ -1,5 +1,7 @@
 package models.actors
 
+import scala.util.control.NonFatal
+
 import models.{ MessageRouter, RequestEnvelope }
 import models.rpc.ResponseMessage
 
@@ -24,6 +26,8 @@ trait ResponderBehavior { me: AbstractWebSocketActor =>
     case m @ ResponseMessage(msg, _, responses) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
-      router.routeResponses(connInfo.linkPath, "n/a", responses.toSeq: _*)
+      router.routeResponses(connInfo.linkPath, "n/a", responses.toSeq: _*) recover {
+        case NonFatal(e) => log.error(s"$ownId: error routing the responses: {}", e.getMessage)
+      }
   }
 }
