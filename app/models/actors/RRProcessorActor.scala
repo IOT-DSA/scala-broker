@@ -1,33 +1,59 @@
 package models.actors
 
+import scala.util.Try
 import scala.util.control.NonFatal
 
-import akka.event.LoggingAdapter
-import models.{ HandlerResult, Origin }
+import akka.actor.{ Actor, ActorLogging, ActorRef, Props }
+import models.{ HandlerResult, Origin, RequestEnvelope, ResponseEnvelope }
 import models.rpc._
+import play.api.cache.CacheApi
 
 /**
- * Processes requests and responses:
+ * Aggregates the requests and fans out the responses. Serves as the gateway for a particular Responder
+ * to cache requests and avoid lower the load on the Responder.
+ *
  * - for requests: caches them and returns only those that need to be forwarded to the client; returns
  *                 the responses that need to be delivered to the originator, if immediately available
  * - for responses: returns the responses grouped by originator, so that they could be delivered to
  *                  the requesters in batches.
  */
-trait RPCProcessor {
-  import RPCProcessor._
+class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with ActorLogging {
+  import RRProcessorActor._
 
   type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
-
-  // for logging
-  protected def log: LoggingAdapter
-  protected def ownId: String
-
-  // for translating the request path
-  protected def ownPath: String
 
   // lookup registries for SID (Subscribe/Unsubscribe) and RID (all other) requests
   private val ridRegistry = new CallRegistry(1)
   private val sidRegistry = new CallRegistry(1)
+
+  private val ownPath = linkPath + Suffix
+  private val ownId = s"Link[$ownPath]"
+
+  /**
+   * Register the processor in the cache.
+   */
+  override def preStart() = {
+    cache.set(ownPath, self)
+    log.info(s"$ownId: responder processor initialized for $linkPath")
+  }
+
+  /**
+   * Receives requests from Requesters and responses from the associated Responder.
+   * Upon processing, it delivers the messages to either the original Requester or the Responder.
+   */
+  def receive = {
+    case re @ RequestEnvelope(from, to, requests) =>
+      log.debug(s"$ownId: received $re")
+      val result = processRequests(from, requests)
+      route(RequestEnvelope(from, to, result.requests), ownPath, to)
+      route(ResponseEnvelope(to, from, result.responses), ownPath, from)
+
+    case re @ ResponseEnvelope(from, to, responses) =>
+      log.debug(s"$ownId: received $re")
+      processResponses(responses) foreach {
+        case (to, rsps) => route(ResponseEnvelope(linkPath, to, rsps), ownPath, to)
+      }
+  }
 
   /**
    * Processes the requests and returns requests that need to be forwaded to their destinations
@@ -218,15 +244,31 @@ trait RPCProcessor {
    * Removes the linkPath prefix from the path.
    */
   private def translatePath(path: String) = {
-    val chopped = path.drop(ownPath.size)
-    if (chopped.isEmpty) "/" else chopped
+    val chopped = path.drop(linkPath.size)
+    if (!chopped.startsWith("/")) "/" + chopped else chopped
+  }
+
+  /**
+   * Routes a message resolving the target actor by the cache lookup.
+   */
+  private def route(msg: Any, from: String, to: String) = Try {
+    val ref = cache.get[ActorRef](to).get
+    log.debug(s"Sending $msg from [$from] to [$to]")
+    ref ! msg
+  } recover {
+    case e: NoSuchElementException => log.error(s"Actor not found for path [$to]")
+    case NonFatal(e)               => log.error(s"Error sending message to [$to]: {}", e.getMessage)
   }
 }
 
 /**
- * Contains constants and helper functions for RPCProcessor.
+ * Factory for [[RRProcessorActor]] instances.
  */
-object RPCProcessor {
+object RRProcessorActor {
   val AddAttributeAction = "addAttribute"
   val SetValueAction = "setValue"
+
+  val Suffix = "#processor"
+
+  def props(linkPath: String, cache: CacheApi) = Props(new RRProcessorActor(linkPath, cache))
 }

@@ -33,15 +33,13 @@ class Settings @Inject() (val playConfig: Configuration) {
    * DSA Paths.
    */
   object Paths {
-    private val cfg = rootConfig.getConfig("broker.path")
-
     val Root = "/"
-    val Data = cfg.getString("data")
-    val Defs = cfg.getString("defs")
-    val Sys = cfg.getString("sys")
-    val Users = cfg.getString("users")
-    val Downstream = cfg.getString("downstream")
-    val Upstream = cfg.getString("upstream")
+    val Data = "/data"
+    val Defs = "/defs"
+    val Sys = "/sys"
+    val Users = "/users"
+    val Downstream = "/downstream"
+    val Upstream = "/upstream"
   }
 
   /**

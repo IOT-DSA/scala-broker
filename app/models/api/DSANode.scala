@@ -1,23 +1,21 @@
 package models.api
 
-import scala.concurrent.Await
+import scala.concurrent.{ Await, Future }
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import scala.util.control.NonFatal
 
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 
-import DSAValueType.DSAValueType
+import DSAValueType.{ DSADynamic, DSAValueType }
 import akka.actor.{ ActorRef, TypedActor, TypedProps }
 import akka.event.Logging
 import models.{ MessageRouter, RequestEnvelope }
-import models.actors.RPCProcessor
+import models.actors.RRProcessorActor
 import models.rpc._
-import models.rpc.DSAValue._
+import models.rpc.DSAValue.{ DSAMap, DSAVal, StringValue, array, longToNumericValue, obj }
 import play.api.cache.CacheApi
-import DSAValueType._
+import scala.util.control.NonFatal
 
 /**
  * A structural unit in Node API.
@@ -70,8 +68,7 @@ trait DSANode {
  * DSA Node actor-based implementation.
  */
 class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSANode])
-    extends DSANode with RPCProcessor
-    with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
+    extends DSANode with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
 
   protected val log = Logging(TypedActor.context.system, getClass)
 
@@ -80,8 +77,9 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
 
   cache.set(path, TypedActor.context.self)
 
-  protected def ownPath = path
-  protected def ownId = s"[$ownPath]"
+  private val processor = TypedActor.context.actorOf(RRProcessorActor.props(path, cache))
+
+  protected def ownId = s"[$path]"
 
   private var _value: DSAVal = _
   def value = Future.successful(_value)
@@ -169,26 +167,15 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
    * Handles custom messages, that are not part of the Typed API.
    */
   def onReceive(message: Any, sender: ActorRef) = message match {
-    case e @ RequestEnvelope(from, _, false, requests) =>
-      log.debug(s"$ownId: received unconfirmed $e")
-      val result = processRequests(from, requests)
-      result.requests foreach handleRequest
-      router.routeHandledResponses(path, from, result.responses: _*) recover {
-        case NonFatal(e) => log.error(s"$ownId: error routing the response {}", e)
-      }
 
-    case e @ RequestEnvelope(_, _, true, requests) =>
+    case e @ RequestEnvelope(_, _, requests) =>
       log.info(s"$ownId: received confirmed $e")
       requests foreach handleRequest
 
     case e @ DSAResponse(rid, stream, updates, columns, error) =>
       log.info(s"$ownId: received $e")
-      if (router.delegateResponseHandling)
-        router.routeUnhandledResponses(path, e)
-      else processResponses(List(e)) foreach {
-        case (to, rsps) => router.routeHandledResponses(path, to, rsps.toSeq: _*) recover {
-          case NonFatal(e) => log.error(s"$ownId: error routing the responses {}", e)
-        }
+      router.routeResponses(path, "n/a", e) recover {
+        case NonFatal(e) => log.error(s"$ownId: error routing the responses: {}", e.getMessage)
       }
 
     case msg @ _ => log.error("Unknown message: " + msg)

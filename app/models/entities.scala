@@ -3,19 +3,17 @@ package models
 import models.rpc.{ DSARequest, DSAResponse }
 
 /**
- * Envelope for internal request routing. If `confirmed` is set to `true`, that means the
- * requests have already been processed/translated and need to delivered to the destination
- * (WebSocket) as is.
+ * Envelope for internal request routing.
  */
-case class RequestEnvelope(from: String, to: String, confirmed: Boolean, requests: Seq[DSARequest]) {
+case class RequestEnvelope(from: String, to: String, requests: Seq[DSARequest]) {
 
   /**
    * Outputs only the first request for compact logging.
    */
   override def toString = if (requests.size < 2)
-    s"RequestEnvelope($from,$to,$confirmed,$requests})"
+    s"RequestEnvelope($from,$to,$requests})"
   else
-    s"RequestEnvelope($from,$to,$confirmed,List(${requests.head},...${requests.size - 1} more))"
+    s"RequestEnvelope($from,$to,List(${requests.head},...${requests.size - 1} more))"
 }
 
 /**

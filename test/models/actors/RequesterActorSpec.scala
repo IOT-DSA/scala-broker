@@ -39,7 +39,7 @@ class RequesterActorSpec extends TestKit(ActorSystem()) with WordSpecLike with M
     "route requests to appropriate targets" in {
       reqActor ! RequestMessage(104, None, List(ListRequest(111, "/sys/abc")))
       expectMsg(PingMessage(2, Some(104)))
-      sysProbe.expectMsg(RequestEnvelope("/reqPath", "/sys", false, List(ListRequest(111, "/sys/abc"))))
+      sysProbe.expectMsg(RequestEnvelope("/reqPath", "/sys", List(ListRequest(111, "/sys/abc"))))
     }
     "route responses to socket" in {
       reqActor ! ResponseEnvelope("", "", List(DSAResponse(101, Some(StreamState.Open))))
