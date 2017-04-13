@@ -19,6 +19,7 @@ import play.api.cache.CacheApi
  */
 class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with ActorLogging {
   import RRProcessorActor._
+  import DSAValue.{ DSAVal, array }
 
   type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
 
@@ -28,6 +29,8 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
 
   private val ownPath = linkPath + Suffix
   private val ownId = s"Link[$ownPath]"
+
+  private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
   /**
    * Register the processor in the cache.
@@ -45,8 +48,10 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
     case re @ RequestEnvelope(from, to, requests) =>
       log.debug(s"$ownId: received $re")
       val result = processRequests(from, requests)
-      route(RequestEnvelope(from, to, result.requests), ownPath, to)
-      route(ResponseEnvelope(to, from, result.responses), ownPath, from)
+      if (!result.requests.isEmpty)
+        route(RequestEnvelope(from, to, result.requests), ownPath, to)
+      if (!result.responses.isEmpty)
+        route(ResponseEnvelope(to, from, result.responses), ownPath, from)
 
     case re @ ResponseEnvelope(from, to, responses) =>
       log.debug(s"$ownId: received $re")
@@ -97,7 +102,7 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
       val origin = Origin(from, rid)
       ridRegistry.lookupByPath(path) match {
         case None =>
-          val targetRid = ridRegistry.saveLookup(origin, Some(path))
+          val targetRid = ridRegistry.saveLookup(origin, DSAMethod.List, Some(path))
           HandlerResult(ListRequest(targetRid, translatePath(path)))
         case Some(rec) =>
           ridRegistry.addOrigin(origin, rec)
@@ -112,27 +117,39 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
    */
   private val handlePassthroughRequest: RequestHandler = {
 
-    def tgtId(from: String, srcId: Int) = ridRegistry.saveLookup(Origin(from, srcId))
+    def tgtId(from: String, srcId: Int, method: DSAMethod.DSAMethod) = ridRegistry.saveLookup(Origin(from, srcId), method)
 
-    val pass: PartialFunction[(String, DSARequest), DSARequest] = {
+    def saveAttribute(nodePath: String, name: String, value: DSAVal) = {
+      log.debug(s"$ownId: saving attribute under $nodePath: $name = $value")
+      val attrMap = attributes.getOrElse(nodePath, Map.empty)
+      attributes(nodePath) = attrMap + (name -> value)
+    }
+
+    // translates request to request for forwarding to responder 
+    // or request to response to handle locally and return response to the requester
+    val pass: PartialFunction[(String, DSARequest), Either[DSARequest, DSAResponse]] = {
+      case (from, SetRequest(rid, path, value, permit)) if isAttribute(path) =>
+        val (nodePath, attrName) = splitPath(path)
+        saveAttribute(nodePath, attrName.get, value)
+        Right(DSAResponse(rid, Some(StreamState.Closed)))
       case (from, SetRequest(rid, path, value, permit)) =>
-        SetRequest(tgtId(from, rid), translatePath(path), value, permit)
+        Left(SetRequest(tgtId(from, rid, DSAMethod.Set), translatePath(path), value, permit))
       case (from, RemoveRequest(rid, path)) =>
-        RemoveRequest(tgtId(from, rid), translatePath(path))
+        Left(RemoveRequest(tgtId(from, rid, DSAMethod.Remove), translatePath(path)))
       case (from, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + AddAttributeAction) =>
         val attrName = params("name").value.toString
-        val attrPath = path.dropRight(AddAttributeAction.size) + attrName
-        val attrValue = params("value")
-        SetRequest(tgtId(from, rid), translatePath(attrPath), attrValue, permit)
+        val nodePath = path.dropRight(AddAttributeAction.size + 1)
+        saveAttribute(nodePath, attrName, params("value"))
+        Right(DSAResponse(rid, Some(StreamState.Closed)))
       case (from, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + SetValueAction) =>
         val attrPath = path.dropRight(SetValueAction.size + 1)
         val attrValue = params("value")
-        SetRequest(tgtId(from, rid), translatePath(attrPath), attrValue, permit)
+        Left(SetRequest(tgtId(from, rid, DSAMethod.Set), translatePath(attrPath), attrValue, permit))
       case (from, InvokeRequest(rid, path, params, permit)) =>
-        InvokeRequest(tgtId(from, rid), translatePath(path), params, permit)
+        Left(InvokeRequest(tgtId(from, rid, DSAMethod.Invoke), translatePath(path), params, permit))
     }
 
-    pass andThen HandlerResult.apply
+    pass andThen (_.fold(HandlerResult.apply, HandlerResult.apply))
   }
 
   /**
@@ -144,8 +161,8 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
       val sidOrigin = Origin(from, srcPath.sid)
       val result = sidRegistry.lookupByPath(srcPath.path) match {
         case None =>
-          val targetSid = sidRegistry.saveLookup(sidOrigin, Some(srcPath.path), None)
-          val targetRid = ridRegistry.saveEmpty
+          val targetSid = sidRegistry.saveLookup(sidOrigin, DSAMethod.Subscribe, Some(srcPath.path), None)
+          val targetRid = ridRegistry.saveEmpty(DSAMethod.Subscribe)
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = targetSid)
           HandlerResult(SubscribeRequest(targetRid, tgtPath))
         case Some(rec) =>
@@ -168,7 +185,7 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
       sidRegistry.removeOrigin(origin) map { rec =>
         val wsReqs = if (rec.origins.isEmpty) {
           sidRegistry.removeLookup(rec)
-          List(UnsubscribeRequest(ridRegistry.saveEmpty, rec.targetId))
+          List(UnsubscribeRequest(ridRegistry.saveEmpty(DSAMethod.Unsubscribe), rec.targetId))
         } else Nil
         HandlerResult(wsReqs, List(DSAResponse(rid, Some(StreamState.Closed))))
       } getOrElse {
@@ -231,11 +248,19 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
           log.warning(s"$ownId: did not find the route for $response")
           Nil
         case Some(rec) =>
-          rec.lastResponse = Some(response)
-          if (response.stream == Some(StreamState.Closed))
+          // adjust response for stored attributes, if appropriate
+          val rsp = if (rec.method == DSAMethod.List) {
+            val attrUpdates = attributes.getOrElse(rec.path.get, Map.empty) map {
+              case (name, value) => array(name, value)
+            }
+            val oldUpdates = response.updates getOrElse Nil
+            response.copy(updates = Some(oldUpdates ++ attrUpdates))
+          } else response
+          rec.lastResponse = Some(rsp)
+          if (rsp.stream == Some(StreamState.Closed))
             ridRegistry.removeLookup(rec)
           rec.origins map { origin =>
-            (origin.source, response.copy(rid = origin.sourceId))
+            (origin.source, rsp.copy(rid = origin.sourceId))
           } toSeq
       }
   }

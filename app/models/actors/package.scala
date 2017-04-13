@@ -22,17 +22,24 @@ package object actors {
     case r"/downstream/(\w+)$responder(/.*)?$_" => s"/downstream/$responder"
     case "/upstream"                            => cfg.Paths.Root
     case r"/upstream/(\w+)$broker(/.*)?$_"      => s"/upstream/$broker"
-    case _                                      => trimPath(path)
+    case _                                      => splitPath(path)._1 
   }
   
   /**
-   * Strips the trailing attribute or config name from the path.
+   * Splits a path into a (node, attribute/config) pair. If the path does not represents
+   * an attribute or config, the second element of the returned tuple will be None.
    */
-  private def trimPath(path: String) = {
-  	val elements = path.split("/")
-  	elements.lastOption.flatMap(_.headOption) match {
-  		case Some(ch) if ch == '$' || ch == '@' => elements.dropRight(1).mkString("/")
-  		case _ => path
-  	}
-  }                   
+  def splitPath(path: String): (String, Option[String]) = path.split("/").lastOption collect {
+    case s if s.startsWith("@") || s.startsWith("$") => (path.dropRight(s.size + 1), Some(s))
+  } getOrElse Tuple2(path, None)
+  
+  /**
+   * Returns `true` if the path represents an attribute.
+   */
+  def isAttribute(path: String) = path matches ".*/@[^/@]+"
+  
+  /**
+   * Returns `true` if the path represents a config.
+   */
+  def isConfig(path: String) = path matches ".*/\\$\\$?[^/\\$]+"
 }
