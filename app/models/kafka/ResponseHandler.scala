@@ -3,19 +3,22 @@ package models.kafka
 import org.apache.kafka.streams.processor.ProcessorContext
 
 import models.ResponseEnvelope
-import models.rpc.{ DSAResponse, StreamState, extractSid, replaceSid }
+import models.rpc.{ DSAMethod, DSAResponse, DSAValue, StreamState, extractSid, replaceSid }
+
 
 /**
  * Handles responses coming from Web Socket.
  */
 class ResponseHandler extends AbstractTransformer[String, ResponseEnvelope, String, Seq[ResponseEnvelope]] {
 
-  var ridRegistry: CallRegistry = null
-  var sidRegistry: CallRegistry = null
+  private var ridRegistry: CallRegistry = null
+  private var sidRegistry: CallRegistry = null
+  private var attrStore: AttributeStore = null
 
   override def postInit(ctx: ProcessorContext) = {
     ridRegistry = BrokerFlow.RidManager.build(ctx)
     sidRegistry = BrokerFlow.SidManager.build(ctx)
+    attrStore = AttributeStore.build(ctx)
   }
 
   /**
@@ -54,12 +57,21 @@ class ResponseHandler extends AbstractTransformer[String, ResponseEnvelope, Stri
           log.warn(s"did not find the route for $response")
           Nil
         case Some(rec) =>
-          if (response.stream == Some(StreamState.Closed))
+          // adjust response for stored attributes, if appropriate
+          val rsp = if (rec.method == DSAMethod.List) {
+            val attrUpdates = attrStore.getAttributes(target, rec.path.get) map {
+              case (name, value) => DSAValue.array(name, value)
+            }
+            val oldUpdates = response.updates getOrElse Nil
+            response.copy(updates = Some(oldUpdates ++ attrUpdates))
+          } else response
+
+          if (rsp.stream == Some(StreamState.Closed))
             ridRegistry.removeLookup(target, rec)
           else
-            ridRegistry.updateLookup(target, rec.withResponse(response))
+            ridRegistry.updateLookup(target, rec.withResponse(rsp))
           rec.origins map { origin =>
-            (origin.source, response.copy(rid = origin.sourceId))
+            (origin.source, rsp.copy(rid = origin.sourceId))
           } toSeq
       }
   }
@@ -94,7 +106,7 @@ object ResponseHandler extends AbstractTransformerSupplier[String, ResponseEnvel
   /**
    * Stores required by [[RequestHandler]].
    */
-  val StoresNames = BrokerFlow.RidManager.storeNames ++ BrokerFlow.SidManager.storeNames
+  val StoresNames = BrokerFlow.RidManager.storeNames ++ BrokerFlow.SidManager.storeNames :+ AttributeStore.StoreName
 
   /**
    * Creates a new ResponsetHandler instance.

@@ -1,13 +1,12 @@
 package models.kafka
 
+import org.apache.kafka.streams.kstream.KStreamBuilder
+import org.apache.kafka.streams.processor.ProcessorContext
 import org.apache.kafka.streams.state.KeyValueStore
 
-import models.rpc.{ DSARequest, DSAResponse }
 import models.Origin
-import org.apache.kafka.streams.processor.ProcessorContext
-import org.apache.kafka.streams.kstream.KStreamBuilder
-import scala.util.control.NonFatal
-import org.apache.kafka.streams.errors.ProcessorStateException
+import models.rpc.{ DSAResponse, DSAValue }
+import models.rpc.DSAMethod.DSAMethod
 
 /**
  * Generates an increasing number sequence per key.
@@ -38,6 +37,7 @@ class IdGenerator(store: KeyValueStore[String, Integer], init: Int = 0) {
  * Encapsulates information about requests's subscribers and last received response.
  */
 case class CallRecord(targetId: Int,
+                      val method: DSAMethod,
                       path: Option[String] = None,
                       origins: Set[Origin] = Set.empty,
                       lastResponse: Option[DSAResponse] = None) {
@@ -57,17 +57,17 @@ class CallRegistry(ids: KeyValueStore[String, Integer],
 
   private val idGen = new IdGenerator(ids, 1)
 
-  def saveLookup(target: String, origin: Origin, path: Option[String] = None,
+  def saveLookup(target: String, origin: Origin, method: DSAMethod, path: Option[String] = None,
                  lastResponse: Option[DSAResponse] = None) = {
     val targetId = createTargetId(target)
-    val record = CallRecord(targetId, path, Set(origin), lastResponse)
+    val record = CallRecord(targetId, method, path, Set(origin), lastResponse)
     updateLookup(target, record)
     targetId
   }
 
-  def saveEmpty(target: String) = {
+  def saveEmpty(target: String, method: DSAMethod) = {
     val targetId = createTargetId(target)
-    callsByTargetId.put(targetIdKey(target, targetId), new CallRecord(targetId, None, Set.empty, None))
+    callsByTargetId.put(targetIdKey(target, targetId), new CallRecord(targetId, method, None, Set.empty, None))
     targetId
   }
 
@@ -106,7 +106,7 @@ class CallRegistry(ids: KeyValueStore[String, Integer],
 }
 
 /**
- * Factor for [[CallRegistry]] instances.
+ * Factory for [[CallRegistry]] instances.
  */
 object CallRegistry {
 
@@ -141,4 +141,37 @@ object CallRegistry {
       builder.addKeyValueStore[String, CallRecord](callsByPathName, false)
     }
   }
+}
+
+/**
+ * Stores node attributes.
+ */
+class AttributeStore(store: KeyValueStore[String, Map[String, DSAValue.DSAVal]]) {
+
+  def saveAttribute(target: String, nodePath: String, name: String, value: DSAValue.DSAVal): Unit = {
+    val key = attrKey(target, nodePath)
+    val attrs = Option(store.get(key)).getOrElse(Map.empty)
+    store.put(key, attrs + (name -> value))
+  }
+
+  def getAttributes(target: String, nodePath: String): Map[String, DSAValue.DSAVal] = {
+    val key = attrKey(target, nodePath)
+    Option(store.get(key)).getOrElse(Map.empty)
+  }
+
+  private def attrKey(target: String, nodePath: String) = target + ":" + nodePath
+}
+
+/**
+ * Factory for [[AttributeStore]] instances.
+ */
+object AttributeStore {
+  val StoreName = "NodeAttributes"
+
+  def build(ctx: ProcessorContext) = {
+    new AttributeStore(ctx.getKeyValueStore[String, Map[String, DSAValue.DSAVal]](StoreName))
+  }
+
+  def createStores(builder: KStreamBuilder) =
+    builder.addKeyValueStore[String, Map[String, DSAValue.DSAVal]](StoreName, false)
 }

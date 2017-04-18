@@ -103,7 +103,8 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
 
     val linkNames = ehCache.getKeys.asScala.toList
     val children = linkNames collect {
-      case path: String if path.startsWith(downPrefix) => array(path.drop(downPrefix.size), obj(IsNode))
+      case path: String if path.startsWith(downPrefix) && !path.endsWith(RRProcessorActor.Suffix) =>
+        array(path.drop(downPrefix.size), obj(IsNode))
     }
 
     configs ++ children

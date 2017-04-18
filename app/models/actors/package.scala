@@ -22,17 +22,6 @@ package object actors {
     case r"/downstream/(\w+)$responder(/.*)?$_" => s"/downstream/$responder"
     case "/upstream"                            => cfg.Paths.Root
     case r"/upstream/(\w+)$broker(/.*)?$_"      => s"/upstream/$broker"
-    case _                                      => trimPath(path)
+    case _                                      => splitPath(path)._1 
   }
-  
-  /**
-   * Strips the trailing attribute or config name from the path.
-   */
-  private def trimPath(path: String) = {
-  	val elements = path.split("/")
-  	elements.lastOption.flatMap(_.headOption) match {
-  		case Some(ch) if ch == '$' || ch == '@' => elements.dropRight(1).mkString("/")
-  		case _ => path
-  	}
-  }                   
 }

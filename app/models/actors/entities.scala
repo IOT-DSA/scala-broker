@@ -2,6 +2,7 @@ package models.actors
 
 import models.Origin
 import models.rpc.DSAResponse
+import models.rpc.DSAMethod.DSAMethod
 
 /**
  * Encapsulates DSLink information for WebSocket connection.
@@ -27,6 +28,7 @@ class IntCounter(init: Int = 0) {
  * Encapsulates information about requests's subscribers and last received response.
  */
 class CallRecord(val targetId: Int,
+                 val method: DSAMethod,
                  val path: Option[String],
                  private var _origins: Set[Origin],
                  var lastResponse: Option[DSAResponse]) {
@@ -50,18 +52,18 @@ class CallRegistry(nextId: Int = 1) {
 
   def createTargetId = nextTargetId.inc
 
-  def saveLookup(origin: Origin, path: Option[String] = None, lastResponse: Option[DSAResponse] = None) = {
+  def saveLookup(origin: Origin, method: DSAMethod, path: Option[String] = None, lastResponse: Option[DSAResponse] = None) = {
     val targetId = createTargetId
-    val record = new CallRecord(targetId, path, Set(origin), lastResponse)
+    val record = new CallRecord(targetId, method, path, Set(origin), lastResponse)
     callsByOrigin(origin) = record
     callsByTargetId(targetId) = record
     path foreach (callsByPath(_) = record)
     targetId
   }
 
-  def saveEmpty() = {
+  def saveEmpty(method: DSAMethod) = {
     val targetId = createTargetId
-    callsByTargetId(targetId) = new CallRecord(targetId, None, Set.empty, None)
+    callsByTargetId(targetId) = new CallRecord(targetId, method, None, Set.empty, None)
     targetId
   }
 
