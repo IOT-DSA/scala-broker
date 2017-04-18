@@ -2,22 +2,25 @@ package models.kafka
 
 import org.apache.kafka.streams.processor.ProcessorContext
 
-import models.{ HandlerResult, Origin, RequestEnvelope, ResponseEnvelope }
+import models._
 import models.rpc._
 
 /**
  * Handles requests coming from Web Socket.
  */
 class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String, (RequestEnvelope, ResponseEnvelope)] {
+  import DSAValue.DSAVal
 
   type RequestProcessor = PartialFunction[(String, String, DSARequest), HandlerResult]
 
   private var ridRegistry: CallRegistry = null
   private var sidRegistry: CallRegistry = null
-
+  private var attrStore: AttributeStore = null
+  
   override def postInit(ctx: ProcessorContext) = {
     ridRegistry = BrokerFlow.RidManager.build(ctx)
     sidRegistry = BrokerFlow.SidManager.build(ctx)
+    attrStore = AttributeStore.build(ctx)
   }
 
   /**
@@ -28,7 +31,7 @@ class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String
       val origin = Origin(from, rid)
       ridRegistry.lookupByPath(to, path) match {
         case None =>
-          val targetRid = ridRegistry.saveLookup(to, origin, Some(path))
+          val targetRid = ridRegistry.saveLookup(to, origin, DSAMethod.List, Some(path))
           HandlerResult(ListRequest(targetRid, translatePath(path, to)))
         case Some(rec) =>
           ridRegistry.updateLookup(to, rec.addOrigin(origin))
@@ -43,18 +46,39 @@ class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String
    */
   private val handlePassthroughRequest: RequestProcessor = {
 
-    def tgtId(from: String, to: String, srcId: Int) = ridRegistry.saveLookup(to, Origin(from, srcId))
-
-    val pass: PartialFunction[(String, String, DSARequest), DSARequest] = {
-      case (from, to, SetRequest(rid, path, value, permit)) =>
-        SetRequest(tgtId(from, to, rid), translatePath(path, to), value, permit)
-      case (from, to, RemoveRequest(rid, path)) =>
-        RemoveRequest(tgtId(from, to, rid), translatePath(path, to))
-      case (from, to, InvokeRequest(rid, path, params, permit)) =>
-        InvokeRequest(tgtId(from, to, rid), translatePath(path, to), params, permit)
+    def tgtId(from: String, to: String, srcId: Int, method: DSAMethod.DSAMethod) = 
+      ridRegistry.saveLookup(to, Origin(from, srcId), method)
+      
+    def saveAttribute(target: String, nodePath: String, name: String, value: DSAVal) = {
+      log.debug(s"Saving attribute for $target under $nodePath: $name = $value")
+      attrStore.saveAttribute(target, nodePath, name, value)
     }
 
-    pass andThen HandlerResult.apply
+    // translates request to request for forwarding to responder 
+    // or request to response to handle locally and return response to the requester
+    val pass: PartialFunction[(String, String, DSARequest), Either[DSARequest, DSAResponse]] = {
+      case (from, to, SetRequest(rid, path, value, permit)) if isAttribute(path) =>
+        val (nodePath, attrName) = splitPath(path)
+        saveAttribute(to, nodePath, attrName.get, value)
+        Right(DSAResponse(rid, Some(StreamState.Closed)))
+      case (from, to, SetRequest(rid, path, value, permit)) =>
+        Left(SetRequest(tgtId(from, to, rid, DSAMethod.Set), translatePath(path, to), value, permit))
+      case (from, to, RemoveRequest(rid, path)) =>
+        Left(RemoveRequest(tgtId(from, to, rid, DSAMethod.Remove), translatePath(path, to)))
+      case (from, to, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + AddAttributeAction) =>
+        val attrName = params("name").value.toString
+        val nodePath = path.dropRight(AddAttributeAction.size + 1)
+        saveAttribute(to, nodePath, attrName, params("value"))
+        Right(DSAResponse(rid, Some(StreamState.Closed)))
+      case (from, to, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + SetValueAction) =>
+        val attrPath = path.dropRight(SetValueAction.size + 1)
+        val attrValue = params("value")
+        Left(SetRequest(tgtId(from, to, rid, DSAMethod.Set), translatePath(attrPath, to), attrValue, permit))
+      case (from, to, InvokeRequest(rid, path, params, permit)) =>
+        Left(InvokeRequest(tgtId(from, to, rid, DSAMethod.Invoke), translatePath(path, to), params, permit))
+    }
+    
+    pass andThen (_.fold(HandlerResult.apply, HandlerResult.apply))
   }
 
   /**
@@ -66,8 +90,8 @@ class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String
       val sidOrigin = Origin(from, srcPath.sid)
       val result = sidRegistry.lookupByPath(to, srcPath.path) match {
         case None =>
-          val targetSid = sidRegistry.saveLookup(to, sidOrigin, Some(srcPath.path))
-          val targetRid = ridRegistry.saveEmpty(to)
+          val targetSid = sidRegistry.saveLookup(to, sidOrigin, DSAMethod.Subscribe, Some(srcPath.path))
+          val targetRid = ridRegistry.saveEmpty(to, DSAMethod.Subscribe)
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path, to), sid = targetSid)
           HandlerResult(SubscribeRequest(targetRid, tgtPath))
         case Some(rec) =>
@@ -90,7 +114,7 @@ class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String
       sidRegistry.removeOrigin(to, origin) map { rec =>
         val wsReqs = if (rec.origins.isEmpty) {
           sidRegistry.removeLookup(to, rec)
-          List(UnsubscribeRequest(ridRegistry.saveEmpty(to), rec.targetId))
+          List(UnsubscribeRequest(ridRegistry.saveEmpty(to, DSAMethod.Unsubscribe), rec.targetId))
         } else Nil
         HandlerResult(wsReqs, List(DSAResponse(rid, Some(StreamState.Closed))))
       } getOrElse {
@@ -148,7 +172,7 @@ class RequestHandler extends AbstractTransformer[String, RequestEnvelope, String
    */
   private def translatePath(path: String, linkPath: String) = {
     val chopped = path.drop(linkPath.size)
-    if (chopped.isEmpty) "/" else chopped
+    if (!chopped.startsWith("/")) "/" + chopped else chopped
   }
 }
 
@@ -160,7 +184,7 @@ object RequestHandler extends AbstractTransformerSupplier[String, RequestEnvelop
   /**
    * Stores required by [[RequestHandler]].
    */
-  val StoresNames = BrokerFlow.RidManager.storeNames ++ BrokerFlow.SidManager.storeNames
+  val StoresNames = BrokerFlow.RidManager.storeNames ++ BrokerFlow.SidManager.storeNames :+ AttributeStore.StoreName
 
   /**
    * Creates a new RequestHandler instance.

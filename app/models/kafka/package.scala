@@ -14,6 +14,9 @@ import com.typesafe.config.Config
 import cakesolutions.kafka.KafkaProducer
 import models.kafka.CallRecord
 import play.api.libs.json.{ Json, Reads, Writes }
+import play.api.libs.json.Format
+
+import models.rpc._
 
 /**
  * Types and utility functions for Kafka.
@@ -45,8 +48,16 @@ package object kafka {
   /**
    * CallRecord <-> Kafka
    */
+  implicit val DSAMethodFormat = Format(enumReads(DSAMethod), enumWrites)
   implicit val CallRecordFormat = Json.format[CallRecord]
   implicit val CallRecordSerde = Serdes.serdeFrom(serializer[CallRecord], deserializer[CallRecord])
+
+  /**
+   * AttributeMap <-> Kafka
+   */
+  implicit val AttrMapSerde = Serdes.serdeFrom(
+    serializer[Map[String, DSAValue.DSAVal]],
+    deserializer[Map[String, DSAValue.DSAVal]])
 
   /**
    * String <-> Kafka

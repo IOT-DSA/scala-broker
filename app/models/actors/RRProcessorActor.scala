@@ -4,7 +4,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props }
-import models.{ HandlerResult, Origin, RequestEnvelope, ResponseEnvelope }
+import models._
 import models.rpc._
 import play.api.cache.CacheApi
 
@@ -19,7 +19,7 @@ import play.api.cache.CacheApi
  */
 class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with ActorLogging {
   import RRProcessorActor._
-  import DSAValue.{ DSAVal, array }
+  import models.rpc.DSAValue.{ DSAVal, array }
 
   type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
 
@@ -290,9 +290,6 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
  * Factory for [[RRProcessorActor]] instances.
  */
 object RRProcessorActor {
-  val AddAttributeAction = "addAttribute"
-  val SetValueAction = "setValue"
-
   val Suffix = "#processor"
 
   def props(linkPath: String, cache: CacheApi) = Props(new RRProcessorActor(linkPath, cache))

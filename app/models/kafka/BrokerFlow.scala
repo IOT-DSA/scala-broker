@@ -96,6 +96,7 @@ object BrokerFlow {
   private def createStores(builder: KStreamBuilder) = {
     RidManager.createStores(builder)
     SidManager.createStores(builder)
+    AttributeStore.createStores(builder)
   }
 
   /**
