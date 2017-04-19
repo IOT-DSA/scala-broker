@@ -1,11 +1,14 @@
 package models
 
 import scala.collection.JavaConverters.asScalaSetConverter
+import scala.concurrent.duration.DurationLong
+
+import org.apache.kafka.streams.StreamsConfig
+
 import javax.inject.{ Inject, Singleton }
 import play.api.Configuration
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
-import org.apache.kafka.streams._
 
 @Singleton
 class Settings @Inject() (val playConfig: Configuration) {
@@ -46,6 +49,11 @@ class Settings @Inject() (val playConfig: Configuration) {
    * Used in Allowed messages sent on handshake.
    */
   val Salt = rootConfig.getInt("broker.salt")
+
+  /**
+   * Checking interval for undelivered messages.
+   */
+  val UndeliveredInterval = rootConfig.getDuration("broker.undelivered.interval").getSeconds.seconds
 
   /**
    * Kafka configuration.

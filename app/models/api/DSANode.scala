@@ -16,6 +16,7 @@ import models.rpc._
 import models.rpc.DSAValue.{ DSAMap, DSAVal, StringValue, array, longToNumericValue, obj }
 import play.api.cache.CacheApi
 import scala.util.control.NonFatal
+import models.Settings
 
 /**
  * A structural unit in Node API.
@@ -67,7 +68,7 @@ trait DSANode {
 /**
  * DSA Node actor-based implementation.
  */
-class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSANode])
+class DSANodeImpl(router: MessageRouter, cache: CacheApi, settings: Settings, val parent: Option[DSANode])
     extends DSANode with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
 
   protected val log = Logging(TypedActor.context.system, getClass)
@@ -77,7 +78,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
 
   cache.set(path, TypedActor.context.self)
 
-  private val processor = TypedActor.context.actorOf(RRProcessorActor.props(path, cache))
+  private val processor = TypedActor.context.actorOf(RRProcessorActor.props(path, cache, settings.UndeliveredInterval))
 
   protected def ownId = s"[$path]"
 
@@ -136,7 +137,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
-    val props = DSANode.props(router, cache, Some(this))
+    val props = DSANode.props(router, cache, settings, Some(this))
     val child = TypedActor(TypedActor.context).typedActorOf(props, name)
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
@@ -289,6 +290,6 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, val parent: Option[DSA
  * Factory for DSANodeImpl instances.
  */
 object DSANode {
-  def props(router: MessageRouter, cache: CacheApi, parent: Option[DSANode]) =
-    TypedProps(classOf[DSANode], new DSANodeImpl(router, cache, parent))
+  def props(router: MessageRouter, cache: CacheApi, settings: Settings, parent: Option[DSANode]) =
+    TypedProps(classOf[DSANode], new DSANodeImpl(router, cache, settings, parent))
 }
