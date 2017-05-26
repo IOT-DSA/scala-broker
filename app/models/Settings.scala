@@ -75,6 +75,7 @@ class Settings @Inject() (val playConfig: Configuration) {
       val ReqEnvelopeOut = ApplicationId + "_" + cfg.getString("topics.req.envelope.out")
       val RspEnvelopeIn = ApplicationId + "_" + cfg.getString("topics.rsp.envelope.in")
       val RspEnvelopeOut = ApplicationId + "_" + cfg.getString("topics.rsp.envelope.out")
+      val Undelivered = ApplicationId + "_" + cfg.getString("topics.undelivered")
     }
 
     val Streams = {

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+KAFKA_HOME=/usr/local/Cellar/kafka/0.10.1.0
+BOOTSTRAP_URL=localhost:9092
+
+$KAFKA_HOME/bin/kafka-console-consumer --bootstrap-server $BOOTSTRAP_URL --topic $1 --property print.key=true --property key.separator=, --from-beginning
