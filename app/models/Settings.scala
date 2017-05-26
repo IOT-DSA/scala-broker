@@ -1,11 +1,14 @@
 package models
 
 import scala.collection.JavaConverters.asScalaSetConverter
+import scala.concurrent.duration.DurationLong
+
+import org.apache.kafka.streams.StreamsConfig
+
 import javax.inject.{ Inject, Singleton }
 import play.api.Configuration
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
-import org.apache.kafka.streams._
 
 @Singleton
 class Settings @Inject() (val playConfig: Configuration) {
@@ -48,6 +51,11 @@ class Settings @Inject() (val playConfig: Configuration) {
   val Salt = rootConfig.getInt("broker.salt")
 
   /**
+   * Checking interval for undelivered messages.
+   */
+  val UndeliveredInterval = rootConfig.getDuration("broker.undelivered.interval").getSeconds.seconds
+
+  /**
    * Kafka configuration.
    */
   object Kafka {
@@ -67,6 +75,7 @@ class Settings @Inject() (val playConfig: Configuration) {
       val ReqEnvelopeOut = ApplicationId + "_" + cfg.getString("topics.req.envelope.out")
       val RspEnvelopeIn = ApplicationId + "_" + cfg.getString("topics.rsp.envelope.in")
       val RspEnvelopeOut = ApplicationId + "_" + cfg.getString("topics.rsp.envelope.out")
+      val Undelivered = ApplicationId + "_" + cfg.getString("topics.undelivered")
     }
 
     val Streams = {

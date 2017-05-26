@@ -24,7 +24,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
 
   private val log = Logger(getClass)
 
-  private val processor = context.actorOf(RRProcessorActor.props(Root, cache))
+  private val processor = context.actorOf(RRProcessorActor.props(Root, cache, settings.UndeliveredInterval))
 
   // a hack to retrieve underlying EhCache until another cache plugin is implemented
   private val ehCache = {
@@ -119,7 +119,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
    * Creates a /data node.
    */
   private def createDataNode = {
-    val dataNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "data")
+    val dataNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, settings, None), "data")
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode
@@ -129,7 +129,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
    * Creates a /defs node hierarchy.
    */
   private def createDefsNode = {
-    val defsNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "defs")
+    val defsNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, settings, None), "defs")
     defsNode.profile = "node"
     defsNode.addChild("profile").foreach { node =>
       node.profile = "static"
@@ -150,7 +150,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
    * Creates a /users node.
    */
   private def createUsersNode = {
-    val usersNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "users")
+    val usersNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, settings, None), "users")
     usersNode.profile = "node"
     usersNode
   }
@@ -159,7 +159,7 @@ class RootNodeActor(settings: Settings, cache: CacheApi, router: MessageRouter) 
    * Creates a /sys node.
    */
   private def createSysNode = {
-    val sysNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, None), "sys")
+    val sysNode = TypedActor(context).typedActorOf(DSANode.props(router, cache, settings, None), "sys")
     sysNode.profile = "node"
     sysNode
   }

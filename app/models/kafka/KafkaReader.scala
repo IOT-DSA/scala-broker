@@ -3,15 +3,16 @@ package models.kafka
 import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.collection.JavaConverters.{ iterableAsScalaIterableConverter, seqAsJavaListConverter }
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
 
-import org.apache.kafka.common.serialization.Deserializer
+import org.apache.kafka.common.serialization.{ Deserializer, Serializer }
 import org.slf4j.LoggerFactory
 
 import com.typesafe.config.Config
 
 import akka.actor.{ ActorRef, actorRef2Scala }
-import cakesolutions.kafka.KafkaConsumer
+import cakesolutions.kafka.{ KafkaConsumer, KafkaProducer, KafkaProducerRecord }
 import javax.inject.Singleton
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
 import play.api.cache.CacheApi
@@ -32,6 +33,10 @@ class KafkaReader(cache: CacheApi, settings: Settings) {
 
   // consume responses and route them to Requester actor
   private val rspOutThread = createConsumerThread[ResponseEnvelope](Topics.RspEnvelopeOut, 2000)
+
+  // when the requester actor cannot be found - route to the DLQ 
+  private val undeliveredPoducer = createProducerForUndelivered
+  private val undeliveredThread = createConsumerThread[ResponseEnvelope](Topics.Undelivered, 5000)
 
   /**
    * `true` if the consumer threads have been started.
@@ -82,7 +87,7 @@ class KafkaReader(cache: CacheApi, settings: Settings) {
           records foreach { record =>
             val target = record.key
             val envelope = record.value
-            route(envelope, target)
+            send(envelope, target)
           }
         }
         consumer.close
@@ -109,11 +114,32 @@ class KafkaReader(cache: CacheApi, settings: Settings) {
   /**
    * Resolves the `to` actor and sends the message to its mailbox.
    */
-  private def route(msg: Any, to: String) = Try {
+  private def send(msg: Any, to: String): Try[Unit] = Try {
     val ref = cache.get[ActorRef](to).get
     log.trace(s"Sending $msg to [$to] as actor $ref")
     ref ! msg
   } recover {
-    case e: NoSuchElementException => throw new IllegalArgumentException(s"Actor not found for path [$to]")
+    case e: NoSuchElementException => msg match {
+      case rsp: ResponseEnvelope =>
+        val record = KafkaProducerRecord(Topics.Undelivered, to, rsp)
+        undeliveredPoducer.send(record) map (_ => {})
+      case _ => throw new IllegalArgumentException(s"Actor not found for path [$to]")
+    }
+  }
+
+  /**
+   * Creates a new Kafka producer for posting undelivered messages.
+   */
+  private def createProducerForUndelivered: KafkaProducer[String, ResponseEnvelope] = {
+    import org.apache.kafka.clients.producer.ProducerConfig._
+
+    val kser = implicitly[Serializer[String]]
+    val vser = implicitly[Serializer[ResponseEnvelope]]
+
+    val clientId = "dsa_undelivered" + hashCode
+    val conf = KafkaProducer.Conf(Producer, kser, vser)
+      .withProperty(BOOTSTRAP_SERVERS_CONFIG, BrokerUrl)
+      .withProperty(CLIENT_ID_CONFIG, clientId)
+    KafkaProducer(conf)
   }
 }

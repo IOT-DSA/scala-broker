@@ -10,7 +10,7 @@ import models.rpc.ResponseMessage
  */
 trait ResponderBehavior { me: AbstractWebSocketActor =>
 
-  private val processor = context.actorOf(RRProcessorActor.props(connInfo.linkPath, cache))
+  private val processor = context.actorOf(RRProcessorActor.props(connInfo.linkPath, cache, settings.UndeliveredInterval))
 
   // for response routing  
   def router: MessageRouter

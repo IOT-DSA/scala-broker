@@ -1,5 +1,6 @@
 package models.actors
 
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -16,9 +17,14 @@ import play.api.cache.CacheApi
  *                 the responses that need to be delivered to the originator, if immediately available
  * - for responses: returns the responses grouped by originator, so that they could be delivered to
  *                  the requesters in batches.
+ *
+ * @param linkPath      the path of the correspondent link or broker own node.
+ * @param cache         actor cache.
+ * @param checkInterval time interval to periodically check undelivered messages.
  */
-class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with ActorLogging {
+class RRProcessorActor(linkPath: String, cache: CacheApi, checkInterval: FiniteDuration) extends Actor with ActorLogging {
   import RRProcessorActor._
+  import context.dispatcher
   import models.rpc.DSAValue.{ DSAVal, array }
 
   type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
@@ -32,12 +38,16 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
 
   private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
+  private val undelivered = collection.mutable.Queue.empty[(Any, String)]
+
   /**
    * Register the processor in the cache.
    */
   override def preStart() = {
     cache.set(ownPath, self)
     log.info(s"$ownId: responder processor initialized for $linkPath")
+
+    context.system.scheduler.schedule(checkInterval, checkInterval, self, CheckUndelivered)
   }
 
   /**
@@ -49,15 +59,19 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
       log.debug(s"$ownId: received $re")
       val result = processRequests(from, requests)
       if (!result.requests.isEmpty)
-        route(RequestEnvelope(from, to, result.requests), ownPath, to)
+        send(RequestEnvelope(from, to, result.requests), to)
       if (!result.responses.isEmpty)
-        route(ResponseEnvelope(to, from, result.responses), ownPath, from)
+        send(ResponseEnvelope(to, from, result.responses), from)
 
     case re @ ResponseEnvelope(from, to, responses) =>
       log.debug(s"$ownId: received $re")
       processResponses(responses) foreach {
-        case (to, rsps) => route(ResponseEnvelope(linkPath, to, rsps), ownPath, to)
+        case (to, rsps) => send(ResponseEnvelope(linkPath, to, rsps), to)
       }
+
+    case CheckUndelivered =>
+      val ready = undelivered.dequeueAll { case (_, to) => cache.get(to).isDefined }
+      ready foreach { case (msg, to) => send(msg, to) }
   }
 
   /**
@@ -276,13 +290,15 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
   /**
    * Routes a message resolving the target actor by the cache lookup.
    */
-  private def route(msg: Any, from: String, to: String) = Try {
+  private def send(msg: Any, to: String) = Try {
     val ref = cache.get[ActorRef](to).get
-    log.debug(s"Sending $msg from [$from] to [$to]")
+    log.debug(s"Sending $msg from [$ownPath] to [$to]")
     ref ! msg
   } recover {
-    case e: NoSuchElementException => log.error(s"Actor not found for path [$to]")
-    case NonFatal(e)               => log.error(s"Error sending message to [$to]: {}", e.getMessage)
+    case e: NoSuchElementException =>
+      log.error(s"Actor not found for path [$to], saving to Undelivered queue")
+      undelivered.enqueue(msg -> to)
+    case NonFatal(e) => log.error(s"Error sending message to [$to]: {}", e.getMessage)
   }
 }
 
@@ -292,5 +308,8 @@ class RRProcessorActor(linkPath: String, cache: CacheApi) extends Actor with Act
 object RRProcessorActor {
   val Suffix = "#processor"
 
-  def props(linkPath: String, cache: CacheApi) = Props(new RRProcessorActor(linkPath, cache))
+  case object CheckUndelivered
+
+  def props(linkPath: String, cache: CacheApi, checkInterval: FiniteDuration) =
+    Props(new RRProcessorActor(linkPath, cache, checkInterval))
 }
