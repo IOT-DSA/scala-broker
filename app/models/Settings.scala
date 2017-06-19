@@ -10,6 +10,9 @@ import play.api.Configuration
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
+/**
+ * Encapsulates application settings – both hardcoded and configured in `application.conf`.
+ */
 @Singleton
 class Settings @Inject() (val playConfig: Configuration) {
 
@@ -33,6 +36,13 @@ class Settings @Inject() (val playConfig: Configuration) {
   }
 
   /**
+   * DSA Nodes.
+   */
+  object Nodes {
+    val Downstream = "downstream"
+  }
+
+  /**
    * DSA Paths.
    */
   object Paths {
@@ -41,7 +51,7 @@ class Settings @Inject() (val playConfig: Configuration) {
     val Defs = "/defs"
     val Sys = "/sys"
     val Users = "/users"
-    val Downstream = "/downstream"
+    val Downstream = Root + Nodes.Downstream
     val Upstream = "/upstream"
   }
 
@@ -54,6 +64,11 @@ class Settings @Inject() (val playConfig: Configuration) {
    * Checking interval for undelivered messages.
    */
   val UndeliveredInterval = rootConfig.getDuration("broker.undelivered.interval").getSeconds.seconds
+  
+  /**
+   * The maximum number of children in LIST response.
+   */
+  val ChildrenPerListResponse = rootConfig.getInt("broker.children.per.response")
 
   /**
    * Kafka configuration.
