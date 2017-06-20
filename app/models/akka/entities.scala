@@ -7,10 +7,7 @@ import models.rpc.DSAMethod.DSAMethod
 /**
  * Encapsulates DSLink information for WebSocket connection.
  */
-case class ConnectionInfo(dsId: String, isRequester: Boolean, isResponder: Boolean, linkPath: String) {
-  //TODO switch derive linkPath from linkName
-  val linkName = dsId.substring(0, dsId.length - 44)
-}
+case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, isResponder: Boolean)
 
 /**
  * Similar to [[java.util.concurrent.atomic.AtomicInteger]], but not thread safe,

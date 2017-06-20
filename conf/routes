@@ -3,9 +3,11 @@
 # https://www.playframework.com/documentation/latest/ScalaRouting
 # ~~~~
 
-GET    /               controllers.MainController.index
-POST   /conn           controllers.MainController.conn
-GET    /ws             controllers.MainController.ws
+GET    /               controllers.AltController.index
+GET    /config         controllers.AltController.viewConfig
+GET    /links          controllers.AltController.findDslinks(regex ?= ".*", limit: Int ?= 100, offset: Int ?= 0)
+POST   /conn           controllers.AltController.conn
+GET    /ws             controllers.AltController.ws
 
 # Map static resources from the /public folder to the /assets URL path
 GET    /assets/*file   controllers.Assets.versioned(path="/public", file: Asset)

@@ -40,6 +40,7 @@ class Settings @Inject() (val playConfig: Configuration) {
    */
   object Nodes {
     val Downstream = "downstream"
+    val Upstream = "upstream"
   }
 
   /**
@@ -52,7 +53,7 @@ class Settings @Inject() (val playConfig: Configuration) {
     val Sys = "/sys"
     val Users = "/users"
     val Downstream = Root + Nodes.Downstream
-    val Upstream = "/upstream"
+    val Upstream = Root + Nodes.Upstream
   }
 
   /**

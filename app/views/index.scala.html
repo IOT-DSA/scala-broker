@@ -3,16 +3,11 @@
 @import com.typesafe.config._
 
 @main("DSA Broker") {
-  <h1>DSABroker</h1>
-  <p>Scala based implementation of a DSA broker. Uses Play, akka and kafka streams</p>
-  
-<h2>Configuration</h2>
-<pre id="config"></pre>
-<script type="text/javascript">
-        var div = document.createElement('div');
-        div.innerHTML = "@config.render(ConfigRenderOptions.concise)";
-        var data = JSON.parse(div.firstChild.nodeValue.replace(/\n/g, " "));
-        var js = JSON.stringify(data, undefined, 2);
-        document.getElementById('config').innerHTML = js;
-</script>  
+<h1>DSABroker</h1>
+<p>Akka based implementation of a DSA broker in Scala.</p>
+
+<ul>
+	<li><a href="/config">Configuration</a></li>
+	<li><a href="/links">DSLinks</a></li>
+</ul>
 }
