@@ -15,8 +15,6 @@ trait RequesterBehavior { me: DSLinkActor =>
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
   private val targetsBySid = collection.mutable.Map.empty[Int, String]
 
-  private val resolveLink = resolveLinkPath(settings) _
-
   private var lastRid: Int = 0
 
   /**
@@ -121,7 +119,7 @@ trait RequesterBehavior { me: DSLinkActor =>
       case SubscribeRequest(_, paths)   => paths.head.path // assuming one path after split
     }
 
-    extractPath andThen resolveLink
+    extractPath andThen resolveLinkPath
   }
 
   /**

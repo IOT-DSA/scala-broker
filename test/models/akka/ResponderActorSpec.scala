@@ -12,9 +12,7 @@ import play.api.Configuration
  */
 class ResponderActorSpec extends AbstractActorSpec {
 
-  val settings = new Settings(new Configuration(ConfigFactory.load))
-
-  val responder = system.actorOf(ResponderActor.props(settings), "responder")
+  val responder = system.actorOf(ResponderActor.props, "responder")
   val ws = TestProbe()
   responder.tell(DSLinkActor.WSConnected, ws.ref)
 

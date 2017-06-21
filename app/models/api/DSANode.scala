@@ -64,7 +64,7 @@ trait DSANode {
 /**
  * DSA Node actor-based implementation.
  */
-class DSANodeImpl(settings: Settings, val parent: Option[DSANode])
+class DSANodeImpl(val parent: Option[DSANode])
     extends DSANode with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
 
   protected val log = Logging(TypedActor.context.system, getClass)
@@ -129,7 +129,7 @@ class DSANodeImpl(settings: Settings, val parent: Option[DSANode])
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
-    val props = DSANode.props(settings, Some(this))
+    val props = DSANode.props(Some(this))
     val child = TypedActor(TypedActor.context).typedActorOf(props, name)
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
@@ -274,8 +274,11 @@ class DSANodeImpl(settings: Settings, val parent: Option[DSANode])
 }
 
 /**
- * Factory for DSANodeImpl instances.
+ * Factory for [[DSANodeImpl]] instances.
  */
 object DSANode {
-  def props(settings: Settings, parent: Option[DSANode]) = TypedProps(classOf[DSANode], new DSANodeImpl(settings, parent))
+  /**
+   * Creates a new [[DSANodeImpl]] props instance.
+   */
+  def props(parent: Option[DSANode]) = TypedProps(classOf[DSANode], new DSANodeImpl(parent))
 }

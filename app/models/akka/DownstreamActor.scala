@@ -19,14 +19,14 @@ import models.ResponseEnvelope
  * actorSystem.actorOf(DownstreamActor.props(...), "downstream")
  * </pre>
  */
-class DownstreamActor(settings: Settings) extends Actor with ActorLogging {
+class DownstreamActor extends Actor with ActorLogging {
   import DownstreamActor._
   import StreamState._
 
-  assert(self.path.name == settings.Nodes.Downstream,
-    s"Downstream actor should be created under name ${settings.Nodes.Downstream}")
+  assert(self.path.name == Settings.Nodes.Downstream,
+    s"Downstream actor should be created under name ${Settings.Nodes.Downstream}")
 
-  private val ownId = "[" + settings.Paths.Downstream + "]"
+  private val ownId = "[" + Settings.Paths.Downstream + "]"
 
   override def preStart = log.debug(s"$ownId actor created")
 
@@ -67,9 +67,9 @@ class DownstreamActor(settings: Settings) extends Actor with ActorLogging {
    */
   private def createDSLink(ci: ConnectionInfo) = {
     val child = (ci.isRequester, ci.isResponder) match {
-      case (true, false) => context.actorOf(RequesterActor.props(settings), ci.linkName)
-      case (false, true) => context.actorOf(ResponderActor.props(settings), ci.linkName)
-      case (true, true)  => context.actorOf(DualActor.props(settings), ci.linkName)
+      case (true, false) => context.actorOf(RequesterActor.props, ci.linkName)
+      case (false, true) => context.actorOf(ResponderActor.props, ci.linkName)
+      case (true, true)  => context.actorOf(DualActor.props, ci.linkName)
       case _             => throw new IllegalArgumentException("DSLink must be Requester, Responder or Dual")
     }
     log.debug(s"DSLink[${child.path.name}] created for ${ci.linkName}")
@@ -81,7 +81,7 @@ class DownstreamActor(settings: Settings) extends Actor with ActorLogging {
    */
   private def processRequest(from: String, request: DSARequest): TraversableOnce[ResponseEnvelope] = request match {
     case ListRequest(rid, _) =>
-      listNodes grouped settings.ChildrenPerListResponse map { rows =>
+      listNodes grouped Settings.ChildrenPerListResponse map { rows =>
         val response = DSAResponse(rid = rid, stream = Some(Open), updates = Some(rows.toList))
         ResponseEnvelope(ownId, from, List(response))
       }
@@ -120,5 +120,5 @@ object DownstreamActor {
   /**
    * Creates a new instance of [[DownstreamActor]] props.
    */
-  def props(settings: Settings) = Props(new DownstreamActor(settings))
+  def props = Props(new DownstreamActor)
 }

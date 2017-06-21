@@ -12,8 +12,8 @@ package object akka {
   /**
    * Sends a message to an actor using its DSA link path.
    */
-  def dsaSend(to: String, msg: Any)(implicit context: ActorContext, sender: ActorRef, settings: Settings) = 
-    context.actorSelection("/user/" + settings.Nodes.Root + to) ! msg
+  def dsaSend(to: String, msg: Any)(implicit context: ActorContext, sender: ActorRef) = 
+    context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
 
   /**
    * Interpolates strings to produce RegEx.
@@ -25,11 +25,11 @@ package object akka {
   /**
    * Resolves the target link path from the request path.
    */
-  def resolveLinkPath(cfg: Settings)(path: String) = path match {
-    case cfg.Paths.Downstream                   => cfg.Paths.Downstream
-    case r"/downstream/(\w+)$responder(/.*)?$_" => cfg.Paths.Downstream + "/" + responder
-    case cfg.Paths.Upstream                     => cfg.Paths.Upstream
-    case r"/upstream/(\w+)$broker(/.*)?$_"      => cfg.Paths.Upstream + "/" + broker
+  def resolveLinkPath(path: String) = path match {
+    case Settings.Paths.Downstream                   => Settings.Paths.Downstream
+    case r"/downstream/(\w+)$responder(/.*)?$_" => Settings.Paths.Downstream + "/" + responder
+    case Settings.Paths.Upstream                     => Settings.Paths.Upstream
+    case r"/upstream/(\w+)$broker(/.*)?$_"      => Settings.Paths.Upstream + "/" + broker
     case _                                      => splitPath(path)._1 
   }
   

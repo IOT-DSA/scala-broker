@@ -13,17 +13,15 @@ import play.api.Configuration
 class DSANodeSpec extends AbstractActorSpec {
   import models.rpc.DSAValue._
 
-  val settings = new Settings(new Configuration(ConfigFactory.load))
-
   val extension = TypedActor(system)
 
   "DSANode.props" should {
     "create a new node instance" in {
-      val node = extension.typedActorOf(DSANode.props(settings, None), "bar1")
+      val node = extension.typedActorOf(DSANode.props(None), "bar1")
       extension.stop(node)
     }
     "support `path`, `name`, `parent`" in {
-      val node = extension.typedActorOf(DSANode.props(settings, None), "bar2")
+      val node = extension.typedActorOf(DSANode.props(None), "bar2")
       node.parent mustBe None
       node.name mustBe "bar2"
       node.path mustBe "/bar2"
@@ -31,7 +29,7 @@ class DSANodeSpec extends AbstractActorSpec {
   }
 
   "DSANode" should {
-    val node = extension.typedActorOf(DSANode.props(settings, None), "bar3")
+    val node = extension.typedActorOf(DSANode.props(None), "bar3")
     "support `value`" in {
       node.value = 5: DSAVal
       whenReady(node.value) { _ mustBe (5: DSAVal) }

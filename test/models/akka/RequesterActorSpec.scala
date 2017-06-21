@@ -16,8 +16,6 @@ import play.api.Configuration
  */
 class RequesterActorSpec extends AbstractActorSpec {
 
-  val settings = new Settings(new Configuration(ConfigFactory.load))
-
   val abcProbe = TestProbe()
   class AbcActor extends Actor {
     def receive = { case msg => abcProbe.ref ! msg }
@@ -35,7 +33,7 @@ class RequesterActorSpec extends AbstractActorSpec {
     def receive = { case msg => brokerProbe.ref ! msg }
   }), "broker")
 
-  val requester = system.actorOf(RequesterActor.props(settings), "requester")
+  val requester = system.actorOf(RequesterActor.props, "requester")
   val ws = TestProbe()
   requester.tell(DSLinkActor.WSConnected, ws.ref)
 

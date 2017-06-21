@@ -13,9 +13,8 @@ import play.api.Configuration
  * DSLinkActor test suite.
  */
 class DSLinkActorSpec extends AbstractActorSpec {
-  val settings = new Settings(new Configuration(ConfigFactory.load))
 
-  val link = system.actorOf(Props(new DSLinkActor()(settings) {}), "link")
+  val link = system.actorOf(Props(new DSLinkActor {}), "link")
   val probe = TestProbe()
 
   "DSLinkActor" should {
