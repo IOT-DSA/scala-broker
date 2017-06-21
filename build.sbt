@@ -1,7 +1,6 @@
 // properties
 val APP_VERSION = "0.1.0-SNAPSHOT"
 val SCALA_VERSION = "2.11.8"
-val KAFKA_VERSION = "0.10.1.0"
 
 // settings
 name := "scala-broker"
@@ -27,8 +26,6 @@ coverageFailOnMinimum := true
 // dependencies
 libraryDependencies ++= Seq(
   cache,
-  "org.apache.kafka"         % "kafka-streams"           % KAFKA_VERSION,
-  "net.cakesolutions"       %% "scala-kafka-client"      % KAFKA_VERSION,
   "org.scalatest"           %% "scalatest"               % "2.2.1"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.12.1"        % "test",
   "org.scalatestplus.play"  %% "scalatestplus-play"      % "1.5.1"         % "test",

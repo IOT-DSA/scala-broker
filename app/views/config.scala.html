@@ -1,0 +1,19 @@
+@(config: com.typesafe.config.ConfigObject)
+
+@import com.typesafe.config._
+
+@main("DSA Broker: Config") {
+<h1>DSABroker Configuration</h1>
+  
+<a href="/">Home</a>
+<p/>
+  
+<pre id="config"></pre>
+<script type="text/javascript">
+        var div = document.createElement('div');
+        div.innerHTML = "@config.render(ConfigRenderOptions.concise)";
+        var data = JSON.parse(div.firstChild.nodeValue.replace(/\n/g, " "));
+        var js = JSON.stringify(data, undefined, 2);
+        document.getElementById('config').innerHTML = js;
+</script>  
+}

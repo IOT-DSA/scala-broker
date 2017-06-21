@@ -1,18 +1,15 @@
-package models.actors
+package models.akka
 
 import scala.util.control.NonFatal
 
-import models.{ MessageRouter, ResponseEnvelope }
+import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
-trait RequesterBehavior { me: AbstractWebSocketActor =>
-
-  // for request routing
-  def router: MessageRouter
+trait RequesterBehavior { me: DSLinkActor =>
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
@@ -27,13 +24,14 @@ trait RequesterBehavior { me: AbstractWebSocketActor =>
    */
   val requesterBehavior: Receive = {
     case m @ RequestMessage(msg, ack, requests) =>
-      log.info(s"$ownId: received $m from WebSocket")
-      sendAck(msg)
+      log.debug(s"$ownId: received $m")
       processRequests(requests)
       requests.lastOption foreach (req => lastRid = req.rid)
     case e @ ResponseEnvelope(from, to, responses) =>
       log.debug(s"$ownId: received $e")
       processResponses(responses)
+      // TODO temporary until connected/disconnected behavior is implemented
+      ws foreach (_ ! e)
   }
 
   /**
@@ -87,8 +85,6 @@ trait RequesterBehavior { me: AbstractWebSocketActor =>
     }
 
     log.debug(s"RID targets: ${targetsByRid.size}, SID targets: ${targetsBySid.size}")
-
-    sendResponses(responses: _*)
   }
 
   /**
@@ -96,9 +92,10 @@ trait RequesterBehavior { me: AbstractWebSocketActor =>
    */
   private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
     requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
-      case (to, reqs) => router.routeRequests(connInfo.linkPath, to, reqs.toSeq: _*) recover {
-        case NonFatal(e) => log.error(s"$ownId: error routing the requests: {}", e.getMessage)
-      }
+      case (to, reqs) =>
+        val envelope = RequestEnvelope(linkPath, to, reqs.toSeq)
+        log.debug(s"$ownId: sending $envelope to [$to]")
+        dsaSend(to, envelope)
     }
   }
 

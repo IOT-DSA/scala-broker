@@ -1,0 +1,69 @@
+@(regex: String, limit: Int, offset: Int, links: Iterable[String], total: Int)
+
+@main("DSA Broker: DSLinks") {
+<h1>DSLinks</h1>
+  
+<a href="/">Home</a>
+<p/>
+
+<table>
+	<tr>
+		<td>Pattern:</td>
+		<td><input type="text" id="regex" value="@regex"/></td>
+	</tr>
+	<tr>
+		<td>Limit:</td>
+		<td><input type="number" id="limit" value="@limit"/></td>
+	</tr>
+	<tr>
+		<td>Offset:</td>
+		<td><input type="number" id="offset" value="@offset"/></td>
+	</tr>
+	<tr>
+		<td/>
+		<td>
+			<input type="button" value="Search" onclick="search()"/>
+			<input type="button" value="Reset" onclick="reset()"/>
+		</td>
+	</tr>
+</table>
+<br/>
+
+<script>
+function search() {
+	var regex = document.getElementById("regex").value;
+	var limit = document.getElementById("limit").value;
+	var offset = document.getElementById("offset").value;
+	window.location.href = window.location.pathname + "?" + 
+		$.param({'regex':regex, 'limit':limit, 'offset':offset});
+}
+
+function reset() {
+	document.getElementById("regex").value = '.*';
+	document.getElementById("limit").value = 100;
+	document.getElementById("offset").value = 0;
+}
+</script>
+
+<table class="datagrid">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Status</th>
+		</tr>
+	</thead>
+	<tfoot>
+		<tr>
+			<td><b>@links.size</b> out of total <b>@total</b> items found.</td>
+		</tr>
+	</tfoot>
+	<tbody>
+	@for(link <- links) {
+		<tr>
+			<td>@link</td>
+			<td>?</td>
+		</tr>
+	}
+	</tbody>
+</table>  
+}

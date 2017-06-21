@@ -4,6 +4,8 @@
 # ~~~~
 
 GET    /               controllers.MainController.index
+GET    /config         controllers.MainController.viewConfig
+GET    /links          controllers.MainController.findDslinks(regex ?= ".*", limit: Int ?= 100, offset: Int ?= 0)
 POST   /conn           controllers.MainController.conn
 GET    /ws             controllers.MainController.ws
 

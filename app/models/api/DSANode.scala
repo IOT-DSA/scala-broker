@@ -10,13 +10,9 @@ import org.joda.time.format.ISODateTimeFormat
 import DSAValueType.{ DSADynamic, DSAValueType }
 import akka.actor.{ ActorRef, TypedActor, TypedProps }
 import akka.event.Logging
-import models.{ MessageRouter, RequestEnvelope }
-import models.actors.RRProcessorActor
+import models.{ RequestEnvelope, ResponseEnvelope, Settings }
 import models.rpc._
 import models.rpc.DSAValue.{ DSAMap, DSAVal, StringValue, array, longToNumericValue, obj }
-import play.api.cache.CacheApi
-import scala.util.control.NonFatal
-import models.Settings
 
 /**
  * A structural unit in Node API.
@@ -68,17 +64,13 @@ trait DSANode {
 /**
  * DSA Node actor-based implementation.
  */
-class DSANodeImpl(router: MessageRouter, cache: CacheApi, settings: Settings, val parent: Option[DSANode])
+class DSANodeImpl(settings: Settings, val parent: Option[DSANode])
     extends DSANode with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
 
   protected val log = Logging(TypedActor.context.system, getClass)
 
   val name = TypedActor.context.self.path.name
   val path = parent.map(_.path).getOrElse("") + "/" + name
-
-  cache.set(path, TypedActor.context.self)
-
-  private val processor = TypedActor.context.actorOf(RRProcessorActor.props(path, cache, settings.UndeliveredInterval))
 
   protected def ownId = s"[$path]"
 
@@ -137,7 +129,7 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, settings: Settings, va
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
-    val props = DSANode.props(router, cache, settings, Some(this))
+    val props = DSANode.props(settings, Some(this))
     val child = TypedActor(TypedActor.context).typedActorOf(props, name)
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
@@ -169,15 +161,10 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, settings: Settings, va
    */
   def onReceive(message: Any, sender: ActorRef) = message match {
 
-    case e @ RequestEnvelope(_, _, requests) =>
-      log.info(s"$ownId: received confirmed $e")
-      requests foreach handleRequest
-
-    case e @ DSAResponse(rid, stream, updates, columns, error) =>
+    case e @ RequestEnvelope(from, _, requests) =>
       log.info(s"$ownId: received $e")
-      router.routeResponses(path, "n/a", e) recover {
-        case NonFatal(e) => log.error(s"$ownId: error routing the responses: {}", e.getMessage)
-      }
+      val responses = requests flatMap handleRequest
+      sender ! ResponseEnvelope(path, from, responses)
 
     case msg @ _ => log.error("Unknown message: " + msg)
   }
@@ -185,56 +172,56 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, settings: Settings, va
   /**
    * Handles DSA requests by processing them and sending the response to itself.
    */
-  def handleRequest: PartialFunction[DSARequest, Unit] = {
+  def handleRequest: PartialFunction[DSARequest, Iterable[DSAResponse]] = {
 
     /* set */
 
     case SetRequest(rid, "", newValue, _) =>
       value = newValue
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     case SetRequest(rid, name, newValue, _) if name.startsWith("$") =>
       addConfigs(name -> newValue)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     case SetRequest(rid, name, newValue, _) if name.startsWith("@") =>
       addAttributes(name -> newValue)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     /* remove */
 
     case RemoveRequest(rid, name) if name.startsWith("$") =>
       removeConfig(name)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     case RemoveRequest(rid, name) if name.startsWith("@") =>
       removeAttribute(name)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     /* invoke */
 
     case InvokeRequest(rid, _, params, _) =>
       invoke(params)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     /* subscribe */
 
     case SubscribeRequest(rid, paths) =>
       assert(paths.size == 1, "Only a single path is allowed in Subscribe")
       subscribe(paths.head.sid, TypedActor.context.self)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
-      if (_value != null) {
+      val head = DSAResponse(rid, Some(StreamState.Closed))
+      val tail = if (_value != null) {
         val update = obj("sid" -> paths.head.sid, "value" -> _value, "ts" -> now)
-        val response = DSAResponse(0, Some(StreamState.Open), Some(List(update)))
-        TypedActor.context.self ! response
-      }
+        DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil
+      } else Nil
+      head :: tail
 
     /* unsubscribe */
 
     case UnsubscribeRequest(rid, sids) =>
       assert(sids.size == 1, "Only a single sid is allowed in Unsubscribe")
       unsubscribe(sids.head)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     /* list */
 
@@ -245,13 +232,13 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, settings: Settings, va
         obj("$is" -> c._2.profile, "$name" -> Await.result(c._2.displayName, Duration.Inf),
           "$type" -> Await.result(c._2.valueType.map(_.toString), Duration.Inf))))
       val updates = Nil ++ cfgUpdates ++ attrUpdates ++ childUpdates
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Open), Some(updates))
+      DSAResponse(rid, Some(StreamState.Open), Some(updates)) :: Nil
 
     /* close */
 
     case CloseRequest(rid) =>
       unlist(rid)
-      TypedActor.context.self ! DSAResponse(rid, Some(StreamState.Closed))
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
   }
 
   // event handlers
@@ -290,6 +277,5 @@ class DSANodeImpl(router: MessageRouter, cache: CacheApi, settings: Settings, va
  * Factory for DSANodeImpl instances.
  */
 object DSANode {
-  def props(router: MessageRouter, cache: CacheApi, settings: Settings, parent: Option[DSANode]) =
-    TypedProps(classOf[DSANode], new DSANodeImpl(router, cache, settings, parent))
+  def props(settings: Settings, parent: Option[DSANode]) = TypedProps(classOf[DSANode], new DSANodeImpl(settings, parent))
 }
