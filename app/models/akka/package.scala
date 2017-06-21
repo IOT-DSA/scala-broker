@@ -2,11 +2,18 @@ package models
 
 import scala.util.matching.Regex
 import models.rpc.DSAValue._
+import _root_.akka.actor._
 
 /**
  * Types and utility functions for DSA actors.
  */
 package object akka {
+
+  /**
+   * Sends a message to an actor using its DSA link path.
+   */
+  def dsaSend(to: String, msg: Any)(implicit context: ActorContext, sender: ActorRef, settings: Settings) = 
+    context.actorSelection("/user/" + settings.Nodes.Root + to) ! msg
 
   /**
    * Interpolates strings to produce RegEx.

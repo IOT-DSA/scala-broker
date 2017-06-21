@@ -9,7 +9,7 @@ import models.rpc.DSAMessage
 /**
  * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.
  */
-abstract class DSLinkActor(val settings: Settings) extends Actor with ActorLogging {
+abstract class DSLinkActor(implicit val settings: Settings) extends Actor with ActorLogging {
   import DSLinkActor._
 
   val linkName = self.path.name

@@ -6,7 +6,7 @@ import models.Settings
 /**
  * Endpoint DSLink in RESPONDER mode.
  */
-class ResponderActor(settings: Settings) extends DSLinkActor(settings) with ResponderBehavior {
+class ResponderActor(settings: Settings) extends DSLinkActor()(settings) with ResponderBehavior {
 
   override def receive = super.receive orElse responderBehavior
 }

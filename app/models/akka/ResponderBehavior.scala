@@ -33,7 +33,7 @@ trait ResponderBehavior { me: DSLinkActor =>
     case m @ ResponseMessage(_, _, responses) =>
       log.debug(s"$ownId: received $m")
       processResponses(responses) foreach {
-        case (to, rsps) => context.actorSelection("/user" + to) ! ResponseEnvelope(linkPath, to, rsps)
+        case (to, rsps) => dsaSend(to, ResponseEnvelope(linkPath, to, rsps)) 
       }
   }
 

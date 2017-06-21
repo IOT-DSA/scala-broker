@@ -1,23 +1,26 @@
 package controllers
 
-import scala.concurrent.Future
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.duration.{ Duration, DurationInt }
 
-import akka.actor.ActorSystem
+import akka.actor.{ ActorRef, ActorSystem }
+import akka.pattern.ask
 import akka.stream.Materializer
+import akka.stream.scaladsl.Flow
+import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.actors._
-import models.kafka._
+import models.akka.{ DownstreamActor, RootNodeActor }
+import models.akka.ConnectionInfo
+import models.akka.DSLinkActor.StartWSFlow
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
-import play.api.http.websocket.{ CloseCodes, CloseMessage, WebSocketCloseException }
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import play.api.libs.json.{ JsError, JsValue, Json, Reads, Writes }
-import play.api.libs.streams.ActorFlow
-import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
-import play.api.mvc.WebSocket.MessageFlowTransformer
 import play.api.inject.ApplicationLifecycle
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import play.api.libs.json.{ JsError, JsValue, Json, Reads }
+import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
+import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 
 /**
  * DSA Client-Broker connection request.
@@ -32,48 +35,56 @@ case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponde
 class MainController @Inject() (implicit settings: Settings, actorSystem: ActorSystem,
                                 materializer: Materializer, cache: CacheApi,
                                 life: ApplicationLifecycle) extends Controller {
-  import settings.Kafka._
-
   private val log = Logger(getClass)
+
+  implicit private val timeout = Timeout(5 seconds)
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
-  private val router = createRouter
+  private val broker = actorSystem.actorOf(RootNodeActor.props(settings), settings.Nodes.Root)
 
-  if (Enabled) {
-    val kr = new KafkaReader(cache, settings)
-    life.addStopHook(() => Future.successful { kr.stop; router.close })
-    kr.start
+  private val downstream = {
+    val nodes = (broker ? RootNodeActor.GetChildren).mapTo[Map[String, ActorRef]]
+    Await.result(nodes.map(_(settings.Nodes.Downstream)), Duration.Inf)
   }
-
-  if (Enabled && RouterAutoStart) {
-    life.addStopHook(() => Future.successful { BrokerFlow.stop })
-    BrokerFlow.start
-  }
-
-  // initialize main actors
-  actorSystem.actorOf(RootNodeActor.props(settings, cache, router), "root")
 
   /**
    * Displays the main app page.
    */
-  def index = Action { implicit request =>
+  def index = Action {
     Ok(views.html.index(settings.rootConfig.root))
+  }
+
+  /**
+   * Displays the configuration.
+   */
+  def viewConfig = Action {
+    Ok(views.html.config(settings.rootConfig.root))
+  }
+
+  /**
+   * Displays the DSLinks page.
+   */
+  def findDslinks(regex: String, limit: Int, offset: Int) = Action.async {
+    val fLinks = (downstream ? DownstreamActor.FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+    val fTotalLinkCount = (downstream ? DownstreamActor.GetDSLinkCount).mapTo[Int]
+    for {
+      links <- fLinks
+      total <- fTotalLinkCount
+    } yield Ok(views.html.links(regex, limit, offset, links, total))
   }
 
   /**
    * Accepts a connection request and sends back the server config JSON.
    */
   def conn = Action(validateJson[ConnectionRequest]) { implicit request =>
-    log.debug(s"Conn request received: $request")
+    log.debug(s"Conn request received at $request : ${request.body}")
 
-    val linkPath = getLinkPath(request)
+    val ci = buildConnectionInfo(request)
+    val linkPath = settings.Paths.Downstream + "/" + ci.linkName
     val json = settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
 
-    val dsId = getDsId(request)
-    val connReq = request.body
-    val ci = ConnectionInfo(dsId, connReq.isRequester, connReq.isResponder, linkPath)
-    cache.set(dsId, ci)
+    cache.set(ci.dsId, ci)
 
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)
@@ -83,48 +94,22 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
    * Establishes a WebSocket connection.
    */
   def ws = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
+    import DownstreamActor._
+
     log.debug(s"WS request received: $request")
     val dsId = getDsId(request)
     val connInfo = cache.get[ConnectionInfo](dsId)
     log.debug(s"Conn info retrieved for $dsId: $connInfo")
 
-    val flow = connInfo map { ci =>
-      (ci.isRequester, ci.isResponder, WebSocketActorConfig(ci, settings, cache))
-    } collect {
-      case (true, true, cfg)  => ActorFlow.actorRef(DualActor.props(_, cfg, router))
-      case (true, false, cfg) => ActorFlow.actorRef(RequesterActor.props(_, cfg, router))
-      case (false, true, cfg) => ActorFlow.actorRef(ResponderActor.props(_, cfg, router))
+    connInfo map { ci =>
+      for {
+        dslink <- (downstream ? GetOrCreateDSLink(ci)).mapTo[ActorRef]
+        flow <- (dslink ? StartWSFlow).mapTo[Flow[DSAMessage, DSAMessage, _]]
+      } yield Right(flow)
+    } getOrElse {
+      Future.successful(Left(Forbidden))
     }
-    Future.successful(flow.toRight {
-      log.error("WS conn rejected: invalid or missing connection info")
-      Forbidden
-    })
   }(transformer)
-
-  /* misc */
-
-  /**
-   * Performs transformations JsValue->In and Out->JsValue.
-   */
-  def jsonMessageFlowTransformer[In: Reads, Out: Writes]: MessageFlowTransformer[In, Out] = {
-
-    val fOut = (out: Out) => {
-      val json = Json.toJson(out)
-      log.trace("WS Out: " + json)
-      json
-    }
-
-    val fIn = (json: JsValue) => {
-      log.trace("WS In: " + json)
-      Json.fromJson[In](json).fold({ errors =>
-        val errorInfo = Json.stringify(JsError.toJson(errors))
-        log.error(s"Invalid WS message: $json. Errors: $errorInfo")
-        throw WebSocketCloseException(CloseMessage(Some(CloseCodes.Unacceptable), errorInfo))
-      }, identity)
-    }
-
-    WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer.map(fIn, fOut)
-  }
 
   /**
    * Validates the JSON and extracts a request message.
@@ -142,19 +127,12 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
   private def getDsId(request: RequestHeader) = request.queryString("dsId").head
 
   /**
-   * Constructs a link path from the connection request.
+   * Constructs a connection info instance from the incoming request.
    */
-  private def getLinkPath(request: Request[ConnectionRequest]) = {
+  private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val linkName = dsId.substring(0, dsId.length - 44)
-    settings.Paths.Downstream + "/" + linkName
+    val connReq = request.body
+    ConnectionInfo(dsId, linkName, connReq.isRequester, connReq.isResponder)
   }
-
-  /**
-   * Depending on the settings, creates either Akka router or Kafka router.
-   */
-  private def createRouter = if (settings.Kafka.Enabled)
-    new KafkaRouter(BrokerUrl, Producer, Topics.ReqEnvelopeIn, Topics.RspEnvelopeIn)
-  else
-    new AkkaRouter(cache)
 }

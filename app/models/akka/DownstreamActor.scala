@@ -26,11 +26,11 @@ class DownstreamActor(settings: Settings) extends Actor with ActorLogging {
   assert(self.path.name == settings.Nodes.Downstream,
     s"Downstream actor should be created under name ${settings.Nodes.Downstream}")
 
-  private val ownId = settings.Paths.Downstream
+  private val ownId = "[" + settings.Paths.Downstream + "]"
 
-  override def preStart = log.debug(s"[$ownId] actor created")
+  override def preStart = log.debug(s"$ownId actor created")
 
-  override def postStop = log.debug(s"[$ownId] actor stopped")
+  override def postStop = log.debug(s"$ownId actor stopped")
 
   def receive = {
     case GetDSLink(name) => sender ! context.child(name)

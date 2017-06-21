@@ -1,9 +1,12 @@
-package models.actors
+package models.akka
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import models.api.{ DSAAction, DSANode, DSAValueType }
 
+/**
+ * Standard node actions.
+ */
 object StandardActions {
   import DSAValueType._
 

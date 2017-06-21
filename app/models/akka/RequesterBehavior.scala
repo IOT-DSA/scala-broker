@@ -95,7 +95,7 @@ trait RequesterBehavior { me: DSLinkActor =>
       case (to, reqs) =>
         val envelope = RequestEnvelope(linkPath, to, reqs.toSeq)
         log.debug(s"$ownId: sending $envelope to [$to]")
-        context.actorSelection("/user" + to) ! envelope
+        dsaSend(to, envelope)
     }
   }
 
