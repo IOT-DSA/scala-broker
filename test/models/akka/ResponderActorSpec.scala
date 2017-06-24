@@ -18,7 +18,7 @@ class ResponderActorSpec extends AbstractActorSpec {
 
   "ResponderActor" should {
     "deliver requests to WS" in {
-      val envelope = RequestEnvelope("source", "target", List(ListRequest(1, "/")))
+      val envelope = RequestEnvelope(List(ListRequest(1, "/")))
       responder.tell(envelope, testActor)
       ws.expectMsg(envelope)
     }

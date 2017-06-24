@@ -26,9 +26,9 @@ package object akka {
    * Resolves the target link path from the request path.
    */
   def resolveLinkPath(path: String) = path match {
-    case Settings.Paths.Downstream                   => Settings.Paths.Downstream
+    case Settings.Paths.Downstream              => Settings.Paths.Downstream
     case r"/downstream/(\w+)$responder(/.*)?$_" => Settings.Paths.Downstream + "/" + responder
-    case Settings.Paths.Upstream                     => Settings.Paths.Upstream
+    case Settings.Paths.Upstream                => Settings.Paths.Upstream
     case r"/upstream/(\w+)$broker(/.*)?$_"      => Settings.Paths.Upstream + "/" + broker
     case _                                      => splitPath(path)._1 
   }

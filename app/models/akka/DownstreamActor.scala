@@ -5,11 +5,9 @@ import java.util.regex.Pattern
 import scala.util.control.NonFatal
 
 import akka.actor.{ Actor, ActorLogging, Props, Status, actorRef2Scala }
-import models.Settings
+import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ BooleanValue, StringValue, array, obj }
-import models.RequestEnvelope
-import models.rpc._
-import models.ResponseEnvelope
 
 /**
  * Actor for DSA `/downstream` node.
@@ -21,7 +19,7 @@ import models.ResponseEnvelope
  */
 class DownstreamActor extends Actor with ActorLogging {
   import DownstreamActor._
-  import StreamState._
+  import models.rpc.StreamState._
 
   assert(self.path.name == Settings.Nodes.Downstream,
     s"Downstream actor should be created under name ${Settings.Nodes.Downstream}")
@@ -57,8 +55,8 @@ class DownstreamActor extends Actor with ActorLogging {
       val result = filtered.drop(offset).take(limit).map(_.path.name)
       sender ! result
 
-    case RequestEnvelope(from, _, requests) =>
-      val envelopes = requests flatMap (processRequest(from, _))
+    case RequestEnvelope(requests) =>
+      val envelopes = requests flatMap processRequest
       envelopes foreach (sender ! _)
   }
 
@@ -79,14 +77,14 @@ class DownstreamActor extends Actor with ActorLogging {
   /**
    * Processes an incoming request and produces a list of response envelopes, if any.
    */
-  private def processRequest(from: String, request: DSARequest): TraversableOnce[ResponseEnvelope] = request match {
+  private def processRequest(request: DSARequest): TraversableOnce[ResponseEnvelope] = request match {
     case ListRequest(rid, _) =>
       listNodes grouped Settings.ChildrenPerListResponse map { rows =>
         val response = DSAResponse(rid = rid, stream = Some(Open), updates = Some(rows.toList))
-        ResponseEnvelope(ownId, from, List(response))
+        ResponseEnvelope(List(response))
       }
     case CloseRequest(rid) =>
-      List(ResponseEnvelope(ownId, from, List(DSAResponse(rid = rid, stream = Some(Closed)))))
+      List(ResponseEnvelope(List(DSAResponse(rid = rid, stream = Some(Closed)))))
     case _ =>
       log.error(s"$ownId: invalid request - $request")
       Nil

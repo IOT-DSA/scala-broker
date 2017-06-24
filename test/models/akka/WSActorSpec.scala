@@ -39,12 +39,12 @@ class WSActorSpec extends AbstractActorSpec {
     }
     "send enveloped requests to socket" in {
       val req = ListRequest(111, "/path")
-      wsActor ! RequestEnvelope("from", "to", List(req))
+      wsActor ! RequestEnvelope(List(req))
       expectMsg(RequestMessage(5, None, List(req)))
     }
     "send enveloped responses to socket" in {
       val rsp = DSAResponse(111)
-      wsActor ! ResponseEnvelope("from", "to", List(rsp))
+      wsActor ! ResponseEnvelope(List(rsp))
       expectMsg(ResponseMessage(6, None, List(rsp)))
     }
   }

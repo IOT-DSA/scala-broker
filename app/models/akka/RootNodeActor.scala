@@ -43,10 +43,10 @@ class RootNodeActor extends Actor with ActorLogging {
   def receive = {
     case GetChildren => sender ! nodes
 
-    case env @ RequestEnvelope(from, _, reqs) =>
+    case env @ RequestEnvelope(reqs) =>
       log.info(s"Received: $env")
       val responses = reqs map processDSARequest
-      sender ! ResponseEnvelope(Settings.Paths.Root, from, responses)
+      sender ! ResponseEnvelope(responses)
 
     case msg @ _ => log.error(s"Unknown message received: $msg")
   }

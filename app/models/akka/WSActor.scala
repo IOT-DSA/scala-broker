@@ -51,10 +51,10 @@ class WSActor(out: ActorRef, link: ActorRef, config: WSActorConfig) extends Acto
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
       link ! m
-    case e @ RequestEnvelope(_, _, requests) =>
+    case e @ RequestEnvelope(requests) =>
       log.debug(s"$ownId: received $e")
       sendRequests(requests: _*)
-    case e @ ResponseEnvelope(_, _, responses) =>
+    case e @ ResponseEnvelope(responses) =>
       log.debug(s"$ownId: received $e")
       sendResponses(responses: _*)
   }

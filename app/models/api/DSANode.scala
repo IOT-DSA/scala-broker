@@ -161,10 +161,10 @@ class DSANodeImpl(val parent: Option[DSANode])
    */
   def onReceive(message: Any, sender: ActorRef) = message match {
 
-    case e @ RequestEnvelope(from, _, requests) =>
+    case e @ RequestEnvelope(requests) =>
       log.info(s"$ownId: received $e")
       val responses = requests flatMap handleRequest
-      sender ! ResponseEnvelope(path, from, responses)
+      sender ! ResponseEnvelope(responses)
 
     case msg @ _ => log.error("Unknown message: " + msg)
   }
