@@ -6,7 +6,7 @@ import models.Settings
 /**
  * Endpoint DSLink in REQUESTER mode.
  */
-class RequesterActor(settings: Settings) extends DSLinkActor()(settings) with RequesterBehavior {
+class RequesterActor extends DSLinkActor with RequesterBehavior {
 
   override def receive = super.receive orElse requesterBehavior
 
@@ -23,5 +23,5 @@ object RequesterActor {
   /**
    * Creates a new Props instance for [[RequesterActor]].
    */
-  def props(settings: Settings) = Props(new RequesterActor(settings))
+  def props = Props(new RequesterActor)
 }

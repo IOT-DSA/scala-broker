@@ -15,8 +15,6 @@ trait RequesterBehavior { me: DSLinkActor =>
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
   private val targetsBySid = collection.mutable.Map.empty[Int, String]
 
-  private val resolveLink = resolveLinkPath(settings) _
-
   private var lastRid: Int = 0
 
   /**
@@ -27,7 +25,7 @@ trait RequesterBehavior { me: DSLinkActor =>
       log.debug(s"$ownId: received $m")
       processRequests(requests)
       requests.lastOption foreach (req => lastRid = req.rid)
-    case e @ ResponseEnvelope(from, to, responses) =>
+    case e @ ResponseEnvelope(responses) =>
       log.debug(s"$ownId: received $e")
       processResponses(responses)
       // TODO temporary until connected/disconnected behavior is implemented
@@ -93,7 +91,7 @@ trait RequesterBehavior { me: DSLinkActor =>
   private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
     requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) =>
-        val envelope = RequestEnvelope(linkPath, to, reqs.toSeq)
+        val envelope = RequestEnvelope(reqs.toSeq)
         log.debug(s"$ownId: sending $envelope to [$to]")
         dsaSend(to, envelope)
     }
@@ -121,7 +119,7 @@ trait RequesterBehavior { me: DSLinkActor =>
       case SubscribeRequest(_, paths)   => paths.head.path // assuming one path after split
     }
 
-    extractPath andThen resolveLink
+    extractPath andThen resolveLinkPath
   }
 
   /**

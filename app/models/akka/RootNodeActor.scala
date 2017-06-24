@@ -12,13 +12,13 @@ import models.rpc.ListRequest
 /**
  * Handles requests to the top broker node.
  */
-class RootNodeActor(settings: Settings) extends Actor with ActorLogging {
+class RootNodeActor extends Actor with ActorLogging {
   import RootNodeActor._
-  import settings.Nodes._
+  import Settings.Nodes._
   import models.rpc.StreamState._
 
   // create children
-  private val downstreamNode = context.actorOf(DownstreamActor.props(settings), Downstream)
+  private val downstreamNode = context.actorOf(DownstreamActor.props, Downstream)
   private val dataNode = createDataNode
   private val defsNode = createDefsNode
   private val usersNode = createUsersNode
@@ -43,10 +43,10 @@ class RootNodeActor(settings: Settings) extends Actor with ActorLogging {
   def receive = {
     case GetChildren => sender ! nodes
 
-    case env @ RequestEnvelope(from, _, reqs) =>
+    case env @ RequestEnvelope(reqs) =>
       log.info(s"Received: $env")
       val responses = reqs map processDSARequest
-      sender ! ResponseEnvelope(settings.Paths.Root, from, responses)
+      sender ! ResponseEnvelope(responses)
 
     case msg @ _ => log.error(s"Unknown message received: $msg")
   }
@@ -80,7 +80,7 @@ class RootNodeActor(settings: Settings) extends Actor with ActorLogging {
    * Creates a /data node.
    */
   private def createDataNode = {
-    val dataNode = TypedActor(context).typedActorOf(DSANode.props(settings, None), Data)
+    val dataNode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode
@@ -90,7 +90,7 @@ class RootNodeActor(settings: Settings) extends Actor with ActorLogging {
    * Creates a /defs node hierarchy.
    */
   private def createDefsNode = {
-    val defsNode = TypedActor(context).typedActorOf(DSANode.props(settings, None), Defs)
+    val defsNode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
     defsNode.profile = "node"
     defsNode.addChild("profile").foreach { node =>
       node.profile = "static"
@@ -111,7 +111,7 @@ class RootNodeActor(settings: Settings) extends Actor with ActorLogging {
    * Creates a /users node.
    */
   private def createUsersNode = {
-    val usersNode = TypedActor(context).typedActorOf(DSANode.props(settings, None), Users)
+    val usersNode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
     usersNode.profile = "node"
     usersNode
   }
@@ -120,7 +120,7 @@ class RootNodeActor(settings: Settings) extends Actor with ActorLogging {
    * Creates a /sys node.
    */
   private def createSysNode = {
-    val sysNode = TypedActor(context).typedActorOf(DSANode.props(settings, None), Sys)
+    val sysNode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
     sysNode.profile = "node"
     sysNode
   }
@@ -129,7 +129,7 @@ class RootNodeActor(settings: Settings) extends Actor with ActorLogging {
    * Creates a /upstream node.
    */
   private def createUpstreamNode = {
-    val upstreamNode = TypedActor(context).typedActorOf(DSANode.props(settings, None), Upstream)
+    val upstreamNode = TypedActor(context).typedActorOf(DSANode.props(None), Upstream)
     upstreamNode.profile = "node"
     upstreamNode
   }
@@ -145,5 +145,5 @@ object RootNodeActor {
   /**
    * Creates a new [[RootNodeActor]] props instance.
    */
-  def props(settings: Settings) = Props(new RootNodeActor(settings))
+  def props = Props(new RootNodeActor)
 }

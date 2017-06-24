@@ -32,7 +32,7 @@ case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponde
  * Handles main web requests.
  */
 @Singleton
-class MainController @Inject() (implicit settings: Settings, actorSystem: ActorSystem,
+class MainController @Inject() (actorSystem: ActorSystem,
                                 materializer: Materializer, cache: CacheApi,
                                 life: ApplicationLifecycle) extends Controller {
   private val log = Logger(getClass)
@@ -41,25 +41,25 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
-  private val broker = actorSystem.actorOf(RootNodeActor.props(settings), settings.Nodes.Root)
+  private val broker = actorSystem.actorOf(RootNodeActor.props, Settings.Nodes.Root)
 
   private val downstream = {
     val nodes = (broker ? RootNodeActor.GetChildren).mapTo[Map[String, ActorRef]]
-    Await.result(nodes.map(_(settings.Nodes.Downstream)), Duration.Inf)
+    Await.result(nodes.map(_(Settings.Nodes.Downstream)), Duration.Inf)
   }
 
   /**
    * Displays the main app page.
    */
   def index = Action {
-    Ok(views.html.index(settings.rootConfig.root))
+    Ok(views.html.index(Settings.rootConfig.root))
   }
 
   /**
    * Displays the configuration.
    */
   def viewConfig = Action {
-    Ok(views.html.config(settings.rootConfig.root))
+    Ok(views.html.config(Settings.rootConfig.root))
   }
 
   /**
@@ -81,8 +81,8 @@ class MainController @Inject() (implicit settings: Settings, actorSystem: ActorS
     log.debug(s"Conn request received at $request : ${request.body}")
 
     val ci = buildConnectionInfo(request)
-    val linkPath = settings.Paths.Downstream + "/" + ci.linkName
-    val json = settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
+    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
+    val json = Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
 
     cache.set(ci.dsId, ci)
 

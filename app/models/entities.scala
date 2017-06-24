@@ -1,39 +1,40 @@
 package models
 
 import models.rpc.{ DSARequest, DSAResponse }
+import _root_.akka.actor.ActorRef
 
 /**
  * Envelope for internal request routing.
  */
-case class RequestEnvelope(from: String, to: String, requests: Seq[DSARequest]) {
+case class RequestEnvelope(requests: Seq[DSARequest]) {
 
   /**
    * Outputs only the first request for compact logging.
    */
   override def toString = if (requests.size < 2)
-    s"RequestEnvelope($from,$to,$requests})"
+    s"RequestEnvelope($requests})"
   else
-    s"RequestEnvelope($from,$to,List(${requests.head},...${requests.size - 1} more))"
+    s"RequestEnvelope(List(${requests.head},...${requests.size - 1} more))"
 }
 
 /**
  * Envelope for internal response routing.
  */
-case class ResponseEnvelope(from: String, to: String, responses: Seq[DSAResponse]) {
+case class ResponseEnvelope(responses: Seq[DSAResponse]) {
 
   /**
    * Outputs only the first response for compact logging.
    */
   override def toString = if (responses.size < 2)
-    s"ResponseEnvelope($from,$to,$responses})"
+    s"ResponseEnvelope($responses})"
   else
-    s"ResponseEnvelope($from,$to,List(${responses.head},...${responses.size - 1} more))"
+    s"ResponseEnvelope(List(${responses.head},...${responses.size - 1} more))"
 }
 
 /**
  * Used in call records to store the subscribers for future responses.
  */
-case class Origin(source: String, sourceId: Int)
+case class Origin(source: ActorRef, sourceId: Int)
 
 /**
  * Combines the requests that need to be dispatched to the WebSocket and

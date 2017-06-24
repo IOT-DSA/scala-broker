@@ -19,11 +19,10 @@ import com.typesafe.config.ConfigFactory
 class DownstreamActorSpec extends AbstractActorSpec {
   import DownstreamActor._
 
-  val settings = new Settings(new Configuration(ConfigFactory.load))
   implicit val timeout = Timeout(5 seconds)
   val dsId = "link" + "?" * 44
 
-  val downstream = system.actorOf(props(settings), settings.Nodes.Downstream)
+  val downstream = system.actorOf(props, Settings.Nodes.Downstream)
 
   "CreateDSLink" should {
     "create a new requester" in {

@@ -9,11 +9,11 @@ import models.rpc.DSAMessage
 /**
  * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.
  */
-abstract class DSLinkActor(implicit val settings: Settings) extends Actor with ActorLogging {
+abstract class DSLinkActor extends Actor with ActorLogging {
   import DSLinkActor._
 
   val linkName = self.path.name
-  val linkPath = settings.Paths.Downstream + "/" + linkName
+  val linkPath = Settings.Paths.Downstream + "/" + linkName
 
   protected val ownId = s"DSLink[$linkName]"
 
@@ -54,7 +54,7 @@ abstract class DSLinkActor(implicit val settings: Settings) extends Actor with A
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both).run()
 
-    val wsProps = WSActor.props(toSocket, self, WSActorConfig(linkName, settings.Salt))
+    val wsProps = WSActor.props(toSocket, self, WSActorConfig(linkName, Settings.Salt))
 
     val fromSocket = context.actorOf(Props(new Actor {
       val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))

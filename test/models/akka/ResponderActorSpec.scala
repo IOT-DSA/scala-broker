@@ -12,15 +12,13 @@ import play.api.Configuration
  */
 class ResponderActorSpec extends AbstractActorSpec {
 
-  val settings = new Settings(new Configuration(ConfigFactory.load))
-
-  val responder = system.actorOf(ResponderActor.props(settings), "responder")
+  val responder = system.actorOf(ResponderActor.props, "responder")
   val ws = TestProbe()
   responder.tell(DSLinkActor.WSConnected, ws.ref)
 
   "ResponderActor" should {
     "deliver requests to WS" in {
-      val envelope = RequestEnvelope("source", "target", List(ListRequest(1, "/")))
+      val envelope = RequestEnvelope(List(ListRequest(1, "/")))
       responder.tell(envelope, testActor)
       ws.expectMsg(envelope)
     }

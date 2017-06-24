@@ -16,8 +16,6 @@ import play.api.Configuration
  */
 class RequesterActorSpec extends AbstractActorSpec {
 
-  val settings = new Settings(new Configuration(ConfigFactory.load))
-
   val abcProbe = TestProbe()
   class AbcActor extends Actor {
     def receive = { case msg => abcProbe.ref ! msg }
@@ -35,7 +33,7 @@ class RequesterActorSpec extends AbstractActorSpec {
     def receive = { case msg => brokerProbe.ref ! msg }
   }), "broker")
 
-  val requester = system.actorOf(RequesterActor.props(settings), "requester")
+  val requester = system.actorOf(RequesterActor.props, "requester")
   val ws = TestProbe()
   requester.tell(DSLinkActor.WSConnected, ws.ref)
 
@@ -43,20 +41,20 @@ class RequesterActorSpec extends AbstractActorSpec {
     "route requests to broker root" in {
       val requests = List(ListRequest(1, "/"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      brokerProbe.expectMsg(RequestEnvelope("/downstream/requester", "/", requests))
+      brokerProbe.expectMsg(RequestEnvelope(requests))
     }
     "route requests to downstream" in {
       val requests = List(ListRequest(1, "/downstream"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      downstreamProbe.expectMsg(RequestEnvelope("/downstream/requester", "/downstream", requests))
+      downstreamProbe.expectMsg(RequestEnvelope(requests))
     }
     "route requests to links" in {
       val requests = List(ListRequest(1, "/downstream/abc"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      abcProbe.expectMsg(RequestEnvelope("/downstream/requester", "/downstream/abc", requests))
+      abcProbe.expectMsg(RequestEnvelope(requests))
     }
     "forward responses to WS" in {
-      val envelope = ResponseEnvelope("source", "target", List(DSAResponse(1)))
+      val envelope = ResponseEnvelope(List(DSAResponse(1)))
       requester.tell(envelope, testActor)
       ws.expectMsg(envelope)
     }

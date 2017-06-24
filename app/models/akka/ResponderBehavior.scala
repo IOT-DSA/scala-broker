@@ -6,13 +6,14 @@ import models._
 import models.rpc._
 import models.rpc.DSAValue.{ DSAVal, StringValue, array }
 import models.splitPath
+import _root_.akka.actor.ActorRef
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
 trait ResponderBehavior { me: DSLinkActor =>
 
-  type RequestHandler = PartialFunction[(String, DSARequest), HandlerResult]
+  type RequestHandler = PartialFunction[DSARequest, HandlerResult]
 
   // lookup registries for SID (Subscribe/Unsubscribe) and RID (all other) requests
   private val ridRegistry = new CallRegistry(1)
@@ -21,19 +22,19 @@ trait ResponderBehavior { me: DSLinkActor =>
   private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
   val responderBehavior: Receive = {
-    case env @ RequestEnvelope(from, to, requests) =>
+    case env @ RequestEnvelope(requests) =>
       log.debug(s"$ownId: received $env")
-      val result = processRequests(from, requests)
+      val result = processRequests(requests)
       // TODO just temporary, implement connected/disconnected behavior
       if (!result.requests.isEmpty)
-        ws foreach (_ ! RequestEnvelope(from, to, result.requests))
+        ws foreach (_ ! RequestEnvelope(result.requests))
       if (!result.responses.isEmpty)
-        sender ! ResponseEnvelope(to, from, result.responses)
+        sender ! ResponseEnvelope(result.responses)
 
     case m @ ResponseMessage(_, _, responses) =>
       log.debug(s"$ownId: received $m")
       processResponses(responses) foreach {
-        case (to, rsps) => dsaSend(to, ResponseEnvelope(linkPath, to, rsps)) 
+        case (to, rsps) => to ! ResponseEnvelope(rsps) 
       }
   }
 
@@ -41,12 +42,12 @@ trait ResponderBehavior { me: DSLinkActor =>
    * Processes the requests and returns requests that need to be forwaded to their destinations
    * as well as the responses that need to be delivered to the originators.
    */
-  def processRequests(from: String, requests: Seq[DSARequest]): HandlerResult = {
+  def processRequests(requests: Seq[DSARequest]): HandlerResult = {
     val handler = handleListRequest orElse handlePassthroughRequest orElse
       handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
     val results = requests map (request => try {
-      handler(from -> request)
+      handler(request)
     } catch {
       case NonFatal(e) => log.error(s"$ownId: error handling request $request - {}", e); HandlerResult.Empty
     })
@@ -60,7 +61,7 @@ trait ResponderBehavior { me: DSLinkActor =>
   /**
    * Processes the responses and returns the translated ones groupped by their destinations.
    */
-  def processResponses(responses: Seq[DSAResponse]): Map[String, Seq[DSAResponse]] = {
+  def processResponses(responses: Seq[DSAResponse]): Map[ActorRef, Seq[DSAResponse]] = {
     val handler = handleSubscribeResponse orElse handleNonSubscribeResponse
 
     val results = responses flatMap handler
@@ -75,8 +76,8 @@ trait ResponderBehavior { me: DSLinkActor =>
    * Handles List request.
    */
   private val handleListRequest: RequestHandler = {
-    case (from, ListRequest(rid, path)) =>
-      val origin = Origin(from, rid)
+    case ListRequest(rid, path) =>
+      val origin = Origin(sender, rid)
       ridRegistry.lookupByPath(path) match {
         case None =>
           val targetRid = ridRegistry.saveLookup(origin, DSAMethod.List, Some(path))
@@ -94,7 +95,7 @@ trait ResponderBehavior { me: DSLinkActor =>
    */
   private val handlePassthroughRequest: RequestHandler = {
 
-    def tgtId(from: String, srcId: Int, method: DSAMethod.DSAMethod) = ridRegistry.saveLookup(Origin(from, srcId), method)
+    def tgtId(srcId: Int, method: DSAMethod.DSAMethod) = ridRegistry.saveLookup(Origin(sender, srcId), method)
 
     def saveAttribute(nodePath: String, name: String, value: DSAVal) = {
       log.debug(s"$ownId: saving attribute under $nodePath: $name = $value")
@@ -104,26 +105,26 @@ trait ResponderBehavior { me: DSLinkActor =>
 
     // translates request to request for forwarding to responder 
     // or request to response to handle locally and return response to the requester
-    val pass: PartialFunction[(String, DSARequest), Either[DSARequest, DSAResponse]] = {
-      case (from, SetRequest(rid, path, value, permit)) if isAttribute(path) =>
+    val pass: PartialFunction[DSARequest, Either[DSARequest, DSAResponse]] = {
+      case SetRequest(rid, path, value, permit) if isAttribute(path) =>
         val (nodePath, attrName) = splitPath(path)
         saveAttribute(nodePath, attrName.get, value)
         Right(DSAResponse(rid, Some(StreamState.Closed)))
-      case (from, SetRequest(rid, path, value, permit)) =>
-        Left(SetRequest(tgtId(from, rid, DSAMethod.Set), translatePath(path), value, permit))
-      case (from, RemoveRequest(rid, path)) =>
-        Left(RemoveRequest(tgtId(from, rid, DSAMethod.Remove), translatePath(path)))
-      case (from, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + AddAttributeAction) =>
+      case SetRequest(rid, path, value, permit) =>
+        Left(SetRequest(tgtId(rid, DSAMethod.Set), translatePath(path), value, permit))
+      case RemoveRequest(rid, path) =>
+        Left(RemoveRequest(tgtId(rid, DSAMethod.Remove), translatePath(path)))
+      case InvokeRequest(rid, path, params, permit) if path.endsWith("/" + AddAttributeAction) =>
         val attrName = params("name").value.toString
         val nodePath = path.dropRight(AddAttributeAction.size + 1)
         saveAttribute(nodePath, attrName, params("value"))
         Right(DSAResponse(rid, Some(StreamState.Closed)))
-      case (from, InvokeRequest(rid, path, params, permit)) if path.endsWith("/" + SetValueAction) =>
+      case InvokeRequest(rid, path, params, permit) if path.endsWith("/" + SetValueAction) =>
         val attrPath = path.dropRight(SetValueAction.size + 1)
         val attrValue = params("value")
-        Left(SetRequest(tgtId(from, rid, DSAMethod.Set), translatePath(attrPath), attrValue, permit))
-      case (from, InvokeRequest(rid, path, params, permit)) =>
-        Left(InvokeRequest(tgtId(from, rid, DSAMethod.Invoke), translatePath(path), params, permit))
+        Left(SetRequest(tgtId(rid, DSAMethod.Set), translatePath(attrPath), attrValue, permit))
+      case InvokeRequest(rid, path, params, permit) =>
+        Left(InvokeRequest(tgtId(rid, DSAMethod.Invoke), translatePath(path), params, permit))
     }
 
     pass andThen (_.fold(HandlerResult.apply, HandlerResult.apply))
@@ -133,9 +134,9 @@ trait ResponderBehavior { me: DSLinkActor =>
    * Handles Subscribe request.
    */
   private val handleSubscribeRequest: RequestHandler = {
-    case (from, req @ SubscribeRequest(rid, _)) =>
+    case req @ SubscribeRequest(rid, _) =>
       val srcPath = req.path // to ensure there's only one path (see requester actor)
-      val sidOrigin = Origin(from, srcPath.sid)
+      val sidOrigin = Origin(sender, srcPath.sid)
       val result = sidRegistry.lookupByPath(srcPath.path) match {
         case None =>
           val targetSid = sidRegistry.saveLookup(sidOrigin, DSAMethod.Subscribe, Some(srcPath.path), None)
@@ -157,8 +158,8 @@ trait ResponderBehavior { me: DSLinkActor =>
    * Handles Unsubscribe request.
    */
   private val handleUnsubscribeRequest: RequestHandler = {
-    case (from, req @ UnsubscribeRequest(rid, _)) =>
-      val origin = Origin(from, req.sid) // to ensure there's only one sid (see requester actor)
+    case req @ UnsubscribeRequest(rid, _) =>
+      val origin = Origin(sender, req.sid) // to ensure there's only one sid (see requester actor)
       sidRegistry.removeOrigin(origin) map { rec =>
         val wsReqs = if (rec.origins.isEmpty) {
           sidRegistry.removeLookup(rec)
@@ -175,8 +176,8 @@ trait ResponderBehavior { me: DSLinkActor =>
    * Handles Close request.
    */
   private val handleCloseRequest: RequestHandler = {
-    case (from, CloseRequest(rid)) =>
-      val origin = Origin(from, rid)
+    case CloseRequest(rid) =>
+      val origin = Origin(sender, rid)
       val record = ridRegistry.removeOrigin(origin)
       record match {
         case None =>
@@ -194,7 +195,7 @@ trait ResponderBehavior { me: DSLinkActor =>
    * Splits the response updates in individual row, translates each update's SID into
    * (potentially) multiple source SIDs and creates one response per source SID.
    */
-  private def handleSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
+  private def handleSubscribeResponse: PartialFunction[DSAResponse, Seq[(ActorRef, DSAResponse)]] = {
     case rsp @ DSAResponse(0, stream, updates, columns, error) =>
       val list = updates.getOrElse(Nil)
       if (list.isEmpty) {
@@ -217,7 +218,7 @@ trait ResponderBehavior { me: DSLinkActor =>
   /**
    * Handles a non-Subscribe response.
    */
-  private val handleNonSubscribeResponse: PartialFunction[DSAResponse, Seq[(String, DSAResponse)]] = {
+  private val handleNonSubscribeResponse: PartialFunction[DSAResponse, Seq[(ActorRef, DSAResponse)]] = {
     case response if response.rid != 0 =>
       val record = ridRegistry.lookupByTargetId(response.rid)
       record match {

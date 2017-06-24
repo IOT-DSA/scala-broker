@@ -6,7 +6,7 @@ import models.Settings
 /**
  * Endpoint DSLink in RESPONDER mode.
  */
-class ResponderActor(settings: Settings) extends DSLinkActor()(settings) with ResponderBehavior {
+class ResponderActor extends DSLinkActor with ResponderBehavior {
 
   override def receive = super.receive orElse responderBehavior
 }
@@ -18,5 +18,5 @@ object ResponderActor {
   /**
    * Creates a new Props instance for [[ResponderActor]].
    */
-  def props(settings: Settings) = Props(new ResponderActor(settings))
+  def props = Props(new ResponderActor)
 }

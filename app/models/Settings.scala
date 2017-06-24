@@ -1,20 +1,18 @@
 package models
 
-import scala.collection.JavaConverters.asScalaSetConverter
 import scala.concurrent.duration.DurationLong
 
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
+import com.typesafe.config.ConfigFactory
+
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
 /**
  * Encapsulates application settings – both hardcoded and configured in `application.conf`.
  */
-@Singleton
-class Settings @Inject() (val playConfig: Configuration) {
+object Settings {
 
-  val rootConfig = playConfig.underlying
+  val rootConfig = ConfigFactory.load
 
   /**
    * DSA Server Configuration.
