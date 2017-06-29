@@ -28,8 +28,6 @@
 	<logger name="play" level="INFO" />
 	<logger name="application" level="DEBUG" />
 	<logger name="controllers" level="DEBUG" />
-	<!-- uncomment to see the message payload in the log -->
-	<!-- <logger name="controllers.MainController" level="TRACE" /> -->
 	<logger name="models" level="DEBUG" />
 
 	<!-- Off these ones as they are annoying, and anyway we manage configuration 
