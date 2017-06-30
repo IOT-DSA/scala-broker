@@ -34,6 +34,9 @@ abstract class ResponderWorker(poolId: String) extends Actor with ActorLogging {
   protected val bindings = collection.mutable.Map.empty[Int, WorkerCallRecord]
 
   def receive = {
+    case LookupTargetId(origin) =>
+      sender ! bindings.find(_._2.origins.contains(origin)).map(_._1)
+      
     case AddOrigin(targetId, origin) =>
       val record = bindings.getOrElseUpdate(targetId, new WorkerCallRecord).addOrigin(origin)
       log.debug(s"$ownId: added binding $targetId -> $origin")
@@ -76,6 +79,7 @@ abstract class ResponderWorker(poolId: String) extends Actor with ActorLogging {
  * Messages for [[ResponderWorker]] actors.
  */
 object ResponderWorker {
+  case class LookupTargetId(origin: Origin)
   case class AddOrigin(targetId: Int, origin: Origin)
   case class RemoveOrigin(origin: Origin)
   case class RemoveAllOrigins(targetId: Int)

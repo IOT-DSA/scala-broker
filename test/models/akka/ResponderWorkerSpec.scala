@@ -3,6 +3,7 @@ package models.akka
 import scala.concurrent.duration.DurationInt
 
 import akka.actor.{ ActorRef, Props, actorRef2Scala }
+import akka.pattern.ask
 import akka.routing.{ Broadcast, ConsistentHashingPool }
 import akka.testkit.TestProbe
 import akka.util.Timeout
@@ -19,8 +20,9 @@ class ResponderWorkerSpec extends AbstractActorSpec {
   implicit val timeout = Timeout(10 seconds)
 
   private val pool = ConsistentHashingPool(3, hashMapping = {
-    case AddOrigin(_, origin) => origin
-    case RemoveOrigin(origin) => origin
+    case AddOrigin(_, origin)   => origin
+    case RemoveOrigin(origin)   => origin
+    case LookupTargetId(origin) => origin
   })
 
   "ResponderWorker" should {
@@ -35,6 +37,12 @@ class ResponderWorkerSpec extends AbstractActorSpec {
       getOrigins(router, 1) mustBe Set(Origin(testActor, 101), Origin(testActor, 102))
       getOrigins(router, 2) mustBe Set(Origin(testActor, 201))
       getOrigins(router, 3) mustBe Set(Origin(testActor, 301), Origin(testActor, 302), Origin(testActor, 303))
+    }
+    "lookup targetId by origin" in {
+      whenReady(router ? LookupTargetId(Origin(testActor, 303))) { _ mustBe Some(3) }
+      whenReady(router ? LookupTargetId(Origin(testActor, 201))) { _ mustBe Some(2) }
+      whenReady(router ? LookupTargetId(Origin(testActor, 102))) { _ mustBe Some(1) }
+      whenReady(router ? LookupTargetId(Origin(testActor, 404))) { _ mustBe None }
     }
     "remove origins for targetId" in {
       router ! RemoveOrigin(Origin(testActor, 101))
