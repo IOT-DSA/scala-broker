@@ -3,7 +3,7 @@ package models.akka
 import scala.util.control.NonFatal
 
 import akka.actor.{ ActorRef, actorRef2Scala, ActorDSL }
-import akka.routing.{ Broadcast, ConsistentHashingPool }
+import akka.routing.{ Broadcast, ConsistentHashingPool, ConsistentHashingRouter }
 import models._
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
@@ -27,6 +27,7 @@ trait PooledResponderBehavior { me: DSLinkActor =>
   import context.system
   import ResponderWorker._
   import ActorDSL._
+  import ConsistentHashingRouter._
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
   type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]
@@ -56,13 +57,17 @@ trait PooledResponderBehavior { me: DSLinkActor =>
   private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
   // LIST and SUBSCRIBE workers
-  private val pool = ConsistentHashingPool(3, hashMapping = {
+  private val originHash: ConsistentHashMapping = {
     case AddOrigin(_, origin)   => origin
     case RemoveOrigin(origin)   => origin
     case LookupTargetId(origin) => origin
-  })
-  private val listRouter = context.actorOf(pool.props(ResponderListWorker.props(linkName)))
-  private val subsRouter = context.actorOf(pool.props(ResponderSubscribeWorker.props(linkName)))
+  }
+
+  private val listPool = ConsistentHashingPool(Settings.Responder.ListPoolSize, hashMapping = originHash)
+  private val listRouter = context.actorOf(listPool.props(ResponderListWorker.props(linkName)))
+
+  private val subsPool = ConsistentHashingPool(Settings.Responder.SubscribePoolSize, hashMapping = originHash)
+  private val subsRouter = context.actorOf(subsPool.props(ResponderSubscribeWorker.props(linkName)))
 
   /**
    * Processes incoming requests and responses.
@@ -225,7 +230,7 @@ trait PooledResponderBehavior { me: DSLinkActor =>
       ibox.receive().asInstanceOf[Option[Int]] map { targetSid =>
         subsRouter ! RemoveOrigin(sidOrigin)
         subsRouter.tell(Broadcast(GetOriginCount(targetSid)), ibox.getRef)
-        val count = (1 to pool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
+        val count = (1 to subsPool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
         if (count < 1) {
           val path = tgtSidLookup(targetSid)
           subsPathLookup -= path
@@ -254,7 +259,7 @@ trait PooledResponderBehavior { me: DSLinkActor =>
           ibox.receive().asInstanceOf[Option[Int]] map { targetId =>
             listRouter ! RemoveOrigin(origin)
             listRouter.tell(Broadcast(GetOriginCount(targetId)), ibox.getRef)
-            val count = (1 to pool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
+            val count = (1 to listPool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
             if (count < 1) {
               val rec = tgtRidLookup(targetId)
               listPathLookup -= rec.path.get
