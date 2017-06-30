@@ -11,13 +11,13 @@ import _root_.akka.actor.ActorRef
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: DSLinkActor =>
+trait SimpleResponderBehavior { me: DSLinkActor =>
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
 
   // lookup registries for SID (Subscribe/Unsubscribe) and RID (all other) requests
-  private val ridRegistry = new CallRegistry(1)
-  private val sidRegistry = new CallRegistry(1)
+  private val ridRegistry = new SimpleCallRegistry(1)
+  private val sidRegistry = new SimpleCallRegistry(1)
 
   private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
