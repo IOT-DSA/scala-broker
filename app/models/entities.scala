@@ -34,7 +34,9 @@ case class ResponseEnvelope(responses: Seq[DSAResponse]) {
 /**
  * Used in call records to store the subscribers for future responses.
  */
-case class Origin(source: ActorRef, sourceId: Int)
+case class Origin(source: ActorRef, sourceId: Int) {
+  override def toString = s"Origin(${source.path.name}:$sourceId)"
+}
 
 /**
  * Combines the requests that need to be dispatched to the WebSocket and
@@ -54,6 +56,6 @@ object HandlerResult {
   def apply(response: DSAResponse): HandlerResult = apply(Nil, List(response))
 
   def apply(request: DSARequest, response: DSAResponse): HandlerResult = apply(List(request), List(response))
-  
+
   def flatten(seq: Seq[HandlerResult]): HandlerResult = apply(seq.flatMap(_.requests), seq.flatMap(_.responses))
 }

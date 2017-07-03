@@ -71,4 +71,14 @@ object Settings {
    * The maximum number of children in LIST response.
    */
   val ChildrenPerListResponse = rootConfig.getInt("broker.children.per.response")
+
+  /**
+   * Responder configuration.
+   */
+  object Responder {
+    private val cfg = rootConfig.getConfig("broker.responder")
+    
+    val ListPoolSize = cfg.getInt("list.pool.size")
+    val SubscribePoolSize = cfg.getInt("subscribe.pool.size")
+  }
 }

@@ -6,7 +6,7 @@ import models.Settings
 /**
  * Endpoint DSLink in DUAL mode.
  */
-class DualActor extends DSLinkActor with RequesterBehavior with ResponderBehavior {
+class DualActor extends DSLinkActor with RequesterBehavior with PooledResponderBehavior {
 
   override def receive = super.receive orElse requesterBehavior orElse responderBehavior
 

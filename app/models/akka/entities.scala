@@ -27,7 +27,7 @@ class IntCounter(init: Int = 0) {
 /**
  * Encapsulates information about requests's subscribers and last received response.
  */
-class CallRecord(val targetId: Int,
+class SimpleCallRecord(val targetId: Int,
                  val method: DSAMethod,
                  val path: Option[String],
                  private var _origins: Set[Origin],
@@ -44,17 +44,17 @@ class CallRecord(val targetId: Int,
  * Stores lookups to retrieve request records by source and target RID/SID and paths,
  * where appropriate.
  */
-class CallRegistry(nextId: Int = 1) {
+class SimpleCallRegistry(nextId: Int = 1) {
   private var nextTargetId = new IntCounter(nextId)
-  private val callsByOrigin = collection.mutable.Map.empty[Origin, CallRecord]
-  private val callsByTargetId = collection.mutable.Map.empty[Int, CallRecord]
-  private val callsByPath = collection.mutable.Map.empty[String, CallRecord]
+  private val callsByOrigin = collection.mutable.Map.empty[Origin, SimpleCallRecord]
+  private val callsByTargetId = collection.mutable.Map.empty[Int, SimpleCallRecord]
+  private val callsByPath = collection.mutable.Map.empty[String, SimpleCallRecord]
 
   def createTargetId = nextTargetId.inc
 
   def saveLookup(origin: Origin, method: DSAMethod, path: Option[String] = None, lastResponse: Option[DSAResponse] = None) = {
     val targetId = createTargetId
-    val record = new CallRecord(targetId, method, path, Set(origin), lastResponse)
+    val record = new SimpleCallRecord(targetId, method, path, Set(origin), lastResponse)
     callsByOrigin(origin) = record
     callsByTargetId(targetId) = record
     path foreach (callsByPath(_) = record)
@@ -63,7 +63,7 @@ class CallRegistry(nextId: Int = 1) {
 
   def saveEmpty(method: DSAMethod) = {
     val targetId = createTargetId
-    callsByTargetId(targetId) = new CallRecord(targetId, method, None, Set.empty, None)
+    callsByTargetId(targetId) = new SimpleCallRecord(targetId, method, None, Set.empty, None)
     targetId
   }
 
@@ -73,14 +73,14 @@ class CallRegistry(nextId: Int = 1) {
 
   def lookupByTargetId(targetId: Int) = callsByTargetId.get(targetId)
 
-  def addOrigin(origin: Origin, record: CallRecord) = {
+  def addOrigin(origin: Origin, record: SimpleCallRecord) = {
     record.addOrigin(origin)
     callsByOrigin(origin) = record
   }
 
   def removeOrigin(origin: Origin) = callsByOrigin remove origin map { rec => rec.removeOrigin(origin); rec }
 
-  def removeLookup(record: CallRecord) = {
+  def removeLookup(record: SimpleCallRecord) = {
     record.origins foreach callsByOrigin.remove
     record.path foreach callsByPath.remove
     callsByTargetId.remove(record.targetId)
