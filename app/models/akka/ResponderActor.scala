@@ -8,7 +8,7 @@ import models.Settings
  */
 class ResponderActor extends DSLinkActor with PooledResponderBehavior {
 
-  override def receive = super.receive orElse responderBehavior
+  override def connected = super.connected orElse responderBehavior  
 }
 
 /**

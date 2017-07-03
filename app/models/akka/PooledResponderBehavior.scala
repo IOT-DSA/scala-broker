@@ -96,10 +96,7 @@ class RidRegistry {
 class SidRegistry {
   private val targetSids = new IntCounter(1)
 
-  // for Subscribe/Unsubscribe tgtSid -> path
   private val pathBySid = collection.mutable.Map.empty[Int, String]
-
-  // for Subscribe calls path->tgtSid
   private val sidByPath = collection.mutable.Map.empty[String, Int]
 
   /**

@@ -8,7 +8,7 @@ import models.Settings
  */
 class RequesterActor extends DSLinkActor with RequesterBehavior {
 
-  override def receive = super.receive orElse requesterBehavior
+  override def connected = super.connected orElse requesterBehavior
 
   override def postStop() = {
     stopRequester

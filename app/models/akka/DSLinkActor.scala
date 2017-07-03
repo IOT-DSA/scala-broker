@@ -9,7 +9,7 @@ import models.rpc.DSAMessage
 /**
  * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.
  */
-abstract class DSLinkActor extends Actor with ActorLogging {
+abstract class DSLinkActor extends Actor with Stash with ActorLogging {
   import DSLinkActor._
 
   val linkName = self.path.name
@@ -34,17 +34,35 @@ abstract class DSLinkActor extends Actor with ActorLogging {
   /**
    * Handles incoming messages.
    */
-  def receive = {
+  final def receive = disconnected
+
+  /**
+   * Handles messages in CONNECTED state.
+   */
+  def connected: Receive = {
+    case Terminated(wsActor) =>
+      log.info(s"$ownId: disconnected from WebSocket")
+      context.unwatch(wsActor)
+      _ws = None
+      context.become(disconnected)
+  }
+
+  /**
+   * Handles messages in DISCONNECTED state.
+   */
+  def disconnected: Receive = {
     case StartWSFlow =>
       log.debug(s"$ownId: connecting to WebSocket")
       sender ! createWSFlow()
     case WSConnected =>
       log.info(s"$ownId: connected to WebSocket")
       _ws = Some(context.watch(sender))
-    case Terminated(wsActor) =>
-      log.info(s"$ownId: disconnected from WebSocket")
-      context.unwatch(wsActor)
-      _ws = None
+      log.debug("$ownId: unstashing all stored messages")
+      unstashAll()
+      context.become(connected)
+    case _ =>
+      log.debug("$ownId: stashing the incoming message")
+      stash()
   }
 
   /**
