@@ -11,14 +11,126 @@ import models.rpc.DSAValue.DSAVal
 import models.splitPath
 
 /**
- * Lookup record resolved by targetRid.
+ * Encapsulates request information for lookups.
  */
-case class TargetLookupRecord(method: DSAMethod, origin: Origin, path: Option[String])
+case class LookupRecord(method: DSAMethod, targetId: Int, origin: Option[Origin], path: Option[String])
 
 /**
- * Lookup record resolved by origin.
+ * Request registry tied to RID.
  */
-case class SourceLookupRecord(method: DSAMethod, targetId: Int)
+class RidRegistry {
+  private val nextTargetId = new IntCounter(1)
+
+  private val callsByTargetId = collection.mutable.Map.empty[Int, LookupRecord]
+  private val callsByOrigin = collection.mutable.Map.empty[Origin, LookupRecord]
+  private val callsByPath = collection.mutable.Map.empty[String, LookupRecord]
+
+  /**
+   * Saves lookup record for LIST call.
+   */
+  def saveListLookup(path: String): Int = saveLookup(DSAMethod.List, None, Some(path))
+
+  /**
+   * Saves lookup record for Set, Remove or Invoke call.
+   */
+  def savePassthroughLookup(method: DSAMethod, origin: Origin): Int = saveLookup(method, Some(origin), None)
+
+  /**
+   * Saves lookup record for SUBSCRIBE call.
+   */
+  def saveSubscribeLookup(origin: Origin): Int = saveLookup(DSAMethod.Subscribe, Some(origin), None)
+
+  /**
+   * Saves lookup record for UNSUBSCRIBE call.
+   */
+  def saveUnsubscribeLookup(origin: Origin): Int = saveLookup(DSAMethod.Unsubscribe, Some(origin), None)
+
+  /**
+   * Saves the lookup and returns the newly generated target RID.
+   */
+  private def saveLookup(method: DSAMethod, origin: Option[Origin], path: Option[String]): Int = {
+    val tgtId = nextTargetId.inc
+    val record = LookupRecord(method, tgtId, origin, path)
+
+    callsByTargetId(tgtId) = record
+    origin foreach (callsByOrigin(_) = record)
+    path foreach (callsByPath(_) = record)
+
+    tgtId
+  }
+
+  /**
+   * Locates the call record by target RID (used by response handlers).
+   */
+  def lookupByTargetId(targetId: Int): Option[LookupRecord] = callsByTargetId.get(targetId)
+
+  /**
+   * Locates the call record by the request origin (applicable to passthrough calls,
+   * though in fact used only to close streaming INVOKE requests.)
+   */
+  def lookupByOrigin(origin: Origin): Option[LookupRecord] = callsByOrigin.get(origin)
+
+  /**
+   * Locates the call record by the path (applicable to LIST calls only).
+   */
+  def lookupByPath(path: String): Option[LookupRecord] = callsByPath.get(path)
+
+  /**
+   * Removes the call record.
+   */
+  def removeLookup(record: LookupRecord) = {
+    record.origin foreach callsByOrigin.remove
+    record.path foreach callsByPath.remove
+    callsByTargetId -= record.targetId
+  }
+
+  /**
+   * Returns brief diagnostic information for the registry.
+   */
+  def info = s"Origin Lookups: ${callsByOrigin.size}, Target Lookups: ${callsByTargetId.size}, Path Lookups: ${callsByPath.size}"
+}
+
+/**
+ * Request registry tied to SID.
+ */
+class SidRegistry {
+  private val targetSids = new IntCounter(1)
+
+  // for Subscribe/Unsubscribe tgtSid -> path
+  private val pathBySid = collection.mutable.Map.empty[Int, String]
+
+  // for Subscribe calls path->tgtSid
+  private val sidByPath = collection.mutable.Map.empty[String, Int]
+
+  /**
+   * Saves the lookup and returns the newly generated SID.
+   */
+  def saveLookup(path: String): Int = {
+    val tgtSid = targetSids.inc
+    sidByPath(path) = tgtSid
+    pathBySid(tgtSid) = path
+    tgtSid
+  }
+
+  /**
+   * Locates the SID by the path.
+   */
+  def lookupByPath(path: String): Option[Int] = sidByPath.get(path)
+
+  /**
+   * Removes the lookup.
+   */
+  def removeLookup(targetSid: Int) = {
+    val path = pathBySid(targetSid)
+    sidByPath -= path
+    pathBySid -= targetSid
+  }
+
+  /**
+   * Returns brief diagnostic information for the registry.
+   */
+  def info = s"Target Lookups: ${pathBySid.size}, Path Lookups: ${sidByPath.size}"
+}
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
@@ -32,26 +144,9 @@ trait PooledResponderBehavior { me: DSLinkActor =>
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
   type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]
 
-  // generates RIDs for all new calls
-  private var targetRids = new IntCounter(1)
+  private val ridRegistry = new RidRegistry
 
-  // generates SIDs for all new calls
-  private var targetSids = new IntCounter(1)
-
-  // used for response lookup
-  private val tgtRidLookup = collection.mutable.Map.empty[Int, TargetLookupRecord]
-
-  // used only for Invoke
-  private val srcRidLookup = collection.mutable.Map.empty[Origin, SourceLookupRecord]
-
-  // for List calls path->tgtRid
-  private val listPathLookup = collection.mutable.Map.empty[String, Int]
-
-  // for Subscribe/Unsubscribe tgtSid -> path
-  private val tgtSidLookup = collection.mutable.Map.empty[Int, String]
-
-  // for Subscribe calls path->tgtSid
-  private val subsPathLookup = collection.mutable.Map.empty[String, Int]
+  private val sidRegistry = new SidRegistry
 
   // stores responder's nodes' attributes locally
   private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
@@ -103,10 +198,8 @@ trait PooledResponderBehavior { me: DSLinkActor =>
       case NonFatal(e) => log.error(s"$ownId: error handling request $request - {}", e); HandlerResult.Empty
     })
 
-    log.info("Tgt RID lookups: " + tgtRidLookup.size)
-    log.info("Src RID lookups: " + srcRidLookup.size)
-    log.info("List Path lookups: " + listPathLookup.size)
-    log.info("Subs Path lookups: " + subsPathLookup.size)
+    log.debug("RID after Req: " + ridRegistry.info)
+    log.debug("SID after Req: " + sidRegistry.info)
 
     HandlerResult.flatten(results)
   }
@@ -119,10 +212,8 @@ trait PooledResponderBehavior { me: DSLinkActor =>
 
     val results = responses flatMap handler
 
-    log.info("Tgt RID lookups: " + tgtRidLookup.size)
-    log.info("Src RID lookups: " + srcRidLookup.size)
-    log.info("List Path lookups: " + listPathLookup.size)
-    log.info("Subs Path lookups: " + subsPathLookup.size)
+    log.debug("RID after Rsp: " + ridRegistry.info)
+    log.debug("SID after Rsp: " + sidRegistry.info)
 
     results groupBy (_._1) mapValues (_.map(_._2))
   }
@@ -133,15 +224,13 @@ trait PooledResponderBehavior { me: DSLinkActor =>
   private val handleListRequest: RequestHandler = {
     case ListRequest(rid, path) =>
       val origin = Origin(sender, rid)
-      listPathLookup.get(path) match {
+      ridRegistry.lookupByPath(path) match {
         case None =>
-          val tgtId = targetRids.inc
-          listPathLookup(path) = tgtId
-          tgtRidLookup(tgtId) = TargetLookupRecord(DSAMethod.List, null, Some(path)) // TODO origin not needed here
+          val tgtId = ridRegistry.saveListLookup(path)
           listRouter ! AddOrigin(tgtId, origin)
           HandlerResult(ListRequest(tgtId, translatePath(path)))
-        case Some(tgtId) =>
-          listRouter ! AddOrigin(tgtId, origin)
+        case Some(rec) =>
+          listRouter ! AddOrigin(rec.targetId, origin)
           HandlerResult.Empty
       }
   }
@@ -151,11 +240,7 @@ trait PooledResponderBehavior { me: DSLinkActor =>
    */
   private def handlePassthroughRequest: RequestHandler = {
 
-    def tgtId(srcId: Int, method: DSAMethod) = targetRids.inc having { tgtId =>
-      val origin = Origin(sender, srcId)
-      tgtRidLookup(tgtId) = TargetLookupRecord(method, origin, None)
-      srcRidLookup(origin) = SourceLookupRecord(method, tgtId)
-    }
+    def tgtId(srcId: Int, method: DSAMethod) = ridRegistry.savePassthroughLookup(method, Origin(sender, srcId))
 
     def saveAttribute(nodePath: String, name: String, value: DSAVal) = {
       log.info(s"$ownId: saving attribute under $nodePath: $name = $value")
@@ -200,13 +285,10 @@ trait PooledResponderBehavior { me: DSLinkActor =>
       val ridOrigin = Origin(sender, srcRid)
       val sidOrigin = Origin(sender, srcPath.sid)
 
-      subsPathLookup.get(srcPath.path) match {
+      sidRegistry.lookupByPath(srcPath.path) match {
         case None =>
-          val tgtRid = targetRids.inc
-          tgtRidLookup(tgtRid) = TargetLookupRecord(DSAMethod.Subscribe, ridOrigin, None) // origin IS needed
-          val tgtSid = targetSids.inc
-          subsPathLookup(srcPath.path) = tgtSid
-          tgtSidLookup(tgtSid) = srcPath.path
+          val tgtRid = ridRegistry.saveSubscribeLookup(ridOrigin)
+          val tgtSid = sidRegistry.saveLookup(srcPath.path)
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
           subsRouter ! AddOrigin(tgtSid, sidOrigin)
           HandlerResult(SubscribeRequest(tgtRid, tgtPath))
@@ -224,22 +306,10 @@ trait PooledResponderBehavior { me: DSLinkActor =>
     case req @ UnsubscribeRequest(rid, _) =>
       val ridOrigin = Origin(sender, rid)
       val sidOrigin = Origin(sender, req.sid)
-      // TODO this is a temporary solution, needs to be async using become() and stash()
-      val ibox = inbox()
-      subsRouter.tell(LookupTargetId(sidOrigin), ibox.getRef)
-      ibox.receive().asInstanceOf[Option[Int]] map { targetSid =>
-        subsRouter ! RemoveOrigin(sidOrigin)
-        subsRouter.tell(Broadcast(GetOriginCount(targetSid)), ibox.getRef)
-        val count = (1 to subsPool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
-        if (count < 1) {
-          val path = tgtSidLookup(targetSid)
-          subsPathLookup -= path
-          tgtSidLookup -= targetSid
-          val tgtRid = targetRids.inc
-          tgtRidLookup(tgtRid) = TargetLookupRecord(DSAMethod.Unsubscribe, ridOrigin, None)
-          HandlerResult(UnsubscribeRequest(tgtRid, List(targetSid)))
-        } else
-          HandlerResult(DSAResponse(rid, Some(StreamState.Closed)))
+      removeOrigin(sidOrigin, subsPool, subsRouter) map { targetSid =>
+        sidRegistry.removeLookup(targetSid)
+        val tgtRid = ridRegistry.saveUnsubscribeLookup(ridOrigin)
+        HandlerResult(UnsubscribeRequest(tgtRid, List(targetSid)))
       } getOrElse HandlerResult(DSAResponse(rid, Some(StreamState.Closed)))
   }
 
@@ -249,26 +319,31 @@ trait PooledResponderBehavior { me: DSLinkActor =>
   private val handleCloseRequest: RequestHandler = {
     case CloseRequest(rid) =>
       val origin = Origin(sender, rid)
-      srcRidLookup.get(origin) match {
-        case Some(SourceLookupRecord(_, tgtId)) => HandlerResult(CloseRequest(tgtId))
-        case _ =>
-          // assumed to be related to LIST call
-          // TODO this is a temporary solution, needs to be async using become() and stash()
-          val ibox = inbox()
-          listRouter.tell(LookupTargetId(origin), ibox.getRef)
-          ibox.receive().asInstanceOf[Option[Int]] map { targetId =>
-            listRouter ! RemoveOrigin(origin)
-            listRouter.tell(Broadcast(GetOriginCount(targetId)), ibox.getRef)
-            val count = (1 to listPool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
-            if (count < 1) {
-              val rec = tgtRidLookup(targetId)
-              listPathLookup -= rec.path.get
-              tgtRidLookup -= targetId
-              HandlerResult(CloseRequest(targetId))
-            } else
-              HandlerResult.Empty
+      ridRegistry.lookupByOrigin(origin) match {
+        case Some(LookupRecord(_, tgtId, _, _)) => HandlerResult(CloseRequest(tgtId)) // passthrough call
+        case _ => // LIST call
+          removeOrigin(origin, listPool, listRouter) map { targetId =>
+            ridRegistry.lookupByTargetId(targetId) foreach ridRegistry.removeLookup
+            HandlerResult(CloseRequest(targetId))
           } getOrElse HandlerResult.Empty
       }
+  }
+
+  /**
+   * Removes the origin from one of the workers. Returns `Some(targetId)` if the entry can be
+   * removed (i.e. no listeners left), or None otherwise.
+   */
+  private def removeOrigin(origin: Origin, pool: ConsistentHashingPool, router: ActorRef) = {
+    val ibox = inbox()
+    router.tell(LookupTargetId(origin), ibox.getRef)
+    ibox.receive().asInstanceOf[Option[Int]] map { targetId =>
+      router ! RemoveOrigin(origin)
+      router.tell(Broadcast(GetOriginCount(targetId)), ibox.getRef)
+      val count = (1 to pool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
+      (targetId, count < 1)
+    } collect {
+      case (targetId, true) => targetId
+    }
   }
 
   /**
@@ -284,15 +359,13 @@ trait PooledResponderBehavior { me: DSLinkActor =>
    */
   private def handleNonSubscribeResponse: ResponseHandler = {
     case rsp if rsp.rid != 0 =>
-      val result = tgtRidLookup.get(rsp.rid) match {
-        case Some(TargetLookupRecord(DSAMethod.List, _, _)) =>
+      val result = ridRegistry.lookupByTargetId(rsp.rid) match {
+        case Some(LookupRecord(DSAMethod.List, _, _, _)) =>
           listRouter ! Broadcast(rsp)
           Nil
-        case Some(TargetLookupRecord(_, origin, _)) =>
-          if (rsp.stream == Some(StreamState.Closed)) {
-            tgtRidLookup -= rsp.rid
-            srcRidLookup -= origin
-          }
+        case Some(rec @ LookupRecord(_, _, Some(origin), _)) =>
+          if (rsp.stream == Some(StreamState.Closed))
+            ridRegistry.removeLookup(rec)
           List((origin.source, rsp.copy(rid = origin.sourceId)))
         case _ =>
           log.warning(s"$ownId: Cannot find original request for target RID: ${rsp.rid}")

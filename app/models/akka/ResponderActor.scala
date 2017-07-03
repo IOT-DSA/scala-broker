@@ -6,7 +6,7 @@ import models.Settings
 /**
  * Endpoint DSLink in RESPONDER mode.
  */
-class ResponderActor extends DSLinkActor with SimpleResponderBehavior {
+class ResponderActor extends DSLinkActor with PooledResponderBehavior {
 
   override def receive = super.receive orElse responderBehavior
 }
