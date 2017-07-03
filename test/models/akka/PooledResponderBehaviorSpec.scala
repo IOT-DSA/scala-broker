@@ -15,7 +15,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
   import models.rpc.StreamState._
 
   val responder = system.actorOf(Props(new DSLinkActor with PooledResponderBehavior {
-    override def receive = super.receive orElse responderBehavior
+    override def connected = super.connected orElse responderBehavior
   }), "R")
 
   val ws = TestProbe()

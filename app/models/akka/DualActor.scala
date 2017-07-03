@@ -8,7 +8,7 @@ import models.Settings
  */
 class DualActor extends DSLinkActor with RequesterBehavior with PooledResponderBehavior {
 
-  override def receive = super.receive orElse requesterBehavior orElse responderBehavior
+  override def connected = super.connected orElse requesterBehavior orElse responderBehavior
 
   override def postStop() = {
     stopRequester
