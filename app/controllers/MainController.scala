@@ -10,9 +10,9 @@ import akka.stream.scaladsl.Flow
 import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ DownstreamActor, RootNodeActor }
-import models.akka.ConnectionInfo
-import models.akka.DSLinkActor.StartWSFlow
+import models.akka.{ ConnectionInfo, DownstreamActor, RootNodeActor }
+import models.akka.DownstreamActor._
+import models.akka.DSLinkActor._
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
@@ -22,12 +22,20 @@ import play.api.libs.json.{ JsError, JsValue, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 
+
 /**
  * DSA Client-Broker connection request.
  */
 case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponder: Boolean,
                              linkData: Option[JsValue], version: String, formats: Option[List[String]],
                              enableWebSocketCompression: Boolean)
+
+/**
+ * Object passed to a view to supply various page information.
+ */
+case class ViewConfig(title: String, navItem: String, heading: String, description: String,
+                      downCount: Option[Int] = None, upCount: Option[Int] = None)
+
 /**
  * Handles main web requests.
  */
@@ -51,29 +59,48 @@ class MainController @Inject() (actorSystem: ActorSystem,
   /**
    * Displays the main app page.
    */
-  def index = Action {
-    Ok(views.html.index(Settings.rootConfig.root))
+  def index = Action.async {
+    getDownUpCount map {
+      case (down, up) => Ok(views.html.index(Some(down), Some(up)))
+    }
   }
-
+  
   /**
-   * Displays the configuration.
+   * Displays data explorer.
    */
-  def viewConfig = Action {
-    Ok(views.html.config(Settings.rootConfig.root))
-  }
+  def dataExplorer = TODO
 
   /**
    * Displays the DSLinks page.
    */
   def findDslinks(regex: String, limit: Int, offset: Int) = Action.async {
-    val fLinks = (downstream ? DownstreamActor.FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
-    val fTotalLinkCount = (downstream ? DownstreamActor.GetDSLinkCount).mapTo[Int]
-    for {
-      links <- fLinks
-      total <- fTotalLinkCount
-    } yield Ok(views.html.links(regex, limit, offset, links, total))
-  }
+    import DownstreamActor._
 
+    val fLinkNames = (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+    val fDownUpCount = getDownUpCount
+    for {
+      names <- fLinkNames
+      (down, up) <- fDownUpCount
+      allLinks <- Future.sequence(names.map(link => (downstream ? GetDSLink(link)).mapTo[Option[ActorRef]]))
+      links = allLinks.collect { case Some(ref) => ref }
+      infos <- Future.sequence(links.map(link => (link ? GetLinkInfo).mapTo[LinkInfo]))
+    } yield Ok(views.html.links(regex, limit, offset, infos, down, Some(down), Some(up)))
+  }
+  
+  /**
+   * Displays upstream connections.
+   */
+  def upstream = TODO
+  
+  /**
+   * Displays the configuration.
+   */
+  def viewConfig = Action.async {
+    getDownUpCount map {
+      case (down, up) => Ok(views.html.config(Settings.rootConfig.root, Some(down), Some(up)))
+    }
+  }
+  
   /**
    * Accepts a connection request and sends back the server config JSON.
    */
@@ -129,10 +156,25 @@ class MainController @Inject() (actorSystem: ActorSystem,
   /**
    * Constructs a connection info instance from the incoming request.
    */
-  private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
-    val dsId = getDsId(request)
-    val linkName = dsId.substring(0, dsId.length - 44)
-    val connReq = request.body
-    ConnectionInfo(dsId, linkName, connReq.isRequester, connReq.isResponder)
+  private def buildConnectionInfo(request: Request[ConnectionRequest]) =
+    ConnectionInfo(getDsId(request), request.body)
+
+  /**
+   * Returns a future with the number of registered downstream dslinks.
+   */
+  private def getDownstreamCount = (downstream ? GetDSLinkCount).mapTo[Int]
+
+  /**
+   * Returns a future with the number of registered upstream connections.
+   */
+  private def getUpstreamCount = Future.successful(0)
+
+  /**
+   * Combines `getDownstreamCount` and `getUpstreamCount` to produce a future tuple (down, up).
+   */
+  private def getDownUpCount = {
+    val fDown = getDownstreamCount
+    val fUp = getUpstreamCount
+    for (down <- fDown; up <- fUp) yield (down, up)
   }
 }

@@ -6,7 +6,7 @@ import models.Settings
 /**
  * Endpoint DSLink in RESPONDER mode.
  */
-class ResponderActor extends DSLinkActor with PooledResponderBehavior {
+class ResponderActor(connInfo: ConnectionInfo) extends DSLinkActor(connInfo) with PooledResponderBehavior {
 
   override def connected = super.connected orElse responderBehavior  
 }
@@ -18,5 +18,5 @@ object ResponderActor {
   /**
    * Creates a new Props instance for [[ResponderActor]].
    */
-  def props = Props(new ResponderActor)
+  def props(connInfo: ConnectionInfo) = Props(new ResponderActor(connInfo))
 }

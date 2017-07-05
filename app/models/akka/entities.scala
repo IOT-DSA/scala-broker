@@ -3,11 +3,26 @@ package models.akka
 import models.Origin
 import models.rpc.DSAResponse
 import models.rpc.DSAMethod.DSAMethod
+import controllers.ConnectionRequest
 
 /**
  * Encapsulates DSLink information for WebSocket connection.
  */
-case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, isResponder: Boolean)
+case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, isResponder: Boolean,
+                          linkData: Option[String] = None, version: String = "",
+                          formats: List[String] = Nil, compression: Boolean = false)
+
+/**
+ * Factory for [[ConnectionInfo]] instances.
+ */
+object ConnectionInfo {
+  /**
+   * Creates a new [[ConnectionInfo]] instance by extracting information from a connection request.
+   */
+  def apply(dsId: String, cr: ConnectionRequest): ConnectionInfo =
+    new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
+      cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression)
+}
 
 /**
  * Similar to [[java.util.concurrent.atomic.AtomicInteger]], but not thread safe,
@@ -28,10 +43,10 @@ class IntCounter(init: Int = 0) {
  * Encapsulates information about requests's subscribers and last received response.
  */
 class SimpleCallRecord(val targetId: Int,
-                 val method: DSAMethod,
-                 val path: Option[String],
-                 private var _origins: Set[Origin],
-                 var lastResponse: Option[DSAResponse]) {
+                       val method: DSAMethod,
+                       val path: Option[String],
+                       private var _origins: Set[Origin],
+                       var lastResponse: Option[DSAResponse]) {
 
   def addOrigin(origin: Origin) = _origins += origin
 

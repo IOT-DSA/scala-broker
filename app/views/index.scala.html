@@ -1,13 +1,13 @@
-@(config: com.typesafe.config.ConfigObject)
+@import controllers.ViewConfig
 
-@import com.typesafe.config._
+@(downCount: Option[Int], upCount: Option[Int])
 
-@main("DSA Broker") {
-<h1>DSABroker</h1>
-<p>Akka based implementation of a DSA broker in Scala.</p>
-
-<ul>
-	<li><a href="/config">Configuration</a></li>
-	<li><a href="/links">DSLinks</a></li>
-</ul>
+@main(ViewConfig("DSABroker", "Home", "Dashboard", "Broker Operational Status", downCount, upCount)) {
+<div class="matter">
+	<div class="container-fluid">
+		<div class="row-fluid">
+			Broker information...
+		</div>
+	</div>
+</div>
 }

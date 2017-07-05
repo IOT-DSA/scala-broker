@@ -33,7 +33,8 @@ class RequesterActorSpec extends AbstractActorSpec {
     def receive = { case msg => brokerProbe.ref ! msg }
   }), "broker")
 
-  val requester = system.actorOf(RequesterActor.props, "requester")
+  val ci = ConnectionInfo("", "", true, false)
+  val requester = system.actorOf(RequesterActor.props(ci), "requester")
   val ws = TestProbe()
   requester.tell(DSLinkActor.WSConnected, ws.ref)
 
