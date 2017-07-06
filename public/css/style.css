@@ -1413,17 +1413,17 @@ form{
 
 /* Chart */
 
-#curve-chart,#live-chart,#pie-chart,#pie-chart2,#pie-chart3{
+#curve-chart,#live-chart,#pie-types-chart,#pie-targets-chart,#pie-origins-chart{
 	height: 250px;
 	max-width: 100%;
 }
 
-#bar-chart{
+#requests-today-chart{
 	height: 283px;
 	width: 99.5%;	
 }
 
-#pie-chart,#pie-chart2,#pie-chart3{
+#pie-types-chart,#pie-targets-chart,#pie-origins-chart{
 	max-width: 300px;
 	margin: 10px auto;
 }

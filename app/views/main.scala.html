@@ -1,6 +1,6 @@
 @import controllers.ViewConfig
 
-@(cfg: ViewConfig)(content: Html)
+@(cfg: ViewConfig)(content: Html)(tail: Html)
 
 @active(flag: Boolean) = @{if(flag) "class=active" else ""}
 
@@ -80,12 +80,15 @@
 
 		<span class="totop"><a href="#"><i class="fa fa-chevron-up"></i></a></span>		
         
+        <!-- putting scripts at the bottom to make loading faster -->
 		<script src="@routes.Assets.versioned("js/jquery.js")"></script>
 		<script src="@routes.Assets.versioned("js/bootstrap.min.js")"></script>
 		<script src="@routes.Assets.versioned("js/jquery-ui.min.js")"></script> 
 		<script src="@routes.Assets.versioned("js/jquery.gritter.min.js")"></script>
 		<script src="@routes.Assets.versioned("js/respond.min.js")"></script>
 		<script src="@routes.Assets.versioned("js/html5shiv.js")"></script>
-		<script src="@routes.Assets.versioned("js/custom.js")"></script>       
+		<script src="@routes.Assets.versioned("js/custom.js")"></script>
+		
+		@tail 
     </body>
 </html>

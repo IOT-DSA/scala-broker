@@ -1,8 +1,4 @@
 
-/*Sparklines */
-
-/* Sparkline plugin Section starts */
-
 $("#status1").sparkline([5,6,7,9,9,5,9,6,5,6,6,7,7,6,7,8,9,5 ], {
     type: 'line',
     width: '80',
@@ -52,23 +48,28 @@ $("#status7").sparkline([3,6,3,9,9,5,4,6,5,6,4,9,7,6,7,8,8,5 ], {
     lineColor: '#0ca5e7',
     fillColor: '#e5f3f9'});
 	
-$("#todayspark1").sparkline([8,11,9,12,10,9,13,11,12,11,10,12,11,], {
+$("#connectionsToday").sparkline([8,11,9,12,10,9,13,11,12,11], {
     type: 'bar',
     height: '50',
     barWidth: 7,
     barColor: '#fff'});
 
-$("#todayspark2").sparkline([7,11,9,12,8,9,14,11,10,12,10,12,11,], {
+$("#bounceRate").sparkline([7,9,14,11,10,12,10,12,11,], {
     type: 'bar',
     height: '50',
     barWidth: 7,
     barColor: '#fff'});
 
-$("#todayspark3").sparkline([3,6,3,9,9,5,4,6,5,6,4,9,4,6,3,7,8,9,7,5,8,9,5,7,8,8,5 ], {
+$("#messagesSent").sparkline([3,6,3,9,8,9,5,7,8,8,5 ], {
     type: 'line',
-    width: '170',
+    width: '70',
     height: '50',
     lineColor: '#fff',
     fillColor: '#ddd'});
 
-/* Sparkline plugin section ends */
+$("#messagesRcvd").sparkline([4,2,5,6,4,7,3,3,2,4,5 ], {
+    type: 'line',
+    width: '70',
+    height: '50',
+    lineColor: '#fff',
+    fillColor: '#ddd'});
