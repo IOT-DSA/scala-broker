@@ -1,13 +1,367 @@
-@(config: com.typesafe.config.ConfigObject)
+@import controllers.ViewConfig 
 
-@import com.typesafe.config._
+@(downCount: Option[Int], upCount: Option[Int]) 
 
-@main("DSA Broker") {
-<h1>DSABroker</h1>
-<p>Akka based implementation of a DSA broker in Scala.</p>
+@row1() = {
+<div class="row-fluid">
+	<div class="col-md-12">
+		<ul class="today-datas">
+			<li class="bred">
+				<div class="pull-left">
+					<span id="connectionsToday" class="spark"></span>
+				</div>
+				<div class="datas-text pull-right">
+					<span class="bold">12,420</span> Connections/Day
+				</div>
+				<div class="clearfix"></div>
+			</li>
+			<li class="bgreen">
+				<div class="pull-left">
+					<i class="fa fa-group"></i>
+				</div>
+				<div class="datas-text pull-right">
+					<span class="bold">2</span> Currently Connected
+				</div>
+				<div class="clearfix"></div>
+			</li>
+			<li class="blightblue">
+				<div class="pull-left">
+					<span id="bounceRate" class="spark"></span>
+				</div> 
+				<div class="datas-text pull-right">
+					<span class="bold">15.66%</span> Bounce Rate
+				</div>
+				<div class="clearfix"></div>
+			</li>
+			<li class="bviolet">
+				<div class="pull-left">
+					<span id="messagesSent" class="spark"></span>
+				</div>
+				<div class="datas-text pull-right">
+					<span class="bold">22,325</span> Messages Sent
+				</div>
+				<div class="clearfix"></div>
+			</li>
+			<li class="borange">
+				<div class="pull-left">
+					<span id="messagesRcvd" class="spark"></span>
+				</div>
+				<div class="datas-text pull-right">
+					<span class="bold">19,129</span> Messages Received
+				</div>
+				<div class="clearfix"></div>
+			</li>
+		</ul>
+	</div>
+</div>
+}
 
-<ul>
-	<li><a href="/config">Configuration</a></li>
-	<li><a href="/links">DSLinks</a></li>
-</ul>
+@row2() = {
+<div class="row-fluid">
+	<div class="col-md-8">
+		<div class="widget wlightblue">
+			<div class="widget-head">
+			  <div class="pull-left">Today Requests By Hour</div>
+			  <div class="widget-icons pull-right">
+				<a href="#" class="wminimize"><i class="fa fa-chevron-up"></i></a> 
+				<a href="#" class="wclose"><i class="fa fa-times"></i></a>
+			  </div>
+			  <div class="clearfix"></div>
+			</div>             
+			<div class="widget-content">
+			  <div class="padd">
+				<div id="requests-today-chart"></div>
+			  </div>
+			</div>
+		</div>	
+	</div>
+	<div class="col-md-4">
+		<div class="widget wblue">
+			<div class="widget-head">
+			  <div class="pull-left">Today Status</div>
+			  <div class="widget-icons pull-right">
+				<a href="#" class="wminimize"><i class="fa fa-chevron-up"></i></a> 
+				<a href="#" class="wclose"><i class="fa fa-times"></i></a>
+			  </div>
+			  <div class="clearfix"></div>
+			</div>             
+			<div class="widget-content">
+			  <div class="padd">
+				<ul class="current-status">
+				  <li>
+					<span id="status1"></span> <span class="bold">Connections : 2000</span> <i class="fa fa-arrow-up green"></i>
+				  </li>
+				  <li>
+					<span id="status2"></span> <span class="bold">New Connections : 1,345</span> <i class="fa fa-arrow-down red"></i>
+				  </li>
+				  <li>
+					<span id="status3"></span> <span class="bold">Unique IPs : 2000</span> <i class="fa fa-arrow-up green"></i>
+				  </li>
+				  <li>
+					<span id="status4"></span> <span class="bold">Subscriptions : 800</span> <i class="fa fa-arrow-down red"></i>
+				  </li>
+				  <li>
+					<span id="status5"></span> <span class="bold">Avg. Session Duration : 734 sec</span> <i class="fa fa-arrow-down red"></i>
+				  </li>
+				  <li>
+					<span id="status6"></span> <span class="bold">Error Rate : 0.03%</span> <i class="fa fa-arrow-up green"></i>
+				  </li>   
+				  <li>
+					<span id="status7"></span> <span class="bold">Bounce Rate : 9%</span> <i class="fa fa-arrow-up green"></i>
+				  </li>                                                                                          
+				</ul>
+			  </div>
+			</div>
+		</div>
+	</div>
+</div>
+}
+
+@row3() = {
+<div class="row-fluid">
+	<div class="col-md-12">
+		<div class="widget wred">
+			<div class="widget-head">
+				<div class="pull-left">Real Time Requests</div>
+				<div class="widget-icons pull-right">
+					<a href="#" class="wminimize"><i class="fa fa-chevron-up"></i></a> 
+					<a href="#" class="wclose"><i class="fa fa-times"></i></a>
+	 			</div>
+ 				<div class="clearfix"></div>
+			</div>             
+			<div class="widget-content">
+				<div class="padd">
+					<div id="live-chart"></div>
+					<hr />
+					Update Inverval: <input id="updateInterval" type="text" class="form-control" value="">
+				</div>
+			</div>
+		</div>	
+	</div>
+</div>
+}
+
+@row4() = {
+<div class="row-fluid">
+	<div class="col-md-12">
+		<div class="widget wviolet">
+			<div class="widget-head">
+			  <div class="pull-left">Request Breakdown</div>
+			  <div class="widget-icons pull-right">
+				<a href="#" class="wminimize"><i class="fa fa-chevron-up"></i></a> 
+				<a href="#" class="wclose"><i class="fa fa-times"></i></a>
+			  </div>
+			  <div class="clearfix"></div>
+			</div>		
+			<div class="widget-content">
+				<div class="padd">
+					<div class="row">
+						<div class="col-md-4">
+							<h4>Calls by Type</h4>
+  							<div id="pie-types-chart"></div>
+						</div>
+						<div class="col-md-4">
+							<h4>Calls by Target</h4>
+  							<div id="pie-targets-chart"></div>
+						</div>
+						<div class="col-md-4">
+							<h4>Calls by Origin</h4>
+  							<div id="pie-origins-chart"></div>
+						</div>
+ 					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+}
+
+@main(ViewConfig("DSABroker", "Home", "Dashboard", "Broker Operational Status", downCount, upCount)) {
+<div class="matter">
+	<div class="container-fluid">
+	@row1()
+	@row2()
+	@row3()
+	@row4()
+	</div>
+</div>	
+}{		
+<!-- jQuery Flot -->
+<script src="@routes.Assets.versioned("js/excanvas.min.js")"></script>
+<script src="@routes.Assets.versioned("js/jquery.flot.js")"></script>
+<script src="@routes.Assets.versioned("js/jquery.flot.resize.js")"></script>
+<script src="@routes.Assets.versioned("js/jquery.flot.pie.js")"></script>
+<script src="@routes.Assets.versioned("js/jquery.flot.stack.js")"></script>
+<!-- Sparklines -->
+<script src="@routes.Assets.versioned("js/sparklines.js")"></script>
+
+<!-- Script for this page -->
+<script src="@routes.Assets.versioned("js/sparkline-index.js")"></script>
+
+<script type="text/javascript">
+$(function () {
+
+	var serList = {label: "LIST", data: []};
+	for (var i = 0; i <= 23; i += 1)
+		serList.data.push([i, parseInt(Math.random() * 30)]);
+
+	var serSubscribe = {label: "SUBSCRIBE", data: []};
+	for (var i = 0; i <= 23; i += 1)
+		serSubscribe.data.push([i, parseInt(Math.random() * 30)]);
+
+	var serInvoke = {label: "INVOKE", data: []};
+	for (var i = 0; i <= 23; i += 1)
+		serInvoke.data.push([i, parseInt(Math.random() * 30)]);
+
+	var serSet = {label: "SET", data: []};
+	for (var i = 0; i <= 23; i += 1)
+		serSet.data.push([i, parseInt(Math.random() * 30)]);
+	
+	var serRemove = {label: "REMOVE", data: []};
+	for (var i = 0; i <= 23; i += 1)
+		serRemove.data.push([i, parseInt(Math.random() * 30)]);
+	
+	var stack = 0, bars = true, lines = false, steps = false;
+	
+	function plotWithOptions() {
+		$.plot($("#requests-today-chart"), [ serList, serSubscribe, serInvoke, serSet, serRemove ], {
+			series: {
+				stack: stack,
+				lines: { show: lines, fill: true, steps: steps },
+				bars: { show: bars, barWidth: 0.8 }
+			},
+			grid: {
+				borderWidth: 0, hoverable: true, color: "#777"
+			},
+			bars: {
+				  show: true,
+				  lineWidth: 0,
+				  fill: true,
+				  fillColor: { colors: [ { opacity: 0.9 }, { opacity: 0.8 } ] }
+			},
+			xaxis: {
+				tickSize: 2,
+				tickDecimals: 0
+			}
+		});
+	}
+
+	plotWithOptions();
+	
+	$(".stackControls input").click(function (e) {
+		e.preventDefault();
+		stack = $(this).val() == "With stacking" ? true : null;
+		plotWithOptions();
+	});
+	$(".graphControls input").click(function (e) {
+		e.preventDefault();
+		bars = $(this).val().indexOf("Bars") != -1;
+		lines = $(this).val().indexOf("Lines") != -1;
+		steps = $(this).val().indexOf("steps") != -1;
+		plotWithOptions();
+	});
+});
+
+$(function () {
+    // we use an inline data source in the example, usually data would
+    // be fetched from a server
+    var data = [], totalPoints = 300;
+    function getRandomData() {
+        if (data.length > 0)
+            data = data.slice(1);
+
+        // do a random walk
+        while (data.length < totalPoints) {
+            var prev = data.length > 0 ? data[data.length - 1] : 50;
+            var y = prev + Math.random() * 10 - 5;
+            if (y < 10)
+                y = 10;
+            if (y > 70)
+                y = 70;
+            data.push(y);
+        }
+
+        // zip the generated y values with the x values
+        var res = [];
+        for (var i = 0; i < data.length; ++i)
+            res.push([i, data[i]])
+        return res;
+    }
+
+    // setup control widget
+    var updateInterval = 300;
+    $("#updateInterval").val(updateInterval).change(function () {
+        var v = $(this).val();
+        if (v && !isNaN(+v)) {
+            updateInterval = +v;
+            if (updateInterval < 1)
+                updateInterval = 1;
+            if (updateInterval > 2000)
+                updateInterval = 2000;
+            $(this).val("" + updateInterval);
+        }
+    });
+
+    // setup plot
+    var options = {
+        series: { shadowSize: 0 }, // drawing is faster without shadows
+        lines: {fill: true},
+        grid: {borderWidth:0 },
+        yaxis: { min: 0, max: 100 },
+        colors: ["#ff2424"]
+    };
+    var plot = $.plot($("#live-chart"), [ getRandomData() ], options);
+
+    function update() {
+        plot.setData([ getRandomData() ]);
+        // since the axes don't change, we don't need to call plot.setupGrid()
+        plot.draw();
+        
+        setTimeout(update, updateInterval);
+    }
+
+    update();
+});
+
+$(function () {
+    var options = {
+   		series: {
+   			pie: {
+   				show: true,
+   				radius: 1,
+   				label: {
+   					show: true,
+   					radius: 3/4,
+   					formatter: function(label, series){
+   						return '<div style="font-size:8pt;text-align:center;padding:2px;color:white;">'+label+'<br/>'+Math.round(series.percent)+'%</div>';
+   					},
+   					background: { opacity: 0 }
+       	        }
+   			}
+   		},
+   		grid: {hoverable: true},
+   		legend: {
+   			show: false
+   		}
+   	}
+
+    var typeData = [
+        {label: "List", data: 15}, {label: "Invoke", data: 22}, {label: "Subscribe", data: 3}, 
+        {label: "Set", data: 25}, {label: "Remove", data: 0}
+    ];
+    $.plot($("#pie-types-chart"), typeData, options);
+
+    var targetData = [
+        {label: "10.2.3.4", data: 100}, {label: "10.2.5.19", data: 237}, {label: "127.0.0.1", data: 415},
+        {label: "10.5.5.1", data: 89}, {label: "123.55.55.0", data: 100}, {label: "other", data: 3}
+    ];
+    $.plot($("#pie-targets-chart"), targetData, options);
+
+    var originData = [
+        {label: "10.3.13.42", data: 220}, {label: "10.5.1.3", data: 112}, {label: "127.0.0.1", data: 415},
+        {label: "10.120.0.3", data: 69}, {label: "10.0.0.1", data: 99}, {label: "other", data: 13}
+    ];
+    $.plot($("#pie-origins-chart"), originData, options);
+});
+</script>
 }

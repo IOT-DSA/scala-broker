@@ -13,8 +13,10 @@ import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
  */
 class PooledResponderBehaviorSpec extends AbstractActorSpec {
   import models.rpc.StreamState._
+  
+  val ci = ConnectionInfo("", "", false, true)
 
-  val responder = system.actorOf(Props(new DSLinkActor with PooledResponderBehavior {
+  val responder = system.actorOf(Props(new DSLinkActor(ci) with PooledResponderBehavior {
     override def connected = super.connected orElse responderBehavior
   }), "R")
 

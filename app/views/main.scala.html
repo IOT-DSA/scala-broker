@@ -1,15 +1,94 @@
-@(title: String)(content: Html)
+@import controllers.ViewConfig
+
+@(cfg: ViewConfig)(content: Html)(tail: Html)
+
+@active(flag: Boolean) = @{if(flag) "class=active" else ""}
+
+@optNum(num: Option[Int]) = @{num.map(_.toString).getOrElse("?")}
+
+@navigation() = {
+	<div class="navbar navbar-inverse navbar-fixed-top bs-docs-nav" role="banner">
+		<div class="container">
+			<div class="navbar-header">
+				<button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".bs-navbar-collapse">
+					<span class="sr-only">Toggle navigation</span> 
+					<span class="icon-bar"></span> 
+					<span class="icon-bar"></span> 
+					<span class="icon-bar"></span>
+				</button>
+				<a href="/" class="navbar-brand"> 
+					<img alt="DSA" src="/assets/img/favicon/dsa_logo.png" height="32" />
+				</a>
+			</div>
+			<nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
+				<ul class="nav navbar-nav">
+					<li @active(cfg.navItem == "Home")><a href="/">Home</a></li>
+					<li @active(cfg.navItem == "Data")><a href="/data">Data</a></li>
+					<li @active(cfg.navItem == "DSLinks")><a href="/links">DSLinks <span class="badge badge-success">@optNum(cfg.downCount)</span></a></li>
+					<li @active(cfg.navItem == "Upstream")><a href="/upstream">Upstream <span class="badge badge-info">@optNum(cfg.upCount)</span></a></li>
+					<li @active(cfg.navItem == "Configuration")><a href="/config">Configuration</a></li>
+				</ul>
+			</nav>
+		</div>
+	</div>	
+}
 
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>@title</title>
-        <link rel="stylesheet" media="screen" href="@routes.Assets.versioned("stylesheets/main.css")">
-        <link rel="shortcut icon" type="image/png" href="@routes.Assets.versioned("images/favicon.png")">
-        <script type='text/javascript' src="@routes.Assets.versioned("javascripts/jquery-3.1.1.min.js")"></script>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+		<meta name="description" content="DSABroker">
+		<meta name="keywords" content="dsa,broker,scala,akka">
+		<meta name="author" content="Vlad Orzhekhovskiy">
+		
+        <title>@cfg.title</title>
+        
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/bootstrap.min.css")">
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/jquery-ui.css")"> 
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/jquery.gritter.css")">
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/font-awesome.min.css")">		
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/style.css")">
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/widgets.css")">   
+		
+		<link rel="shortcut icon" href="#">
     </head>
     <body>
-        @content 
-        <script src="@routes.Assets.versioned("javascripts/main.js")" type="text/javascript"></script>
+    	@navigation()
+		
+		<div class="content">
+			<div class="mainbar">
+				<div class="page-head">
+					<h2 class="pull-left">
+						@cfg.heading 
+						<span class="page-meta">@cfg.description</span>
+					</h2>
+					<div class="bread-crumb pull-right">
+						<a href="/">
+						<i class="fa fa-home"></i> Home</a> 
+						<span class="divider">/</span> 
+						<a href="#" class="bread-current">@cfg.heading</a>
+					</div>
+					<div class="clearfix"></div>
+				</div>
+				@content
+			</div>
+			<div class="clearfix"></div>
+		</div>
+
+		<span class="totop"><a href="#"><i class="fa fa-chevron-up"></i></a></span>		
+        
+        <!-- putting scripts at the bottom to make loading faster -->
+		<script src="@routes.Assets.versioned("js/jquery.js")"></script>
+		<script src="@routes.Assets.versioned("js/bootstrap.min.js")"></script>
+		<script src="@routes.Assets.versioned("js/jquery-ui.min.js")"></script> 
+		<script src="@routes.Assets.versioned("js/jquery.gritter.min.js")"></script>
+		<script src="@routes.Assets.versioned("js/respond.min.js")"></script>
+		<script src="@routes.Assets.versioned("js/html5shiv.js")"></script>
+		<script src="@routes.Assets.versioned("js/custom.js")"></script>
+		
+		@tail 
     </body>
 </html>

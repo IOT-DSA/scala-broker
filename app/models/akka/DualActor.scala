@@ -6,7 +6,7 @@ import models.Settings
 /**
  * Endpoint DSLink in DUAL mode.
  */
-class DualActor extends DSLinkActor with RequesterBehavior with PooledResponderBehavior {
+class DualActor(connInfo: ConnectionInfo) extends DSLinkActor(connInfo) with RequesterBehavior with PooledResponderBehavior {
 
   override def connected = super.connected orElse requesterBehavior orElse responderBehavior
 
@@ -23,5 +23,5 @@ object DualActor {
   /**
    * Creates a new Props instance for [[DualActor]].
    */
-  def props = Props(new DualActor)
+  def props(connInfo: ConnectionInfo) = Props(new DualActor(connInfo))
 }
