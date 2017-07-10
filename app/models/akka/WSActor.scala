@@ -3,6 +3,7 @@ package models.akka
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
+import akka.actor.Terminated
 
 /**
  * Encapsulates WebSocket actor configuration.
@@ -24,6 +25,7 @@ class WSActor(out: ActorRef, link: ActorRef, config: WSActorConfig) extends Acto
   override def preStart() = {
     log.info(s"$ownId: initialized, sending 'allowed' to client")
     sendAllowed(config.salt)
+    context.watch(link)
     link ! DSLinkActor.WSConnected
   }
 
@@ -57,6 +59,9 @@ class WSActor(out: ActorRef, link: ActorRef, config: WSActorConfig) extends Acto
     case e @ ResponseEnvelope(responses) =>
       log.debug(s"$ownId: received $e")
       sendResponses(responses: _*)
+    case Terminated(ref) =>
+      log.info("$ownId: link terminated, stopping...")
+      context stop self
   }
 
   /**

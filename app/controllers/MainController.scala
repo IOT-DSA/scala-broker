@@ -3,16 +3,16 @@ package controllers
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration.{ Duration, DurationInt }
 
-import akka.actor.{ ActorRef, ActorSystem }
+import akka.actor._
 import akka.pattern.ask
-import akka.stream.Materializer
-import akka.stream.scaladsl.Flow
+import akka.stream.{ Materializer, OverflowStrategy }
+import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ ConnectionInfo, DownstreamActor, RootNodeActor }
-import models.akka.DownstreamActor._
-import models.akka.DSLinkActor._
+import models.akka.{ RootNodeActor, WSActor, WSActorConfig, ConnectionInfo, DownstreamActor }
+import models.akka.DSLinkActor.{ GetLinkInfo, LinkInfo }
+import models.akka.DownstreamActor.GetDSLinkCount
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
@@ -21,7 +21,6 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, JsValue, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
-
 
 /**
  * DSA Client-Broker connection request.
@@ -64,7 +63,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
       case (down, up) => Ok(views.html.index(Some(down), Some(up)))
     }
   }
-  
+
   /**
    * Displays data explorer.
    */
@@ -74,7 +73,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Displays the DSLinks page.
    */
   def findDslinks(regex: String, limit: Int, offset: Int) = Action.async {
-    import DownstreamActor._
+    import models.akka.DownstreamActor._
 
     val fLinkNames = (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
     val fDownUpCount = getDownUpCount
@@ -86,12 +85,12 @@ class MainController @Inject() (actorSystem: ActorSystem,
       infos <- Future.sequence(links.map(link => (link ? GetLinkInfo).mapTo[LinkInfo]))
     } yield Ok(views.html.links(regex, limit, offset, infos, down, Some(down), Some(up)))
   }
-  
+
   /**
    * Displays upstream connections.
    */
   def upstream = TODO
-  
+
   /**
    * Displays the configuration.
    */
@@ -100,7 +99,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
       case (down, up) => Ok(views.html.config(Settings.rootConfig.root, Some(down), Some(up)))
     }
   }
-  
+
   /**
    * Accepts a connection request and sends back the server config JSON.
    */
@@ -131,7 +130,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
     connInfo map { ci =>
       for {
         dslink <- (downstream ? GetOrCreateDSLink(ci)).mapTo[ActorRef]
-        flow <- (dslink ? StartWSFlow).mapTo[Flow[DSAMessage, DSAMessage, _]]
+        flow = createWSFlow(dslink)
       } yield Right(flow)
     } getOrElse {
       Future.successful(Left(Forbidden))
@@ -146,6 +145,37 @@ class MainController @Inject() (actorSystem: ActorSystem,
       log.error(s"Cannot parse connection request JSON: $js. Error info: ${JsError.toJson(e)}")
       BadRequest(JsError.toJson(e))
     }
+  }
+
+  /**
+   * Creates a new WebSocket flow bound to a newly created WSActor.
+   */
+  private def createWSFlow(dslink: ActorRef,
+                           bufferSize: Int = 16, overflow: OverflowStrategy = OverflowStrategy.dropNew) = {
+    import akka.actor.Status._
+    
+    val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
+      .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
+
+    val wsProps = WSActor.props(toSocket, dslink, WSActorConfig(dslink.path.name, Settings.Salt))
+
+    val fromSocket = actorSystem.actorOf(Props(new Actor {
+      val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+
+      def receive = {
+        case Success(_) | Failure(_) => wsActor ! PoisonPill
+        case Terminated(_)                         => context.stop(self)
+        case other                                 => wsActor ! other
+      }
+
+      override def supervisorStrategy = OneForOneStrategy() {
+        case _ => SupervisorStrategy.Stop
+      }
+    }))
+
+    Flow.fromSinkAndSource[DSAMessage, DSAMessage](
+      Sink.actorRef(fromSocket, Success(())),
+      Source.fromPublisher(publisher))
   }
 
   /**
