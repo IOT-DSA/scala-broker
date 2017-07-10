@@ -6,6 +6,8 @@
 GET    /               controllers.MainController.index
 GET    /data           controllers.MainController.dataExplorer
 GET    /links          controllers.MainController.findDslinks(regex ?= ".*", limit: Int ?= 100, offset: Int ?= 0)
+POST   /disconnect     controllers.MainController.disconnectWS(link)
+POST   /remove         controllers.MainController.removeLink(link)
 GET    /upstream       controllers.MainController.upstream
 GET    /config         controllers.MainController.viewConfig
 POST   /conn           controllers.MainController.conn

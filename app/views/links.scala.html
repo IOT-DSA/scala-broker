@@ -30,7 +30,7 @@
 					</div>
 				</div>
 				<div class="form-group">
-					<label for="offset" class="col-sm-2 control-label">Limit</label>
+					<label for="offset" class="col-sm-2 control-label">Offset</label>
 					<div class="col-sm-10">
 						<input type="number" class="form-control" id="offset" value="@offset" placeholder="first link to display">
 					</div>
@@ -91,9 +91,9 @@
 									<td>@link.ci.compression</td>
 									<td>
 										@if(link.connected) {
-											<button class="btn btn-sm btn-warning" onclick="disconnect()">Disconnect</button>
+											<button class="btn btn-sm btn-warning" onclick="disconnect('@link.ci.linkName')">Disconnect</button>
 										} else {
-											<button class="btn btn-sm btn-danger" onclick="remove()">Remove</button>
+											<button class="btn btn-sm btn-danger" onclick="remove('@link.ci.linkName')">Remove</button>
 										}
 									</td>
 								</tr>
@@ -125,10 +125,18 @@ function reset() {
 	document.getElementById("offset").value = 0;
 }
 
-function disconnect() {
+function disconnect(linkName) {
+	$.post("/disconnect?link=" + linkName, function(data) {
+		alert(data);
+		location.reload();
+	});
 }
 
-function remove() {
+function remove(linkName) {
+	$.post("/remove?link=" + linkName, function(data) {
+		alert(data);
+		location.reload();
+	});
 }
 </script>
 }{<!-- no tail -->}

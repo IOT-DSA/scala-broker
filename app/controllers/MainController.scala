@@ -11,8 +11,8 @@ import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
 import models.Settings
 import models.akka.{ RootNodeActor, WSActor, WSActorConfig, ConnectionInfo, DownstreamActor }
-import models.akka.DSLinkActor.{ GetLinkInfo, LinkInfo }
-import models.akka.DownstreamActor.GetDSLinkCount
+import models.akka.DSLinkActor._
+import models.akka.DownstreamActor._
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
@@ -87,6 +87,30 @@ class MainController @Inject() (actorSystem: ActorSystem,
   }
 
   /**
+   * Disconnects the dslink from Web Socket.
+   */
+  def disconnectWS(name: String) = Action.async {
+    (downstream ? GetDSLink(name)).mapTo[Option[ActorRef]] map {
+      case Some(ref) =>
+        ref ! DisconnectEndpoint(true)
+        Ok("Endpoint disconnected")
+      case None => BadRequest(s"DSLink '$name' is not found")
+    }
+  }
+
+  /**
+   * Removes the DSLink.
+   */
+  def removeLink(name: String) = Action.async {
+    (downstream ? GetDSLink(name)).mapTo[Option[ActorRef]] map {
+      case Some(ref) =>
+        ref ! PoisonPill
+        Ok("DSLink removed")
+      case None => BadRequest(s"DSLink '$name' is not found")
+    }
+  }
+
+  /**
    * Displays upstream connections.
    */
   def upstream = TODO
@@ -153,7 +177,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
   private def createWSFlow(dslink: ActorRef,
                            bufferSize: Int = 16, overflow: OverflowStrategy = OverflowStrategy.dropNew) = {
     import akka.actor.Status._
-    
+
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
 
@@ -164,8 +188,8 @@ class MainController @Inject() (actorSystem: ActorSystem,
 
       def receive = {
         case Success(_) | Failure(_) => wsActor ! PoisonPill
-        case Terminated(_)                         => context.stop(self)
-        case other                                 => wsActor ! other
+        case Terminated(_)           => context.stop(self)
+        case other                   => wsActor ! other
       }
 
       override def supervisorStrategy = OneForOneStrategy() {

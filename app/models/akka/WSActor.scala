@@ -26,7 +26,7 @@ class WSActor(out: ActorRef, link: ActorRef, config: WSActorConfig) extends Acto
     log.info(s"$ownId: initialized, sending 'allowed' to client")
     sendAllowed(config.salt)
     context.watch(link)
-    link ! DSLinkActor.WSConnected
+    link ! DSLinkActor.ConnectEndpoint(self)
   }
 
   /**
