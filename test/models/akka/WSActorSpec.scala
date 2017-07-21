@@ -17,7 +17,7 @@ class WSActorSpec extends AbstractActorSpec {
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {
       expectMsg(AllowedMessage(true, salt))
-      link.expectMsg(DSLinkActor.WSConnected)
+      link.expectMsg(DSLinkActor.ConnectEndpoint(wsActor))
     }
     "return ack for a ping message" in {
       wsActor ! PingMessage(101)

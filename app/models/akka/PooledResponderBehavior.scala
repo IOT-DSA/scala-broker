@@ -168,7 +168,6 @@ trait PooledResponderBehavior { me: DSLinkActor =>
     case env @ RequestEnvelope(requests) =>
       log.info(s"$ownId: received $env from $sender")
       val result = processRequests(requests)
-      // TODO until proper connected/disconnected behavior is implemented
       if (!result.requests.isEmpty)
         ws foreach (_ ! RequestEnvelope(result.requests))
       if (!result.responses.isEmpty)

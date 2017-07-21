@@ -22,7 +22,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   val ws = TestProbe()
 
-  responder.tell(DSLinkActor.WSConnected, ws.ref)
+  responder.tell(DSLinkActor.ConnectEndpoint(ws.ref), ws.ref)
 
   val requesters = (1 to 5) map (_ -> TestProbe()) toMap
 

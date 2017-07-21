@@ -15,7 +15,7 @@ class ResponderActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "", false, true)
   val responder = system.actorOf(ResponderActor.props(ci), "responder")
   val ws = TestProbe()
-  responder.tell(DSLinkActor.WSConnected, ws.ref)
+  responder.tell(DSLinkActor.ConnectEndpoint(ws.ref), ws.ref)
 
   "ResponderActor" should {
     "deliver requests to WS" in {

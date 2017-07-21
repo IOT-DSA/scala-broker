@@ -28,7 +28,6 @@ trait RequesterBehavior { me: DSLinkActor =>
     case e @ ResponseEnvelope(responses) =>
       log.debug(s"$ownId: received $e")
       processResponses(responses)
-      // TODO temporary until connected/disconnected behavior is implemented
       ws foreach (_ ! e)
   }
 
