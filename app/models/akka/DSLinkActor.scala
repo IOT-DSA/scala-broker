@@ -17,8 +17,6 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
 
   protected val ownId = s"DSLink[$linkName]"
 
-  implicit protected val materializer = ActorMaterializer()
-
   private var _ws: Option[ActorRef] = None
   protected def ws = _ws
   protected def isConnected = ws.isDefined
