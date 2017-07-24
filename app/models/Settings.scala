@@ -63,9 +63,9 @@ object Settings {
   val Salt = rootConfig.getInt("broker.salt")
 
   /**
-   * Checking interval for undelivered messages.
+   * Interval to wait for actors' responses.
    */
-  val UndeliveredInterval = rootConfig.getDuration("broker.undelivered.interval").getSeconds.seconds
+  val QueryTimeout = rootConfig.getDuration("broker.query.timeout").getSeconds.seconds
 
   /**
    * The maximum number of children in LIST response.
@@ -77,8 +77,13 @@ object Settings {
    */
   object Responder {
     private val cfg = rootConfig.getConfig("broker.responder")
-    
+
     val ListPoolSize = cfg.getInt("list.pool.size")
     val SubscribePoolSize = cfg.getInt("subscribe.pool.size")
   }
+
+  /**
+   * The number of shards in the downstream pool.
+   */
+  val DownstreamShardCount = rootConfig.getInt("broker.downstream.shard.count")
 }

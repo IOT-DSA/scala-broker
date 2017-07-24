@@ -1,18 +1,19 @@
 package controllers
 
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.duration.{ Duration, DurationInt }
+import scala.concurrent.Future
 
 import akka.actor._
-import akka.pattern.ask
-import akka.stream.{ Materializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
+import akka.pattern.{ ask, pipe }
+import akka.cluster.ClusterEvent.CurrentClusterState
+import akka.stream.Materializer
 import akka.util.Timeout
+import akka.stream.scaladsl._
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ RootNodeActor, WSActor, WSActorConfig, ConnectionInfo, DownstreamActor }
-import models.akka.DSLinkActor._
-import models.akka.DownstreamActor._
+import models.akka.ConnectionInfo
+import models.akka.cluster.FrontendActor
+import models.akka.cluster.DSLinkActor
+import models.akka.cluster.DSLinkActor.{ DSLinkEnvelope, GetLinkInfo, LinkInfo }
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
@@ -21,39 +22,34 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, JsValue, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
-
-/**
- * DSA Client-Broker connection request.
- */
-case class ConnectionRequest(publicKey: String, isRequester: Boolean, isResponder: Boolean,
-                             linkData: Option[JsValue], version: String, formats: Option[List[String]],
-                             enableWebSocketCompression: Boolean)
-
-/**
- * Object passed to a view to supply various page information.
- */
-case class ViewConfig(title: String, navItem: String, heading: String, description: String,
-                      downCount: Option[Int] = None, upCount: Option[Int] = None)
+import akka.actor.PoisonPill
+import models.akka.cluster.DSLinkActor.DisconnectEndpoint
+import models.akka.cluster.WSActor
+import models.akka.cluster.WSActorConfig
+import akka.stream.OverflowStrategy
+import models.akka.cluster.ShardedDSLinkProxy
 
 /**
  * Handles main web requests.
  */
 @Singleton
-class MainController @Inject() (actorSystem: ActorSystem,
+class MainController @Inject() (implicit actorSystem: ActorSystem,
                                 materializer: Materializer, cache: CacheApi,
                                 life: ApplicationLifecycle) extends Controller {
+  import models.akka.cluster.BackendActor._
+  import models.akka.cluster.FrontendActor._
+
   private val log = Logger(getClass)
 
-  implicit private val timeout = Timeout(5 seconds)
+  implicit private val timeout = Timeout(Settings.QueryTimeout)
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
-  private val broker = actorSystem.actorOf(RootNodeActor.props, Settings.Nodes.Root)
+  DSLinkActor.proxyStart(actorSystem)
 
-  private val downstream = {
-    val nodes = (broker ? RootNodeActor.GetChildren).mapTo[Map[String, ActorRef]]
-    Await.result(nodes.map(_(Settings.Nodes.Downstream)), Duration.Inf)
-  }
+  private val frontend = actorSystem.actorOf(FrontendActor.props, "frontend")
+
+  private val akkaAdapter = new ClusteredAkkaAdapter
 
   /**
    * Displays the main app page.
@@ -61,6 +57,20 @@ class MainController @Inject() (actorSystem: ActorSystem,
   def index = Action.async {
     getDownUpCount map {
       case (down, up) => Ok(views.html.index(Some(down), Some(up)))
+    }
+  }
+
+  /**
+   * Displays the cluster information.
+   */
+  def clusterInfo = Action.async {
+    val clusterInfo = getClusterInfo
+    val linkCounts = getDSLinkCounts
+    for (info <- clusterInfo; lc <- linkCounts; upCount <- getUpstreamCount) yield {
+      val countsByAddress = lc.map {
+        case (ref, count) => ref.path.address -> count
+      }
+      Ok(views.html.cluster(info, countsByAddress, Some(lc.values.sum), Some(upCount)))
     }
   }
 
@@ -73,41 +83,29 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Displays the DSLinks page.
    */
   def findDslinks(regex: String, limit: Int, offset: Int) = Action.async {
-    import models.akka.DownstreamActor._
-
-    val fLinkNames = (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+    val fLinkNames = getDSLinkNames(regex, limit, offset)
     val fDownUpCount = getDownUpCount
     for {
       names <- fLinkNames
       (down, up) <- fDownUpCount
-      allLinks <- Future.sequence(names.map(link => (downstream ? GetDSLink(link)).mapTo[Option[ActorRef]]))
-      links = allLinks.collect { case Some(ref) => ref }
-      infos <- Future.sequence(links.map(link => (link ? GetLinkInfo).mapTo[LinkInfo]))
+      infos <- Future.sequence(names map getDSLinkInfo)
     } yield Ok(views.html.links(regex, limit, offset, infos, down, Some(down), Some(up)))
   }
 
   /**
    * Disconnects the dslink from Web Socket.
    */
-  def disconnectWS(name: String) = Action.async {
-    (downstream ? GetDSLink(name)).mapTo[Option[ActorRef]] map {
-      case Some(ref) =>
-        ref ! DisconnectEndpoint(true)
-        Ok("Endpoint disconnected")
-      case None => BadRequest(s"DSLink '$name' is not found")
-    }
+  def disconnectWS(name: String) = Action {
+    new ShardedDSLinkProxy(name) tell DisconnectEndpoint(true)
+    Ok(s"Endpoint '$name' disconnected")
   }
 
   /**
    * Removes the DSLink.
    */
-  def removeLink(name: String) = Action.async {
-    (downstream ? GetDSLink(name)).mapTo[Option[ActorRef]] map {
-      case Some(ref) =>
-        ref ! PoisonPill
-        Ok("DSLink removed")
-      case None => BadRequest(s"DSLink '$name' is not found")
-    }
+  def removeLink(name: String) = Action {
+    new ShardedDSLinkProxy(name) tell PoisonPill
+    Ok(s"DSLink '$name' removed")
   }
 
   /**
@@ -144,21 +142,12 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Establishes a WebSocket connection.
    */
   def ws = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
-    import DownstreamActor._
-
     log.debug(s"WS request received: $request")
     val dsId = getDsId(request)
     val connInfo = cache.get[ConnectionInfo](dsId)
     log.debug(s"Conn info retrieved for $dsId: $connInfo")
 
-    connInfo map { ci =>
-      for {
-        dslink <- (downstream ? GetOrCreateDSLink(ci)).mapTo[ActorRef]
-        flow = createWSFlow(dslink)
-      } yield Right(flow)
-    } getOrElse {
-      Future.successful(Left(Forbidden))
-    }
+    Future.successful(connInfo.map(createWSFlow(_)).toRight(Forbidden))
   }(transformer)
 
   /**
@@ -174,14 +163,15 @@ class MainController @Inject() (actorSystem: ActorSystem,
   /**
    * Creates a new WebSocket flow bound to a newly created WSActor.
    */
-  private def createWSFlow(dslink: ActorRef,
+  private def createWSFlow(ci: ConnectionInfo,
                            bufferSize: Int = 16, overflow: OverflowStrategy = OverflowStrategy.dropNew) = {
     import akka.actor.Status._
 
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
 
-    val wsProps = WSActor.props(toSocket, dslink, WSActorConfig(dslink.path.name, Settings.Salt))
+    val proxy = new ShardedDSLinkProxy(ci.linkName)
+    val wsProps = WSActor.props(toSocket, proxy, WSActorConfig(ci, Settings.Salt))
 
     val fromSocket = actorSystem.actorOf(Props(new Actor {
       val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
@@ -214,21 +204,42 @@ class MainController @Inject() (actorSystem: ActorSystem,
     ConnectionInfo(getDsId(request), request.body)
 
   /**
-   * Returns a future with the number of registered downstream dslinks.
+   * Returns a future with the cluster information.
    */
-  private def getDownstreamCount = (downstream ? GetDSLinkCount).mapTo[Int]
+  private def getClusterInfo = (frontend ? GetClusterInfo).mapTo[CurrentClusterState]
 
   /**
-   * Returns a future with the number of registered upstream connections.
+   * Returns a future with the number of registered dslinks by backend.
+   */
+  private def getDSLinkCounts = (frontend ? GetDSLinkCount).mapTo[Map[ActorRef, Int]]
+
+  /**
+   * Returns a future with the total number of registered dslinks.
+   */
+  private def getTotalDSLinkCount = getDSLinkCounts map (_.values.sum)
+
+  /**
+   * Returns a future with the number of registered upstream connections (currently always 0).
    */
   private def getUpstreamCount = Future.successful(0)
 
   /**
-   * Combines `getDownstreamCount` and `getUpstreamCount` to produce a future tuple (down, up).
+   * Combines `getTotalDSLinkCount` and `getUpstreamCount` to produce a future tuple (down, up).
    */
   private def getDownUpCount = {
-    val fDown = getDownstreamCount
+    val fDown = getTotalDSLinkCount
     val fUp = getUpstreamCount
     for (down <- fDown; up <- fUp) yield (down, up)
   }
+
+  /**
+   * Returns a future with the list of dslink names matching the criteria.
+   */
+  private def getDSLinkNames(regex: String, limit: Int, offset: Int) =
+    (frontend ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+
+  /**
+   * Returns a future with the dslink info.
+   */
+  private def getDSLinkInfo(linkName: String) = new ShardedDSLinkProxy(linkName).ask[LinkInfo](GetLinkInfo)
 }
