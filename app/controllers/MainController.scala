@@ -49,8 +49,6 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
 
   private val frontend = actorSystem.actorOf(FrontendActor.props, "frontend")
 
-  private val akkaAdapter = new ClusteredAkkaAdapter
-
   /**
    * Displays the main app page.
    */
