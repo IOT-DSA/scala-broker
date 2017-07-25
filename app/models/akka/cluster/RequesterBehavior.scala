@@ -1,4 +1,4 @@
-package models.akka
+package models.akka.cluster
 
 import scala.util.control.NonFatal
 
@@ -12,8 +12,8 @@ import models.rpc.DSAValue.DSAVal
 trait RequesterBehavior { me: DSLinkActor =>
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
-  private val targetsByRid = collection.mutable.Map.empty[Int, String]
-  private val targetsBySid = collection.mutable.Map.empty[Int, String]
+  private var targetsByRid = collection.mutable.Map.empty[Int, String]
+  private var targetsBySid = collection.mutable.Map.empty[Int, String]
 
   private var lastRid: Int = 0
 
@@ -27,8 +27,8 @@ trait RequesterBehavior { me: DSLinkActor =>
       requests.lastOption foreach (req => lastRid = req.rid)
     case e @ ResponseEnvelope(responses) =>
       log.debug(s"$ownId: received $e")
-      processResponses(responses)
-      ws foreach (_ ! e)
+      cleanupStoredTargets(responses)
+      sendToEndpoint(e)
   }
 
   /**
@@ -66,9 +66,9 @@ trait RequesterBehavior { me: DSLinkActor =>
   }
 
   /**
-   * Sends responses to Web Socket.
+   * Removes stored targets when the response's stream is closed.
    */
-  private def processResponses(responses: Seq[DSAResponse]) = {
+  private def cleanupStoredTargets(responses: Seq[DSAResponse]) = {
 
     def cleanupSids(rows: Seq[DSAVal]) = try {
       rows collect extractSid foreach targetsBySid.remove
@@ -97,10 +97,10 @@ trait RequesterBehavior { me: DSLinkActor =>
   }
 
   /**
-   * Saves the request's target indexed by its RID or SID.
+   * Saves the request's target indexed by its RID or SID, where applicable.
    */
   private def cacheRequestTarget(request: DSARequest, target: String) = request match {
-    case r @ (_: ListRequest | _: SetRequest | _: RemoveRequest | _: InvokeRequest) => targetsByRid.put(r.rid, target)
+    case r @ (_: ListRequest | _: InvokeRequest) => targetsByRid.put(r.rid, target)
     case r: SubscribeRequest => targetsBySid.put(r.path.sid, target)
     case _ => // do nothing
   }

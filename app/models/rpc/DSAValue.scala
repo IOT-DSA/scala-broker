@@ -42,7 +42,7 @@ object DSAValue {
 
   implicit class ArrayValue(val value: DSAArray) extends DSAValue[DSAArray]
 
-  def array(values: DSAVal*) = ArrayValue(values)
+  def array(values: DSAVal*) = ArrayValue(values.toList)
 
   def obj(tuples: (String, DSAVal)*) = MapValue(tuples.toMap)
 }

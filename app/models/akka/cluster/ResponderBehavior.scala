@@ -1,4 +1,4 @@
-package models.akka
+package models.akka.cluster
 
 import scala.util.control.NonFatal
 
@@ -9,6 +9,7 @@ import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.DSAVal
 import models.splitPath
+import models.akka.{ IntCounter, ResponderWorker, ResponderListWorker, ResponderSubscribeWorker }
 
 /**
  * Encapsulates request information for lookups.
@@ -132,7 +133,7 @@ class SidRegistry {
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait PooledResponderBehavior { me: DSLinkActor =>
+trait ResponderBehavior { me: DSLinkActor =>
   import context.system
   import ResponderWorker._
   import ActorDSL._
@@ -169,7 +170,7 @@ trait PooledResponderBehavior { me: DSLinkActor =>
       log.info(s"$ownId: received $env from $sender")
       val result = processRequests(requests)
       if (!result.requests.isEmpty)
-        ws foreach (_ ! RequestEnvelope(result.requests))
+        sendToEndpoint(RequestEnvelope(result.requests))
       if (!result.responses.isEmpty)
         sender ! ResponseEnvelope(result.responses)
 

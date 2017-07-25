@@ -2,11 +2,9 @@ package models.akka
 
 import org.joda.time.DateTime
 
-import akka.actor._
-import akka.stream.{ ActorMaterializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
+import akka.actor.{ Actor, ActorLogging, ActorRef, Stash, Terminated, actorRef2Scala, PoisonPill }
+import akka.stream.ActorMaterializer
 import models.Settings
-import models.rpc.DSAMessage
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.
@@ -19,8 +17,6 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
 
   protected val ownId = s"DSLink[$linkName]"
 
-  implicit protected val materializer = ActorMaterializer()
-
   private var _ws: Option[ActorRef] = None
   protected def ws = _ws
   protected def isConnected = ws.isDefined
@@ -29,7 +25,7 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
   private var lastDisconnected: Option[DateTime] = _
 
   override def preStart() = {
-    log.info(s"$ownId: initialized, not connected to WebSocket")
+    log.info(s"$ownId: initialized, not connected to Endpoint")
   }
 
   override def postStop() = {
@@ -45,12 +41,12 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
    * Handles messages in CONNECTED state.
    */
   def connected: Receive = {
+    case DisconnectEndpoint(kill) =>
+      log.info(s"$ownId: disconnected from Endpoint")
+      disconnectFromEndpoint(kill)
     case Terminated(wsActor) =>
-      log.info(s"$ownId: disconnected from WebSocket")
-      context.unwatch(wsActor)
-      _ws = None
-      lastDisconnected = Some(DateTime.now)
-      context.become(disconnected)
+      log.info(s"$ownId: Endpoint terminated")
+      disconnectFromEndpoint(false)
     case GetLinkInfo =>
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
   }
@@ -59,16 +55,9 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
    * Handles messages in DISCONNECTED state.
    */
   def disconnected: Receive = {
-    case StartWSFlow =>
-      log.debug(s"$ownId: connecting to WebSocket")
-      sender ! createWSFlow()
-    case WSConnected =>
-      log.info(s"$ownId: connected to WebSocket")
-      _ws = Some(context.watch(sender))
-      log.debug("$ownId: unstashing all stored messages")
-      lastConnected = Some(DateTime.now)
-      unstashAll()
-      context.become(connected)
+    case ConnectEndpoint(ref) =>
+      log.info(s"$ownId: connected to Endpoint")
+      connectToEndpoint(ref)
     case GetLinkInfo =>
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
     case _ =>
@@ -76,32 +65,23 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
       stash()
   }
 
-  /**
-   * Creates a new WebSocket flow bound to a newly created WSActor.
-   */
-  private def createWSFlow(bufferSize: Int = 16, overflow: OverflowStrategy = OverflowStrategy.dropNew) = {
-    val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
-      .toMat(Sink.asPublisher(false))(Keep.both).run()
+  private def connectToEndpoint(ref: ActorRef) = {
+    _ws = Some(context.watch(ref))
+    log.debug("$ownId: unstashing all stored messages")
+    lastConnected = Some(DateTime.now)
+    unstashAll()
+    context.become(connected)
+  }
 
-    val wsProps = WSActor.props(toSocket, self, WSActorConfig(linkName, Settings.Salt))
-
-    val fromSocket = context.actorOf(Props(new Actor {
-      val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
-
-      def receive = {
-        case Status.Success(_) | Status.Failure(_) => wsActor ! PoisonPill
-        case Terminated(_)                         => context.stop(self)
-        case other                                 => wsActor ! other
-      }
-
-      override def supervisorStrategy = OneForOneStrategy() {
-        case _ => SupervisorStrategy.Stop
-      }
-    }))
-
-    Flow.fromSinkAndSource[DSAMessage, DSAMessage](
-      Sink.actorRef(fromSocket, Status.Success(())),
-      Source.fromPublisher(publisher))
+  private def disconnectFromEndpoint(kill: Boolean) = {
+    _ws foreach { ref =>
+      context unwatch ref
+      if (kill)
+        ref ! PoisonPill
+    }
+    _ws = None
+    lastDisconnected = Some(DateTime.now)
+    context.become(disconnected)
   }
 }
 
@@ -111,14 +91,15 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
 object DSLinkActor {
 
   /**
-   * Sent by the controller to initiate a new WebSocket flow.
+   * Connects the link to the endpoint actor, which can be responsible for handling a WebSocket
+   * connection or TCP/IP channel, etc.
    */
-  case object StartWSFlow
+  case class ConnectEndpoint(ref: ActorRef)
 
   /**
-   * Sent by a WSActor once the socket connection has been established.
+   * Disconnects the endpoint actor, optionally sending it a PoisonPill.
    */
-  case object WSConnected
+  case class DisconnectEndpoint(kill: Boolean)
 
   /**
    * Request to send detailed link information.

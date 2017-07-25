@@ -1,0 +1,58 @@
+@import _root_.akka.actor.Address
+@import _root_.akka.cluster.ClusterEvent.CurrentClusterState
+@import controllers.ViewConfig
+
+@(info: CurrentClusterState, linkCounts: Map[Address, Int], downCount: Option[Int], upCount: Option[Int]) 
+
+@main(ViewConfig("DSA Broker: Cluster", "Cluster", "Cluster", "Akka Cluster Information", downCount, upCount)) {
+<div class="matter">
+	<div class="container-fluid">
+		<div class="row-fluid">
+			<div class="widget wviolet">
+				<div class="widget-head">Cluster Nodes</div>
+				<div class="widget-content">
+					<div class="table-responsive">
+						<table class="table table-striped table-bordered table-hover">
+							<thead>
+								<tr>
+									<th>Leader</th>
+									<th>Address</th>
+									<th>UID</th>
+									<th>Roles</th>
+									<th>Links</th>
+									<th>Status</th>
+								</tr>
+							</thead>
+							<tbody>
+							@for(member <- info.members) {
+								<tr>
+									<td>
+									@if(info.leader == Some(member.address)) {
+										<i class="fa fa-check-circle-o fa-2x green"></i>
+									}
+									</td>
+									<td>@member.address</td>
+									<td>@member.uniqueAddress.longUid</td>
+									<td>@member.roles.mkString(",")</td>
+									<td>@linkCounts.getOrElse(member.address, 0)</td>
+									<td>
+									@if(info.unreachable.contains(member)) {
+										<span class="label label-important">Unreachable</span>
+									} else {
+										<span class="label label-success">@member.status</span>
+									}
+									</td>
+								</tr>
+							}
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="widget-foot">
+					<strong>@info.members.size</strong> nodes found.
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+}{<!-- no tail -->}

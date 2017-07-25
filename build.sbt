@@ -1,13 +1,13 @@
 // properties
 val APP_VERSION = "0.1.0-SNAPSHOT"
 val SCALA_VERSION = "2.11.8"
+val AKKA_VERSION = "2.4.12"
 
 // settings
 name := "scala-broker"
 organization := "org.iot-dsa"
 version := APP_VERSION
 scalaVersion := SCALA_VERSION
-EclipseKeys.createSrc := EclipseCreateSrc.All
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
@@ -26,6 +26,12 @@ coverageFailOnMinimum := true
 // dependencies
 libraryDependencies ++= Seq(
   cache,
+  "com.typesafe.akka"       %% "akka-cluster"            % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-metrics"    % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
+  "ch.qos.logback"           % "logback-classic"         % "1.1.7",
   "org.scalatest"           %% "scalatest"               % "2.2.1"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.12.1"        % "test",
   "org.scalatestplus.play"  %% "scalatestplus-play"      % "1.5.1"         % "test",

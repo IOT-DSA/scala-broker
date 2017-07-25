@@ -20,9 +20,9 @@ class DSLinkActorSpec extends AbstractActorSpec {
   val probe = TestProbe()
 
   "DSLinkActor" should {
-    "start a WebSocket flow" in {
-      link ! DSLinkActor.StartWSFlow
-      expectMsgType[Flow[DSAMessage, DSAMessage, _]]
+    "return link info" in {
+      link ! DSLinkActor.GetLinkInfo
+      expectMsgType[DSLinkActor.LinkInfo]
     }
   }
 }

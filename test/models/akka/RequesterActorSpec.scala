@@ -36,7 +36,7 @@ class RequesterActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "", true, false)
   val requester = system.actorOf(RequesterActor.props(ci), "requester")
   val ws = TestProbe()
-  requester.tell(DSLinkActor.WSConnected, ws.ref)
+  requester.tell(DSLinkActor.ConnectEndpoint(ws.ref), ws.ref)
 
   "RequesterActor" should {
     "route requests to broker root" in {

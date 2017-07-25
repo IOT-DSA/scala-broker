@@ -1,21 +1,23 @@
-package models.akka
+package models.akka.cluster
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
 import akka.actor.Terminated
+import models.akka.IntCounter
+import models.akka.ConnectionInfo
 
 /**
  * Encapsulates WebSocket actor configuration.
  */
-case class WSActorConfig(linkName: String, salt: Int)
+case class WSActorConfig(connInfo: ConnectionInfo, salt: Int)
 
 /**
  * WebSocket endpoint actor for requesters, responders and dual links.
  */
-class WSActor(out: ActorRef, link: ActorRef, config: WSActorConfig) extends Actor with ActorLogging {
-
-  private val ownId = s"WSActor[${config.linkName}]"
+class WSActor(out: ActorRef, link: DSLinkProxy, config: WSActorConfig) extends Actor with ActorLogging {
+  private val linkName = config.connInfo.linkName
+  private val ownId = s"WSActor[$linkName]"
 
   private var localMsgId = new IntCounter(1)
 
@@ -25,8 +27,7 @@ class WSActor(out: ActorRef, link: ActorRef, config: WSActorConfig) extends Acto
   override def preStart() = {
     log.info(s"$ownId: initialized, sending 'allowed' to client")
     sendAllowed(config.salt)
-    context.watch(link)
-    link ! DSLinkActor.ConnectEndpoint(self)
+    link tell DSLinkActor.ConnectEndpoint(self, config.connInfo)
   }
 
   /**
@@ -48,11 +49,11 @@ class WSActor(out: ActorRef, link: ActorRef, config: WSActorConfig) extends Acto
     case m @ RequestMessage(msg, _, _) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
-      link ! m
+      link tell m
     case m @ ResponseMessage(msg, _, _) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
-      link ! m
+      link tell m
     case e @ RequestEnvelope(requests) =>
       log.debug(s"$ownId: received $e")
       sendRequests(requests: _*)
@@ -102,5 +103,5 @@ object WSActor {
   /**
    * Creates a new Props instance for [[WSActor]].
    */
-  def props(out: ActorRef, link: ActorRef, config: WSActorConfig) = Props(new WSActor(out, link, config))
+  def props(out: ActorRef, link: DSLinkProxy, config: WSActorConfig) = Props(new WSActor(out, link, config))
 }
