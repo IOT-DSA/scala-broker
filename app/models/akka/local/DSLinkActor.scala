@@ -5,12 +5,12 @@ import org.joda.time.DateTime
 import akka.actor._
 import models.Settings
 import models.akka.ConnectionInfo
+import models.akka.Messages._
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.
  */
 abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash with ActorLogging {
-  import DSLinkActor._
 
   val linkName = self.path.name
   val linkPath = Settings.Paths.Downstream + "/" + linkName
@@ -55,7 +55,7 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
    * Handles messages in DISCONNECTED state.
    */
   def disconnected: Receive = {
-    case ConnectEndpoint(ref) =>
+    case ConnectEndpoint(ref, _) =>
       log.info(s"$ownId: connected to Endpoint")
       connectToEndpoint(ref)
     case GetLinkInfo =>
@@ -83,33 +83,4 @@ abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash wi
     lastDisconnected = Some(DateTime.now)
     context.become(disconnected)
   }
-}
-
-/**
- * DSLinkActor messages.
- */
-object DSLinkActor {
-
-  /**
-   * Connects the link to the endpoint actor, which can be responsible for handling a WebSocket
-   * connection or TCP/IP channel, etc.
-   */
-  case class ConnectEndpoint(ref: ActorRef)
-
-  /**
-   * Disconnects the endpoint actor, optionally sending it a PoisonPill.
-   */
-  case class DisconnectEndpoint(kill: Boolean)
-
-  /**
-   * Request to send detailed link information.
-   */
-  case object GetLinkInfo
-
-  /**
-   * Encapsulates link information sent as the response to GetLinkInfo command.
-   */
-  case class LinkInfo(ci: ConnectionInfo, connected: Boolean,
-                      lastConnected: Option[DateTime],
-                      lastDisconnected: Option[DateTime])
 }

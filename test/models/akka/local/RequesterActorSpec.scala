@@ -3,7 +3,7 @@ package models.akka.local
 import akka.actor.{ Actor, Props, actorRef2Scala }
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ AbstractActorSpec, ConnectionInfo }
+import models.akka.{ AbstractActorSpec, ConnectionInfo, Messages }
 import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
 
 /**
@@ -31,7 +31,7 @@ class RequesterActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "", true, false)
   val requester = system.actorOf(RequesterActor.props(ci), "requester")
   val ws = TestProbe()
-  requester.tell(DSLinkActor.ConnectEndpoint(ws.ref), ws.ref)
+  requester.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
 
   "RequesterActor" should {
     "route requests to broker root" in {

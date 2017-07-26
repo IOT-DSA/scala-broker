@@ -2,7 +2,7 @@ package models.akka.local
 
 import akka.testkit.TestProbe
 import models.RequestEnvelope
-import models.akka.{ AbstractActorSpec, ConnectionInfo }
+import models.akka.{ AbstractActorSpec, ConnectionInfo, Messages }
 import models.rpc.ListRequest
 
 /**
@@ -13,7 +13,7 @@ class ResponderActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "", false, true)
   val responder = system.actorOf(ResponderActor.props(ci), "responder")
   val ws = TestProbe()
-  responder.tell(DSLinkActor.ConnectEndpoint(ws.ref), ws.ref)
+  responder.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
 
   "ResponderActor" should {
     "deliver requests to WS" in {

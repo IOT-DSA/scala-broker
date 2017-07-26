@@ -4,8 +4,10 @@ import org.joda.time.DateTime
 
 import akka.actor._
 import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
-import models.akka.ConnectionInfo
 import models.Settings
+import models.akka.{ ConnectionInfo, EntityEnvelope }
+import models.akka.Messages._
+import models.akka.ShardedActorProxy
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint actor.
@@ -17,6 +19,7 @@ import models.Settings
  */
 class DSLinkActor extends Actor with Stash with ActorLogging with RequesterBehavior with ResponderBehavior {
   import DSLinkActor._
+  import Settings.Paths._
 
   protected def linkName = self.path.name
   protected val linkPath = Settings.Paths.Downstream + "/" + linkName
@@ -47,7 +50,7 @@ class DSLinkActor extends Actor with Stash with ActorLogging with RequesterBehav
    * Handles messages in CONNECTED state.
    */
   def connected = linkConnected orElse requesterBehavior orElse responderBehavior
-  
+
   /**
    * Manages basic DSLink connected state.
    */
@@ -80,7 +83,7 @@ class DSLinkActor extends Actor with Stash with ActorLogging with RequesterBehav
     case DisconnectEndpoint(_) =>
       log.warning(s"$ownId: not connected to Endpoint, ignoring DISCONNECT")
     case _ =>
-      log.debug("$ownId: stashing the incoming message")
+      log.debug(s"$ownId: stashing the incoming message")
       stash()
   }
 
@@ -116,6 +119,22 @@ class DSLinkActor extends Actor with Stash with ActorLogging with RequesterBehav
    * Sends a message to the endpoint, if connected.
    */
   protected def sendToEndpoint(msg: Any) = endpoint foreach (_ ! msg)
+  
+  /**
+   * Sends a message to an actor using its DSA link path.
+   */
+  def dsaSend(to: String, msg: Any) = {
+    if (to == Downstream)
+      context.actorSelection("/user/backend") ! msg
+    else if (to startsWith Downstream) {
+      val linkName = to drop Downstream.size + 1
+      implicit val system = context.system
+      new ShardedActorProxy(DSLinkActor.region, linkName) ! msg
+    }
+    else {
+      context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
+    }
+  }  
 }
 
 /**
@@ -125,39 +144,11 @@ object DSLinkActor {
   import models.Settings._
 
   /**
-   * Connects the link to the endpoint actor, which can be responsible for handling a WebSocket
-   * connection or TCP/IP channel, etc.
-   */
-  case class ConnectEndpoint(ref: ActorRef, ci: ConnectionInfo)
-
-  /**
-   * Disconnects the endpoint actor, optionally sending it a PoisonPill.
-   */
-  case class DisconnectEndpoint(kill: Boolean)
-
-  /**
-   * Request to send detailed link information.
-   */
-  case object GetLinkInfo
-
-  /**
-   * Encapsulates link information sent as the response to GetLinkInfo command.
-   */
-  case class LinkInfo(ci: ConnectionInfo, connected: Boolean,
-                      lastConnected: Option[DateTime],
-                      lastDisconnected: Option[DateTime])
-
-  /**
    * Creates a new instance of [[DSLinkActor]].
    */
   def props = Props(new DSLinkActor)
 
   /* CLUSTER */
-
-  /**
-   * Wrapps messages to be delivered by the shard region.
-   */
-  final case class DSLinkEnvelope(linkName: String, payload: Any)
 
   /**
    * Starts a shard region for Downstream dslink actors.
@@ -184,10 +175,10 @@ object DSLinkActor {
   def region(implicit system: ActorSystem): ActorRef = ClusterSharding(system).shardRegion(Nodes.Downstream)
 
   private val extractEntityId: ShardRegion.ExtractEntityId = {
-    case DSLinkEnvelope(linkName, payload) => (linkName, payload)
+    case EntityEnvelope(linkName, payload) => (linkName, payload)
   }
 
   private val extractShardId: ShardRegion.ExtractShardId = {
-    case DSLinkEnvelope(linkName, _) => (math.abs(linkName.hashCode) % DownstreamShardCount).toString
+    case EntityEnvelope(linkName, _) => (math.abs(linkName.hashCode) % DownstreamShardCount).toString
   }
 }

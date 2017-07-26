@@ -35,3 +35,8 @@ class IntCounter(init: Int = 0) {
     result
   }
 }
+
+/**
+ * An envelope for message routing, that provides the entityId for the shard coordinator.
+ */
+final case class EntityEnvelope(entityId: String, msg: Any)

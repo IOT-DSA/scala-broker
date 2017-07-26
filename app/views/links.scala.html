@@ -1,6 +1,6 @@
 @import org.joda.time.format.DateTimeFormat
 @import models.akka.ConnectionInfo
-@import models.akka.cluster.DSLinkActor.LinkInfo 
+@import models.akka.Messages.LinkInfo 
 @import controllers.ViewConfig
 
 @(regex: String, limit: Int, offset: Int, links: Iterable[LinkInfo], total: Int, downCount: Option[Int], upCount: Option[Int]) 

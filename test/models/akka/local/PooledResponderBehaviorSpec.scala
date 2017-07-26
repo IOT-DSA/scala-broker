@@ -5,7 +5,7 @@ import scala.concurrent.duration.DurationInt
 import akka.actor.Props
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ AbstractActorSpec, ConnectionInfo }
+import models.akka.{ AbstractActorSpec, ConnectionInfo, Messages }
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
 
@@ -23,7 +23,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   val ws = TestProbe()
 
-  responder.tell(DSLinkActor.ConnectEndpoint(ws.ref), ws.ref)
+  responder.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
 
   val requesters = (1 to 5) map (_ -> TestProbe()) toMap
 

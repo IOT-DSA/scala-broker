@@ -2,7 +2,6 @@ package models.akka
 
 import scala.util.matching.Regex
 
-import akka.actor.{ ActorContext, ActorRef }
 import models.Settings
 import models.rpc.DSAValue.{ DSAVal, StringValue, array }
 import models.splitPath
@@ -11,27 +10,11 @@ import models.splitPath
  * Types and utility functions for DSA clustered actors.
  */
 package object cluster {
-  import models.Settings.Paths._
 
   /* cluster node roles */
   val FrontendRole = "frontend"
   val BackendRole = "backend"
   
-  /**
-   * Sends a message to an actor using its DSA link path.
-   */
-  def dsaSend(to: String, msg: Any)(implicit context: ActorContext, sender: ActorRef) = {
-    if (to == Downstream)
-      context.actorSelection("/user/backend") ! msg
-    else if (to startsWith Downstream) {
-      val linkName = to drop Downstream.size + 1
-      new ShardedDSLinkProxy(linkName)(context.system) tell msg
-    }
-    else {
-      context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
-    }
-  }
-
   /**
    * Interpolates strings to produce RegEx.
    */
