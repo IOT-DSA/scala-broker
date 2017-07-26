@@ -1,11 +1,9 @@
-package models.akka
-
-import com.typesafe.config.ConfigFactory
+package models.akka.local
 
 import akka.testkit.TestProbe
-import models.{ RequestEnvelope, Settings }
+import models.RequestEnvelope
+import models.akka.{ AbstractActorSpec, ConnectionInfo }
 import models.rpc.ListRequest
-import play.api.Configuration
 
 /**
  * ResponderActor test suite.

@@ -1,19 +1,14 @@
-package models.akka
-
-import com.typesafe.config.ConfigFactory
+package models.akka.local
 
 import akka.actor.{ Props, actorRef2Scala }
-import akka.stream.scaladsl.Flow
 import akka.testkit.TestProbe
-import models.Settings
-import models.rpc.DSAMessage
-import play.api.Configuration
+import models.akka.{ AbstractActorSpec, ConnectionInfo }
 
 /**
  * DSLinkActor test suite.
  */
 class DSLinkActorSpec extends AbstractActorSpec {
-  
+
   val ci = ConnectionInfo("", "", true, false)
 
   val link = system.actorOf(Props(new DSLinkActor(ci) {}), "link")

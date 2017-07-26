@@ -1,10 +1,11 @@
-package models.akka
+package models.akka.local
 
 import scala.concurrent.duration.DurationInt
 
 import akka.actor.Props
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.{ AbstractActorSpec, ConnectionInfo }
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
 
@@ -13,7 +14,7 @@ import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
  */
 class PooledResponderBehaviorSpec extends AbstractActorSpec {
   import models.rpc.StreamState._
-  
+
   val ci = ConnectionInfo("", "", false, true)
 
   val responder = system.actorOf(Props(new DSLinkActor(ci) with PooledResponderBehavior {

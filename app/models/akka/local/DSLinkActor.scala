@@ -1,10 +1,10 @@
-package models.akka
+package models.akka.local
 
 import org.joda.time.DateTime
 
-import akka.actor.{ Actor, ActorLogging, ActorRef, Stash, Terminated, actorRef2Scala, PoisonPill }
-import akka.stream.ActorMaterializer
+import akka.actor._
 import models.Settings
+import models.akka.ConnectionInfo
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.

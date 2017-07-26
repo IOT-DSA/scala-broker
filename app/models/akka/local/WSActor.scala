@@ -1,9 +1,9 @@
-package models.akka
+package models.akka.local
 
-import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
+import akka.actor.{ Actor, ActorLogging, ActorRef, Props, Terminated, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.IntCounter
 import models.rpc._
-import akka.actor.Terminated
 
 /**
  * Encapsulates WebSocket actor configuration.

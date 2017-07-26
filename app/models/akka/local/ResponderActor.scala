@@ -1,7 +1,7 @@
-package models.akka
+package models.akka.local
 
 import akka.actor.Props
-import models.Settings
+import models.akka.ConnectionInfo
 
 /**
  * Endpoint DSLink in RESPONDER mode.

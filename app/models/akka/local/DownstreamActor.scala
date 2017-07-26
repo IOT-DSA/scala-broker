@@ -1,4 +1,4 @@
-package models.akka
+package models.akka.local
 
 import java.util.regex.Pattern
 
@@ -6,6 +6,7 @@ import scala.util.control.NonFatal
 
 import akka.actor.{ Actor, ActorLogging, Props, Status, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.akka.{ ConnectionInfo, IsNode, rows }
 import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ BooleanValue, StringValue, array, obj }
 

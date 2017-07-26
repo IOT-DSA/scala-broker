@@ -1,15 +1,10 @@
-package models.akka
+package models.akka.local
 
-import scala.concurrent.duration.DurationInt
-
-import com.typesafe.config.ConfigFactory
-
-import akka.actor.{ Actor, Props }
+import akka.actor.{ Actor, Props, actorRef2Scala }
 import akka.testkit.TestProbe
-import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.{ AbstractActorSpec, ConnectionInfo }
 import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
-import play.api.Configuration
 
 /**
  * RequesterActor test suite.

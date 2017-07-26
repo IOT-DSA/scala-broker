@@ -1,7 +1,6 @@
 package models.akka
 
-import akka.testkit.TestKit
-import akka.testkit.ImplicitSender
+import akka.testkit._
 import org.scalatest._
 import org.scalatest.concurrent.ScalaFutures
 import akka.actor.{ ActorRef, ActorSystem, InvalidActorNameException }
@@ -12,6 +11,7 @@ import akka.util.Timeout
 import models.Settings
 import play.api.Configuration
 import com.typesafe.config.ConfigFactory
+import models.akka.local.DownstreamActor
 
 /**
  * DownstreamActor test suite.

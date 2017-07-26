@@ -1,8 +1,10 @@
-package models.akka
+package models.akka.local
 
 import scala.util.control.NonFatal
 
+import akka.actor.actorRef2Scala
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.{ dsaSend, resolveLinkPath }
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 

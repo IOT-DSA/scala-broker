@@ -1,14 +1,17 @@
-package models.akka
+package models.akka.local
 
 import scala.util.control.NonFatal
 
-import akka.actor.{ ActorRef, actorRef2Scala, ActorDSL }
-import akka.routing.{ Broadcast, ConsistentHashingPool, ConsistentHashingRouter }
+import akka.actor.{ ActorRef, actorRef2Scala }
+import akka.routing.{ Broadcast, ConsistentHashingPool }
+import akka.actor.ActorDSL._
+import akka.routing.ConsistentHashingRouter._
+
 import models._
+import models.akka.{ IntCounter, ResponderListWorker, ResponderSubscribeWorker }
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.DSAVal
-import models.splitPath
 
 /**
  * Encapsulates request information for lookups.
@@ -134,9 +137,7 @@ class SidRegistry {
  */
 trait PooledResponderBehavior { me: DSLinkActor =>
   import context.system
-  import ResponderWorker._
-  import ActorDSL._
-  import ConsistentHashingRouter._
+  import models.akka.ResponderWorker._
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
   type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]

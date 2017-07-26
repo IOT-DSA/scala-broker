@@ -1,7 +1,9 @@
-package models.akka
+package models.akka.local
 
+import akka.actor.actorRef2Scala
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.AbstractActorSpec
 import models.rpc._
 
 /**
