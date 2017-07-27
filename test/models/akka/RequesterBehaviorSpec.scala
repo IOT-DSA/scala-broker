@@ -1,15 +1,15 @@
-package models.akka.local
+package models.akka
 
 import akka.actor.{ Actor, Props, actorRef2Scala }
 import akka.testkit.TestProbe
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ AbstractActorSpec, ConnectionInfo, Messages }
+import models.{ RequestEnvelope, ResponseEnvelope, Settings }
 import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
 
 /**
- * RequesterActor test suite.
+ * RequesterBehavior test suite.
  */
-class RequesterActorSpec extends AbstractActorSpec {
+class RequesterBehaviorSpec extends AbstractActorSpec {
+  import RequesterBehaviorSpec._
 
   val abcProbe = TestProbe()
   class AbcActor extends Actor {
@@ -29,7 +29,7 @@ class RequesterActorSpec extends AbstractActorSpec {
   }), "broker")
 
   val ci = ConnectionInfo("", "", true, false)
-  val requester = system.actorOf(RequesterActor.props(ci), "requester")
+  val requester = system.actorOf(Props(new Requester), "requester")
   val ws = TestProbe()
   requester.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
 
@@ -54,5 +54,20 @@ class RequesterActorSpec extends AbstractActorSpec {
       requester.tell(envelope, testActor)
       ws.expectMsg(envelope)
     }
+  }
+}
+
+/**
+ * Common definitions for [[RequesterBehaviorSpec]].
+ */
+object RequesterBehaviorSpec {
+  /**
+   * Test actor.
+   */
+  class Requester extends AbstractDSLinkActor with RequesterBehavior {
+    
+    override def connected = super.connected orElse requesterBehavior
+    
+    def dsaSend(to: String, msg: Any) = context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
   }
 }

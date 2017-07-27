@@ -1,4 +1,4 @@
-package models.akka.cluster
+package models.akka
 
 import scala.util.control.NonFatal
 
@@ -9,7 +9,6 @@ import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.DSAVal
 import models.splitPath
-import models.akka.{ IntCounter, ResponderWorker, ResponderListWorker, ResponderSubscribeWorker }
 
 /**
  * Encapsulates request information for lookups.
@@ -133,7 +132,7 @@ class SidRegistry {
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: DSLinkActor =>
+trait PooledResponderBehavior { me: AbstractDSLinkActor =>
   import context.system
   import ResponderWorker._
   import ActorDSL._

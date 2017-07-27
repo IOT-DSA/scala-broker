@@ -1,11 +1,10 @@
-package models.akka.local
+package models.akka
 
 import scala.concurrent.duration.DurationInt
 
 import akka.actor.Props
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ AbstractActorSpec, ConnectionInfo, Messages }
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
 
@@ -13,13 +12,12 @@ import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
  * PooledResponderBehavior test suite.
  */
 class PooledResponderBehaviorSpec extends AbstractActorSpec {
+  import PooledResponderBehaviorSpec._
   import models.rpc.StreamState._
 
   val ci = ConnectionInfo("", "", false, true)
 
-  val responder = system.actorOf(Props(new DSLinkActor(ci) with PooledResponderBehavior {
-    override def connected = super.connected orElse responderBehavior
-  }), "R")
+  val responder = system.actorOf(Props(new Responder), "R")
 
   val ws = TestProbe()
 
@@ -181,5 +179,17 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 14, stream = Some(Closed)))))
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 252, stream = Some(Closed)))))
     }
+  }
+}
+
+/**
+ * Common definitions for [[PooledResponderBehaviorSpec]].
+ */
+object PooledResponderBehaviorSpec {
+  /**
+   * Test actor.
+   */
+  class Responder extends AbstractDSLinkActor with PooledResponderBehavior {
+    override def connected = super.connected orElse responderBehavior
   }
 }

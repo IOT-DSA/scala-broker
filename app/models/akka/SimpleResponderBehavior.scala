@@ -1,11 +1,9 @@
-package models.akka.local
+package models.akka
 
 import scala.util.control.NonFatal
 
 import akka.actor.{ ActorRef, actorRef2Scala }
 import models._
-import models.akka.IntCounter
-import models.isAttribute
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ DSAVal, StringValue, array }
@@ -78,7 +76,7 @@ class SimpleCallRegistry(nextId: Int = 1) {
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait SimpleResponderBehavior { me: DSLinkActor =>
+trait SimpleResponderBehavior { me: AbstractDSLinkActor =>
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
 
@@ -92,9 +90,8 @@ trait SimpleResponderBehavior { me: DSLinkActor =>
     case env @ RequestEnvelope(requests) =>
       log.debug(s"$ownId: received $env")
       val result = processRequests(requests)
-      // TODO just temporary, implement connected/disconnected behavior
       if (!result.requests.isEmpty)
-        ws foreach (_ ! RequestEnvelope(result.requests))
+        sendToEndpoint(RequestEnvelope(result.requests))
       if (!result.responses.isEmpty)
         sender ! ResponseEnvelope(result.responses)
 

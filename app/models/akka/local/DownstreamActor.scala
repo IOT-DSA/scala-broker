@@ -66,10 +66,8 @@ class DownstreamActor extends Actor with ActorLogging {
    */
   private def createDSLink(ci: ConnectionInfo) = {
     val child = (ci.isRequester, ci.isResponder) match {
-      case (true, false) => context.actorOf(RequesterActor.props(ci), ci.linkName)
-      case (false, true) => context.actorOf(ResponderActor.props(ci), ci.linkName)
-      case (true, true)  => context.actorOf(DualActor.props(ci), ci.linkName)
-      case _             => throw new IllegalArgumentException("DSLink must be Requester, Responder or Dual")
+      case (false, false) => throw new IllegalArgumentException("DSLink must be Requester, Responder or Dual")
+      case _              => context.actorOf(DSLinkActor.props, ci.linkName)
     }
     log.debug(s"DSLink[${child.path.name}] created for ${ci.linkName}")
     child

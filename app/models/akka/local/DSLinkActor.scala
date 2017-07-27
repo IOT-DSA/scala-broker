@@ -1,86 +1,44 @@
 package models.akka.local
 
-import org.joda.time.DateTime
-
-import akka.actor._
+import akka.actor.Props
 import models.Settings
-import models.akka.ConnectionInfo
-import models.akka.Messages._
+import models.akka.{ AbstractDSLinkActor, RequesterBehavior, PooledResponderBehavior }
 
 /**
- * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.
+ * Represents a DSLink endpoint, which may or may not be connected to an Endpoint actor.
+ * The Endpoint actor is supplied by the facade and can represent a WebSocket or TCP connection,
+ * HTTP response stream, a test actor etc.
+ *
+ * The facade initiates a session by sending `ConnectEndpoint` message to the actor. The session
+ * ends either when `DisconnectEndpoint` message is sent to an actor, or the endpoint actor terminates.
  */
-abstract class DSLinkActor(connInfo: ConnectionInfo) extends Actor with Stash with ActorLogging {
-
-  val linkName = self.path.name
-  val linkPath = Settings.Paths.Downstream + "/" + linkName
-
-  protected val ownId = s"DSLink[$linkName]"
-
-  private var _ws: Option[ActorRef] = None
-  protected def ws = _ws
-  protected def isConnected = ws.isDefined
-
-  private var lastConnected: Option[DateTime] = _
-  private var lastDisconnected: Option[DateTime] = _
-
-  override def preStart() = {
-    log.info(s"$ownId: initialized, not connected to Endpoint")
-  }
-
-  override def postStop() = {
-    log.info(s"$ownId: stopped")
-  }
-
-  /**
-   * Handles incoming messages.
-   */
-  final def receive = disconnected
+class DSLinkActor extends AbstractDSLinkActor with RequesterBehavior with PooledResponderBehavior {
 
   /**
    * Handles messages in CONNECTED state.
    */
-  def connected: Receive = {
-    case DisconnectEndpoint(kill) =>
-      log.info(s"$ownId: disconnected from Endpoint")
-      disconnectFromEndpoint(kill)
-    case Terminated(wsActor) =>
-      log.info(s"$ownId: Endpoint terminated")
-      disconnectFromEndpoint(false)
-    case GetLinkInfo =>
-      sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
+  override def connected = super.connected orElse requesterBehavior orElse responderBehavior
+
+  /**
+   * Cleans up all active requests by sending CLOSE and UNSUBSCRIBE messages to responders.
+   */
+  override def postStop() = {
+    stopRequester
+    super.postStop
   }
 
   /**
-   * Handles messages in DISCONNECTED state.
+   * Sends a message to an actor using its DSA link path.
    */
-  def disconnected: Receive = {
-    case ConnectEndpoint(ref, _) =>
-      log.info(s"$ownId: connected to Endpoint")
-      connectToEndpoint(ref)
-    case GetLinkInfo =>
-      sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
-    case _ =>
-      log.debug("$ownId: stashing the incoming message")
-      stash()
-  }
+  def dsaSend(to: String, msg: Any) = context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
+}
 
-  private def connectToEndpoint(ref: ActorRef) = {
-    _ws = Some(context.watch(ref))
-    log.debug("$ownId: unstashing all stored messages")
-    lastConnected = Some(DateTime.now)
-    unstashAll()
-    context.become(connected)
-  }
-
-  private def disconnectFromEndpoint(kill: Boolean) = {
-    _ws foreach { ref =>
-      context unwatch ref
-      if (kill)
-        ref ! PoisonPill
-    }
-    _ws = None
-    lastDisconnected = Some(DateTime.now)
-    context.become(disconnected)
-  }
+/**
+ * Factory for [[DSLinkActor]] instances.
+ */
+object DSLinkActor {
+  /**
+   * Creates a new instance of [[DSLinkActor]] props.
+   */
+  def props = Props(new DSLinkActor)
 }

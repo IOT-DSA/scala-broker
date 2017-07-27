@@ -11,6 +11,7 @@ import akka.cluster.{ Member, UniqueAddress, Cluster }
 import akka.cluster.ClusterEvent.{ CurrentClusterState, MemberUp }
 import akka.util.Timeout
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.akka.{ IsNode, rows }
 import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ BooleanValue, StringValue, array, obj }
 
