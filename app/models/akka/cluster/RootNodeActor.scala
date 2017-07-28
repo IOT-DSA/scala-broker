@@ -2,7 +2,7 @@ package models.akka.cluster
 
 import akka.actor.{ Actor, ActorLogging, Props, TypedActor, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.StandardActions
+import models.akka._
 import models.api.DSANode
 import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ StringValue, array, obj }

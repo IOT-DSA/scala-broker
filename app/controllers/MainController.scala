@@ -5,15 +5,13 @@ import scala.concurrent.Future
 import akka.actor._
 import akka.pattern.{ ask, pipe }
 import akka.cluster.ClusterEvent.CurrentClusterState
-import akka.stream.Materializer
+import akka.stream._
 import akka.util.Timeout
 import akka.stream.scaladsl._
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.ConnectionInfo
-import models.akka.cluster.FrontendActor
-import models.akka.cluster.DSLinkActor
-import models.akka.cluster.DSLinkActor.{ DSLinkEnvelope, GetLinkInfo, LinkInfo }
+import models.akka._
+import models.akka.cluster.{BackendActor, DSLinkActor, FrontendActor}
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
 import play.api.cache.CacheApi
@@ -22,12 +20,6 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, JsValue, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
-import akka.actor.PoisonPill
-import models.akka.cluster.DSLinkActor.DisconnectEndpoint
-import models.akka.cluster.WSActor
-import models.akka.cluster.WSActorConfig
-import akka.stream.OverflowStrategy
-import models.akka.cluster.ShardedDSLinkProxy
 
 /**
  * Handles main web requests.
@@ -36,8 +28,9 @@ import models.akka.cluster.ShardedDSLinkProxy
 class MainController @Inject() (implicit actorSystem: ActorSystem,
                                 materializer: Materializer, cache: CacheApi,
                                 life: ApplicationLifecycle) extends Controller {
-  import models.akka.cluster.BackendActor._
-  import models.akka.cluster.FrontendActor._
+  import BackendActor._
+  import FrontendActor._
+  import Messages._
 
   private val log = Logger(getClass)
 
@@ -45,7 +38,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
-  DSLinkActor.proxyStart(actorSystem)
+  private val dslinks = DSLinkActor.proxyStart(actorSystem)
 
   private val frontend = actorSystem.actorOf(FrontendActor.props, "frontend")
 
@@ -94,7 +87,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
    * Disconnects the dslink from Web Socket.
    */
   def disconnectWS(name: String) = Action {
-    new ShardedDSLinkProxy(name) tell DisconnectEndpoint(true)
+    new ShardedActorProxy(dslinks, name) ! DisconnectEndpoint(true)
     Ok(s"Endpoint '$name' disconnected")
   }
 
@@ -102,7 +95,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
    * Removes the DSLink.
    */
   def removeLink(name: String) = Action {
-    new ShardedDSLinkProxy(name) tell PoisonPill
+    new ShardedActorProxy(dslinks, name) ! PoisonPill
     Ok(s"DSLink '$name' removed")
   }
 
@@ -168,8 +161,8 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
 
-    val proxy = new ShardedDSLinkProxy(ci.linkName)
-    val wsProps = WSActor.props(toSocket, proxy, WSActorConfig(ci, Settings.Salt))
+    val proxy = new ShardedActorProxy(dslinks, ci.linkName)
+    val wsProps = WebSocketActor.props(toSocket, proxy, WebSocketActorConfig(ci, Settings.Salt))
 
     val fromSocket = actorSystem.actorOf(Props(new Actor {
       val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
@@ -239,5 +232,5 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
   /**
    * Returns a future with the dslink info.
    */
-  private def getDSLinkInfo(linkName: String) = new ShardedDSLinkProxy(linkName).ask[LinkInfo](GetLinkInfo)
+  private def getDSLinkInfo(linkName: String) = new ShardedActorProxy(dslinks, linkName) ?[LinkInfo] GetLinkInfo 
 }

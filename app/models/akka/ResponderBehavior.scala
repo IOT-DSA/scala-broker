@@ -1,166 +1,31 @@
-package models.akka.cluster
+package models.akka
 
 import scala.util.control.NonFatal
 
-import akka.actor.{ ActorRef, actorRef2Scala, ActorDSL }
-import akka.routing.{ Broadcast, ConsistentHashingPool, ConsistentHashingRouter }
+import akka.actor.{ ActorRef, actorRef2Scala }
 import models._
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.DSAVal
 import models.splitPath
-import models.akka.{ IntCounter, ResponderWorker, ResponderListWorker, ResponderSubscribeWorker }
-
-/**
- * Encapsulates request information for lookups.
- */
-case class LookupRecord(method: DSAMethod, targetId: Int, origin: Option[Origin], path: Option[String])
-
-/**
- * Request registry tied to RID.
- */
-class RidRegistry {
-  private val nextTargetId = new IntCounter(1)
-
-  private val callsByTargetId = collection.mutable.Map.empty[Int, LookupRecord]
-  private val callsByOrigin = collection.mutable.Map.empty[Origin, LookupRecord]
-  private val callsByPath = collection.mutable.Map.empty[String, LookupRecord]
-
-  /**
-   * Saves lookup record for LIST call.
-   */
-  def saveListLookup(path: String): Int = saveLookup(DSAMethod.List, None, Some(path))
-
-  /**
-   * Saves lookup record for Set, Remove or Invoke call.
-   */
-  def savePassthroughLookup(method: DSAMethod, origin: Origin): Int = saveLookup(method, Some(origin), None)
-
-  /**
-   * Saves lookup record for SUBSCRIBE call.
-   */
-  def saveSubscribeLookup(origin: Origin): Int = saveLookup(DSAMethod.Subscribe, Some(origin), None)
-
-  /**
-   * Saves lookup record for UNSUBSCRIBE call.
-   */
-  def saveUnsubscribeLookup(origin: Origin): Int = saveLookup(DSAMethod.Unsubscribe, Some(origin), None)
-
-  /**
-   * Saves the lookup and returns the newly generated target RID.
-   */
-  private def saveLookup(method: DSAMethod, origin: Option[Origin], path: Option[String]): Int = {
-    val tgtId = nextTargetId.inc
-    val record = LookupRecord(method, tgtId, origin, path)
-
-    callsByTargetId(tgtId) = record
-    origin foreach (callsByOrigin(_) = record)
-    path foreach (callsByPath(_) = record)
-
-    tgtId
-  }
-
-  /**
-   * Locates the call record by target RID (used by response handlers).
-   */
-  def lookupByTargetId(targetId: Int): Option[LookupRecord] = callsByTargetId.get(targetId)
-
-  /**
-   * Locates the call record by the request origin (applicable to passthrough calls,
-   * though in fact used only to close streaming INVOKE requests.)
-   */
-  def lookupByOrigin(origin: Origin): Option[LookupRecord] = callsByOrigin.get(origin)
-
-  /**
-   * Locates the call record by the path (applicable to LIST calls only).
-   */
-  def lookupByPath(path: String): Option[LookupRecord] = callsByPath.get(path)
-
-  /**
-   * Removes the call record.
-   */
-  def removeLookup(record: LookupRecord) = {
-    record.origin foreach callsByOrigin.remove
-    record.path foreach callsByPath.remove
-    callsByTargetId -= record.targetId
-  }
-
-  /**
-   * Returns brief diagnostic information for the registry.
-   */
-  def info = s"Origin Lookups: ${callsByOrigin.size}, Target Lookups: ${callsByTargetId.size}, Path Lookups: ${callsByPath.size}"
-}
-
-/**
- * Request registry tied to SID.
- */
-class SidRegistry {
-  private val targetSids = new IntCounter(1)
-
-  private val pathBySid = collection.mutable.Map.empty[Int, String]
-  private val sidByPath = collection.mutable.Map.empty[String, Int]
-
-  /**
-   * Saves the lookup and returns the newly generated SID.
-   */
-  def saveLookup(path: String): Int = {
-    val tgtSid = targetSids.inc
-    sidByPath(path) = tgtSid
-    pathBySid(tgtSid) = path
-    tgtSid
-  }
-
-  /**
-   * Locates the SID by the path.
-   */
-  def lookupByPath(path: String): Option[Int] = sidByPath.get(path)
-
-  /**
-   * Removes the lookup.
-   */
-  def removeLookup(targetSid: Int) = {
-    val path = pathBySid(targetSid)
-    sidByPath -= path
-    pathBySid -= targetSid
-  }
-
-  /**
-   * Returns brief diagnostic information for the registry.
-   */
-  def info = s"Target Lookups: ${pathBySid.size}, Path Lookups: ${sidByPath.size}"
-}
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: DSLinkActor =>
-  import context.system
-  import ResponderWorker._
-  import ActorDSL._
-  import ConsistentHashingRouter._
+trait ResponderBehavior { me: AbstractDSLinkActor =>
+  import RidRegistry._
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
   type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]
 
+  // stores call records for forward and reverse RID lookup
   private val ridRegistry = new RidRegistry
 
+  //stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
   private val sidRegistry = new SidRegistry
 
   // stores responder's nodes' attributes locally
   private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
-
-  // LIST and SUBSCRIBE workers
-  private val originHash: ConsistentHashMapping = {
-    case AddOrigin(_, origin)   => origin
-    case RemoveOrigin(origin)   => origin
-    case LookupTargetId(origin) => origin
-  }
-
-  private val listPool = ConsistentHashingPool(Settings.Responder.ListPoolSize, hashMapping = originHash)
-  private val listRouter = context.actorOf(listPool.props(ResponderListWorker.props(linkName)))
-
-  private val subsPool = ConsistentHashingPool(Settings.Responder.SubscribePoolSize, hashMapping = originHash)
-  private val subsRouter = context.actorOf(subsPool.props(ResponderSubscribeWorker.props(linkName)))
 
   /**
    * Processes incoming requests and responses.
@@ -195,8 +60,8 @@ trait ResponderBehavior { me: DSLinkActor =>
       case NonFatal(e) => log.error(s"$ownId: error handling request $request - {}", e); HandlerResult.Empty
     })
 
-    log.debug("RID after Req: " + ridRegistry.info)
-    log.debug("SID after Req: " + sidRegistry.info)
+    log.debug(s"$ownId: RID after Req: " + ridRegistry.info)
+    log.debug(s"$ownId: SID after Req: " + sidRegistry.info)
 
     HandlerResult.flatten(results)
   }
@@ -209,8 +74,8 @@ trait ResponderBehavior { me: DSLinkActor =>
 
     val results = responses flatMap handler
 
-    log.debug("RID after Rsp: " + ridRegistry.info)
-    log.debug("SID after Rsp: " + sidRegistry.info)
+    log.debug(s"$ownId: RID after Rsp: " + ridRegistry.info)
+    log.debug(s"$ownId: SID after Rsp: " + sidRegistry.info)
 
     results groupBy (_._1) mapValues (_.map(_._2))
   }
@@ -224,10 +89,10 @@ trait ResponderBehavior { me: DSLinkActor =>
       ridRegistry.lookupByPath(path) match {
         case None =>
           val tgtId = ridRegistry.saveListLookup(path)
-          listRouter ! AddOrigin(tgtId, origin)
+          addListOrigin(tgtId, origin)
           HandlerResult(ListRequest(tgtId, translatePath(path)))
         case Some(rec) =>
-          listRouter ! AddOrigin(rec.targetId, origin)
+          addListOrigin(rec.targetId, origin)
           HandlerResult.Empty
       }
   }
@@ -287,11 +152,11 @@ trait ResponderBehavior { me: DSLinkActor =>
           val tgtRid = ridRegistry.saveSubscribeLookup(ridOrigin)
           val tgtSid = sidRegistry.saveLookup(srcPath.path)
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
-          subsRouter ! AddOrigin(tgtSid, sidOrigin)
+          addSubscribeOrigin(tgtSid, sidOrigin)
           HandlerResult(SubscribeRequest(tgtRid, tgtPath))
         case Some(tgtSid) =>
           // Close and Subscribe response may come out of order, leaving until it's a problem
-          subsRouter ! AddOrigin(tgtSid, sidOrigin)
+          addSubscribeOrigin(tgtSid, sidOrigin)
           HandlerResult(DSAResponse(srcRid, Some(StreamState.Closed)))
       }
   }
@@ -303,7 +168,7 @@ trait ResponderBehavior { me: DSLinkActor =>
     case req @ UnsubscribeRequest(rid, _) =>
       val ridOrigin = Origin(sender, rid)
       val sidOrigin = Origin(sender, req.sid)
-      removeOrigin(sidOrigin, subsPool, subsRouter) map { targetSid =>
+      removeSubscribeOrigin(sidOrigin) map { targetSid =>
         sidRegistry.removeLookup(targetSid)
         val tgtRid = ridRegistry.saveUnsubscribeLookup(ridOrigin)
         HandlerResult(UnsubscribeRequest(tgtRid, List(targetSid)))
@@ -319,7 +184,7 @@ trait ResponderBehavior { me: DSLinkActor =>
       ridRegistry.lookupByOrigin(origin) match {
         case Some(LookupRecord(_, tgtId, _, _)) => HandlerResult(CloseRequest(tgtId)) // passthrough call
         case _ => // LIST call
-          removeOrigin(origin, listPool, listRouter) map { targetId =>
+          removeListOrigin(origin) map { targetId =>
             ridRegistry.lookupByTargetId(targetId) foreach ridRegistry.removeLookup
             HandlerResult(CloseRequest(targetId))
           } getOrElse HandlerResult.Empty
@@ -327,27 +192,10 @@ trait ResponderBehavior { me: DSLinkActor =>
   }
 
   /**
-   * Removes the origin from one of the workers. Returns `Some(targetId)` if the entry can be
-   * removed (i.e. no listeners left), or None otherwise.
-   */
-  private def removeOrigin(origin: Origin, pool: ConsistentHashingPool, router: ActorRef) = {
-    val ibox = inbox()
-    router.tell(LookupTargetId(origin), ibox.getRef)
-    ibox.receive().asInstanceOf[Option[Int]] map { targetId =>
-      router ! RemoveOrigin(origin)
-      router.tell(Broadcast(GetOriginCount(targetId)), ibox.getRef)
-      val count = (1 to pool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
-      (targetId, count < 1)
-    } collect {
-      case (targetId, true) => targetId
-    }
-  }
-
-  /**
-   * Forwards response to the subscriber router and returns nothing.
+   * Forwards response to the recipients and returns nothing.
    */
   private def handleSubscribeResponse: ResponseHandler = {
-    case rsp @ DSAResponse(0, _, _, _, _) => subsRouter ! Broadcast(rsp); Nil
+    case rsp @ DSAResponse(0, _, _, _, _) => deliverSubscribeResponse(rsp); Nil
   }
 
   /**
@@ -358,7 +206,7 @@ trait ResponderBehavior { me: DSLinkActor =>
     case rsp if rsp.rid != 0 =>
       val result = ridRegistry.lookupByTargetId(rsp.rid) match {
         case Some(LookupRecord(DSAMethod.List, _, _, _)) =>
-          listRouter ! Broadcast(rsp)
+          deliverListResponse(rsp)
           Nil
         case Some(rec @ LookupRecord(_, _, Some(origin), _)) =>
           if (rsp.stream == Some(StreamState.Closed))
@@ -371,7 +219,6 @@ trait ResponderBehavior { me: DSLinkActor =>
 
       result
   }
-
   /**
    * Removes the linkPath prefix from the path.
    */
@@ -379,4 +226,36 @@ trait ResponderBehavior { me: DSLinkActor =>
     val chopped = path.drop(linkPath.size)
     if (!chopped.startsWith("/")) "/" + chopped else chopped
   }
+
+  /**
+   * Adds the origin to the list of recipients for the given target RID.
+   */
+  protected def addListOrigin(targetId: Int, origin: Origin): Unit
+
+  /**
+   * Adds the origin to the list of recipients for the given target SID.
+   */
+  protected def addSubscribeOrigin(targetId: Int, origin: Origin): Unit
+
+  /**
+   * Removes the origin from the collection of LIST recipients it belongs to. Returns `Some(targetId)`
+   * if the call record can be removed (i.e. no listeners left), or None otherwise.
+   */
+  protected def removeListOrigin(origin: Origin): Option[Int]
+
+  /**
+   * Removes the origin from the collection of SUBSCRIBE recipients it belongs to. Returns `Some(targetId)`
+   * if the call record can be removed (i.e. no listeners left), or None otherwise.
+   */
+  protected def removeSubscribeOrigin(origin: Origin): Option[Int]
+
+  /**
+   * Delivers a LIST response to its recipients.
+   */
+  protected def deliverListResponse(rsp: DSAResponse): Unit
+
+  /**
+   * Delivers a SUBSCRIBE response to its recipients.
+   */
+  protected def deliverSubscribeResponse(rsp: DSAResponse): Unit
 }

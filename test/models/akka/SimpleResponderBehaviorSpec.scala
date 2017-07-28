@@ -9,10 +9,10 @@ import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
 
 /**
- * PooledResponderBehavior test suite.
+ * SimpleResponderBehavior test suite.
  */
-class PooledResponderBehaviorSpec extends AbstractActorSpec {
-  import PooledResponderBehaviorSpec._
+class SimpleResponderBehaviorSpec extends AbstractActorSpec {
+  import SimpleResponderBehaviorSpec._
   import models.rpc.StreamState._
 
   val ci = ConnectionInfo("", "", false, true)
@@ -25,7 +25,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   val requesters = (1 to 5) map (_ -> TestProbe()) toMap
 
-  "PooledResponderBehavior" should {
+  "SimpleResponderBehavior" should {
     "handle List requests" in {
       responder.tell(RequestEnvelope(List(ListRequest(101, "/downstream/R/blah"))), requesters(1).ref)
       ws.expectMsg(RequestEnvelope(List(ListRequest(1, "/blah"))))
@@ -183,13 +183,13 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 }
 
 /**
- * Common definitions for [[PooledResponderBehaviorSpec]].
+ * Common definitions for [[SimpleResponderBehaviorSpec]].
  */
-object PooledResponderBehaviorSpec {
+object SimpleResponderBehaviorSpec {
   /**
    * Test actor.
    */
-  class Responder extends AbstractDSLinkActor with PooledResponderBehavior {
+  class Responder extends AbstractDSLinkActor with SimpleResponderBehavior {
     override def connected = super.connected orElse responderBehavior
   }
 }

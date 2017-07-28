@@ -1,20 +1,15 @@
 package models.akka
 
-import scala.concurrent.duration.DurationInt
-
-import com.typesafe.config.ConfigFactory
-
-import akka.actor.{ Actor, Props }
+import akka.actor.{ Actor, Props, actorRef2Scala }
 import akka.testkit.TestProbe
-import akka.util.Timeout
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
 import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
-import play.api.Configuration
 
 /**
- * RequesterActor test suite.
+ * RequesterBehavior test suite.
  */
-class RequesterActorSpec extends AbstractActorSpec {
+class RequesterBehaviorSpec extends AbstractActorSpec {
+  import RequesterBehaviorSpec._
 
   val abcProbe = TestProbe()
   class AbcActor extends Actor {
@@ -34,9 +29,9 @@ class RequesterActorSpec extends AbstractActorSpec {
   }), "broker")
 
   val ci = ConnectionInfo("", "", true, false)
-  val requester = system.actorOf(RequesterActor.props(ci), "requester")
+  val requester = system.actorOf(Props(new Requester), "requester")
   val ws = TestProbe()
-  requester.tell(DSLinkActor.ConnectEndpoint(ws.ref), ws.ref)
+  requester.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
 
   "RequesterActor" should {
     "route requests to broker root" in {
@@ -59,5 +54,20 @@ class RequesterActorSpec extends AbstractActorSpec {
       requester.tell(envelope, testActor)
       ws.expectMsg(envelope)
     }
+  }
+}
+
+/**
+ * Common definitions for [[RequesterBehaviorSpec]].
+ */
+object RequesterBehaviorSpec {
+  /**
+   * Test actor.
+   */
+  class Requester extends AbstractDSLinkActor with RequesterBehavior {
+    
+    override def connected = super.connected orElse requesterBehavior
+    
+    def dsaSend(to: String, msg: Any) = context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
   }
 }

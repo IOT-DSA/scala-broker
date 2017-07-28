@@ -1,23 +1,26 @@
 package models.akka
 
+import akka.actor.actorRef2Scala
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
 
 /**
- * WSActor test suite.
+ * WebSocketActor test suite.
  */
-class WSActorSpec extends AbstractActorSpec {
+class WebSocketActorSpec extends AbstractActorSpec {
+  import Messages._
 
   val salt = 1234
-  val config = WSActorConfig("ws", salt)
+  val ci = ConnectionInfo("", "ws", true, false)
+  val config = WebSocketActorConfig(ci, salt)
   val link = TestProbe()
-  val wsActor = system.actorOf(WSActor.props(testActor, link.ref, config))
+  val wsActor = system.actorOf(WebSocketActor.props(testActor, new ActorRefProxy(link.ref), config))
 
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {
       expectMsg(AllowedMessage(true, salt))
-      link.expectMsg(DSLinkActor.ConnectEndpoint(wsActor))
+      link.expectMsg(ConnectEndpoint(wsActor, ci))
     }
     "return ack for a ping message" in {
       wsActor ! PingMessage(101)

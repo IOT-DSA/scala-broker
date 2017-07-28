@@ -1,23 +1,22 @@
-package models.akka.cluster
+package models.akka
 
+import Messages.ConnectEndpoint
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
-import akka.actor.Terminated
-import models.akka.IntCounter
-import models.akka.ConnectionInfo
 
 /**
  * Encapsulates WebSocket actor configuration.
  */
-case class WSActorConfig(connInfo: ConnectionInfo, salt: Int)
+case class WebSocketActorConfig(connInfo: ConnectionInfo, salt: Int)
 
 /**
- * WebSocket endpoint actor for requesters, responders and dual links.
+ * Represents a WebSocket connection and communicates to the DSLink actor.
  */
-class WSActor(out: ActorRef, link: DSLinkProxy, config: WSActorConfig) extends Actor with ActorLogging {
-  private val linkName = config.connInfo.linkName
-  private val ownId = s"WSActor[$linkName]"
+class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConfig) extends Actor with ActorLogging {
+
+  protected val linkName = config.connInfo.linkName
+  protected val ownId = s"WSActor[$linkName]"
 
   private var localMsgId = new IntCounter(1)
 
@@ -27,7 +26,7 @@ class WSActor(out: ActorRef, link: DSLinkProxy, config: WSActorConfig) extends A
   override def preStart() = {
     log.info(s"$ownId: initialized, sending 'allowed' to client")
     sendAllowed(config.salt)
-    link tell DSLinkActor.ConnectEndpoint(self, config.connInfo)
+    proxy tell ConnectEndpoint(self, config.connInfo)
   }
 
   /**
@@ -49,32 +48,29 @@ class WSActor(out: ActorRef, link: DSLinkProxy, config: WSActorConfig) extends A
     case m @ RequestMessage(msg, _, _) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
-      link tell m
+      proxy tell m
     case m @ ResponseMessage(msg, _, _) =>
       log.info(s"$ownId: received $m from WebSocket")
       sendAck(msg)
-      link tell m
+      proxy tell m
     case e @ RequestEnvelope(requests) =>
       log.debug(s"$ownId: received $e")
       sendRequests(requests: _*)
     case e @ ResponseEnvelope(responses) =>
       log.debug(s"$ownId: received $e")
       sendResponses(responses: _*)
-    case Terminated(ref) =>
-      log.info("$ownId: link terminated, stopping...")
-      context stop self
   }
 
   /**
    * Sends the response message to the client.
    */
-  protected def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty)
+  private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty)
     sendToSocket(ResponseMessage(localMsgId.inc, None, responses.toList))
 
   /**
    * Sends the request message back to the client.
    */
-  protected def sendRequests(requests: DSARequest*) = if (!requests.isEmpty)
+  private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty)
     sendToSocket(RequestMessage(localMsgId.inc, None, requests.toList))
 
   /**
@@ -97,11 +93,12 @@ class WSActor(out: ActorRef, link: DSLinkProxy, config: WSActorConfig) extends A
 }
 
 /**
- * Factory for [[WSActor]] instances.
+ * Factory for [[WebSocketActor]] instances.
  */
-object WSActor {
+object WebSocketActor {
   /**
-   * Creates a new Props instance for [[WSActor]].
+   * Creates a new [[WebSocketActor]] props.
    */
-  def props(out: ActorRef, link: DSLinkProxy, config: WSActorConfig) = Props(new WSActor(out, link, config))
+  def props(out: ActorRef, proxy: CommProxy, config: WebSocketActorConfig) =
+    Props(new WebSocketActor(out, proxy, config))
 }

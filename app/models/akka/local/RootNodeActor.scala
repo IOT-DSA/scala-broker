@@ -1,21 +1,22 @@
-package models.akka
-
-import scala.concurrent.ExecutionContext.Implicits.global
+package models.akka.local
 
 import akka.actor.{ Actor, ActorLogging, Props, TypedActor, actorRef2Scala }
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSANode
 import models.rpc.{ DSAError, DSARequest, DSAResponse }
 import models.rpc.DSAValue.{ StringValue, array, obj }
 import models.rpc.ListRequest
+import models.akka._
 
 /**
  * Handles requests to the top broker node.
  */
 class RootNodeActor extends Actor with ActorLogging {
   import RootNodeActor._
-  import Settings.Nodes._
+  import models.Settings.Nodes._
   import models.rpc.StreamState._
+  
+  import context.dispatcher
 
   // create children
   private val downstreamNode = context.actorOf(DownstreamActor.props, Downstream)
