@@ -26,7 +26,7 @@ class ResponderWorkerSpec extends AbstractActorSpec {
   })
 
   "ResponderWorker" should {
-    val router = system.actorOf(pool.props(Props(new ResponderWorker("") {})))
+    val router = system.actorOf(pool.props(Props(new ResponderListWorker("") {})))
     "add origins for targetId" in {
       router ! AddOrigin(1, Origin(testActor, 101))
       router ! AddOrigin(3, Origin(testActor, 301))

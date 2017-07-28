@@ -6,7 +6,8 @@ import models.{ Origin, Settings }
 import models.rpc.DSAResponse
 
 /**
- * Handles communication with a remote DSLink in Responder mode.
+ * Handles communication with a remote DSLink in Responder mode using a router and a pool of workers
+ * for implementing multi-recipient responce delivery (LIST, SUBSCRIBE).
  */
 trait PooledResponderBehavior extends ResponderBehavior { me: AbstractDSLinkActor =>
   import context.system
