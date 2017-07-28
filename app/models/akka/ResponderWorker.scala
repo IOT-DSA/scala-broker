@@ -11,13 +11,13 @@ import models.rpc.StreamState.StreamState
  * and the last received response, if any.
  */
 class WorkerCallRecord {
-  private var _origins = collection.mutable.Set.empty[Origin]
+  private var _origins = Set.empty[Origin]
   private var _lastResponse: Option[DSAResponse] = None
 
   def lastResponse = _lastResponse
   def setLastResponse(rsp: DSAResponse) = { _lastResponse = Some(rsp); this }
 
-  def origins = _origins.toSet
+  def origins = _origins
   def addOrigin(origin: Origin) = { _origins += origin; this }
   def removeOrigin(origin: Origin) = { _origins -= origin; this }
 }
