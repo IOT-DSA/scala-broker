@@ -42,11 +42,11 @@ class DSLinkManagerSpec extends AbstractActorSpec with Inside {
     }), "downstream")
 
     "send a message to a dslink" in {
-      localMgr.tell("abc", "MSG1")
+      localMgr.tellDSLink("abc", "MSG1")
       abcProbe.expectMsg("MSG1")
     }
     "send request-reply to a dslink" in {
-      whenReady(localMgr.ask[String]("xyz", "MSG2")) { _ mustBe "MSG2" }
+      whenReady(localMgr.askDSLink[String]("xyz", "MSG2")) { _ mustBe "MSG2" }
     }
     "connect dslink to endpoint" in {
       val ci = ConnectionInfo("", "abc", true, false)
@@ -67,19 +67,19 @@ class DSLinkManagerSpec extends AbstractActorSpec with Inside {
   }
 
   "ClusteredDSLinkManager" should {
-    val clusterMgr: DSLinkManager = new ClusteredDSLinkManager()(backendSystem)
+    val clusterMgr: DSLinkManager = new ClusteredDSLinkManager(false)(backendSystem)
     val backendProbe = TestProbe()(backendSystem)
     val backend = backendSystem.actorOf(TestActors.forwardActorProps(backendProbe.ref), "backend")
 
     "send a message to a dslink" in {
-      clusterMgr.tell("abc", ConnectEndpoint(testActor, ConnectionInfo("", "abc", true, false)))
+      clusterMgr.tellDSLink("abc", ConnectEndpoint(testActor, ConnectionInfo("", "abc", true, false)))
       backendProbe.expectMsg(RegisterDSLink("abc", DSLinkMode.Requester, true))
-      clusterMgr.tell("abc", PoisonPill)
+      clusterMgr.tellDSLink("abc", PoisonPill)
       backendProbe.expectMsg(UnregisterDSLink("abc"))
     }
     "send request-reply to a dslink" in {
       val ci = ConnectionInfo("", "xyz", true, false)
-      whenReady(clusterMgr.ask[LinkInfo]("xyz", GetLinkInfo)) { _ mustBe LinkInfo(ci, false, None, None) }
+      whenReady(clusterMgr.askDSLink[LinkInfo]("xyz", GetLinkInfo)) { _ mustBe LinkInfo(ci, false, None, None) }
     }
     "connect dslink to endpoint" in {
       val ci = ConnectionInfo("", "abc", true, false)

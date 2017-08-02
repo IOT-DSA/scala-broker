@@ -44,7 +44,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
   private val frontend = actorSystem.actorOf(FrontendActor.props, "frontend")
 
   val dslinkMgr = if (isClusterMode)
-    new ClusteredDSLinkManager
+    new ClusteredDSLinkManager(true)
   else
     new LocalDSLinkManager
 
@@ -107,7 +107,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
    * Removes the DSLink.
    */
   def removeLink(name: String) = Action {
-    dslinkMgr.tell(name, PoisonPill)
+    dslinkMgr.tellDSLink(name, PoisonPill)
     Ok(s"DSLink '$name' removed")
   }
 

@@ -1,10 +1,6 @@
 package models.akka
 
-import akka.actor.{ ActorRef, ActorSystem, Props }
-import akka.cluster.Cluster
-import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
-import models.Settings
-import models.akka._
+import akka.actor.Props
 import models.akka.responder.PooledResponderBehavior
 
 /**
@@ -17,7 +13,6 @@ import models.akka.responder.PooledResponderBehavior
  */
 class DefaultDSLinkActor(dslinkMgr: DSLinkManager) extends AbstractDSLinkActor
     with RequesterBehavior with PooledResponderBehavior {
-  import models.Settings.Paths._
 
   /**
    * Performs post-stop actions on the requester.
@@ -35,17 +30,7 @@ class DefaultDSLinkActor(dslinkMgr: DSLinkManager) extends AbstractDSLinkActor
   /**
    * Sends a message to an actor using its DSA link path.
    */
-  def dsaSend(to: String, msg: Any) = {
-    if (to == Downstream)
-      context.actorSelection("/user/frontend") ! msg
-    else if (to startsWith Downstream) {
-      val linkName = to drop Downstream.size + 1
-      dslinkMgr.tell(linkName, msg)
-    } else if (isClusterMode)
-      RootNodeActor.childProxy(to)(context.system) ! msg
-    else
-      context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
-  }
+  def dsaSend(to: String, msg: Any) = dslinkMgr.dsaSend(to, msg)
 }
 
 /**

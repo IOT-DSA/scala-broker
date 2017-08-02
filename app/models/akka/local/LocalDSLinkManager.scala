@@ -12,7 +12,7 @@ import scala.concurrent.duration.Duration
 /**
  * Uses Akka Actor Selection to communicate with DSLinks.
  */
-class LocalDSLinkManager(implicit system: ActorSystem) extends DSLinkManager {
+class LocalDSLinkManager(implicit val system: ActorSystem) extends DSLinkManager {
   import Settings._
   import Messages._
 
@@ -21,22 +21,31 @@ class LocalDSLinkManager(implicit system: ActorSystem) extends DSLinkManager {
   /**
    * Sends a message to the DSLink using ActorSelection.
    */
-  def tell(linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender) =
+  def tellDSLink(linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender) =
     select(linkName).tell(msg, sender)
 
   /**
    * Sends a request-response message to the DSLink using ActorSelection.
    */
-  def ask[T: ClassTag](linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender) =
+  def askDSLink[T: ClassTag](linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender) =
     akka.pattern.ask(select(linkName), msg, sender).mapTo[T]
 
+  /**
+   * Sends the message to an actor at the path `/user/broker/path`.
+   */
+  def tellNode(path: String, message: Any)(implicit sender: ActorRef = Actor.noSender) =
+    if (path == Settings.Paths.Downstream)
+      system.actorSelection("/user/backend") ! message
+    else
+      system.actorSelection("/user/" + Settings.Nodes.Root + path) ! message
+
   def connectEndpoint(linkName: String, ep: ActorRef, ci: ConnectionInfo) =
-    tell(linkName, ConnectEndpoint(ep, ci))
+    tellDSLink(linkName, ConnectEndpoint(ep, ci))
 
   def disconnectEndpoint(linkName: String, killEndpoint: Boolean = true) =
-    tell(linkName, DisconnectEndpoint(killEndpoint))
+    tellDSLink(linkName, DisconnectEndpoint(killEndpoint))
 
-  def getDSLinkInfo(linkName: String) = ask[LinkInfo](linkName, GetLinkInfo)
+  def getDSLinkInfo(linkName: String) = askDSLink[LinkInfo](linkName, GetLinkInfo)
 
   /**
    * TODO review this to see if we can avoid blocking

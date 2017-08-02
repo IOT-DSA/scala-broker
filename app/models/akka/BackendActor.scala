@@ -76,7 +76,7 @@ class BackendActor(linkMgr: DSLinkManager) extends Actor with ActorLogging {
 
     case RemoveDisconnectedDSLinks =>
       val disconnected = links.filter(_._2.connected).keys
-      disconnected foreach { name => linkMgr.tell(name, PoisonPill) }
+      disconnected foreach { name => linkMgr.tellDSLink(name, PoisonPill) }
       log.info("Removed {} disconnected DSLinks", disconnected.size)
 
     case RequestEnvelope(requests) =>
@@ -88,15 +88,20 @@ class BackendActor(linkMgr: DSLinkManager) extends Actor with ActorLogging {
    * Handles internal messages.
    */
   def receivePrivate: Receive = {
-    case state: CurrentClusterState => state.members.filter(_.status == Up) foreach register
+    case state: CurrentClusterState =>
+      log.info("Received current cluster state, registering with frontends")
+      state.members.filter(_.status == Up) foreach register
 
-    case MemberUp(m)                => register(m)
+    case MemberUp(m) =>
+      log.info("Member Up: {}, registering", m)
+      register(m)
 
     case RegisterDSLink(name, mode, connected) =>
       links += (name -> LinkState(mode, connected))
       log.info("Registered DSLink '{}'", name)
 
-    case DSLinkStateChanged(name, mode, connected) =>
+    case evt @ DSLinkStateChanged(name, mode, connected) =>
+      log.info("DSLink state changed: {}", evt)
       links.get(name) match {
         case Some(state) => links += (name -> LinkState(mode, connected))
         case None        => log.warning("DSLink {} is not registered, ignoring state change", name)

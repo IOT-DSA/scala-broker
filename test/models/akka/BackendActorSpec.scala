@@ -38,7 +38,7 @@ class BackendActorSpec extends AbstractActorSpec {
   }
 
   val localMgr = new LocalDSLinkManager()(system)
-  val clusterMgr = new ClusteredDSLinkManager()(backendSystem)
+  val clusterMgr = new ClusteredDSLinkManager(false)(backendSystem)
 
   "Local BackendActor" should {
     val fe = TestProbe()(system)

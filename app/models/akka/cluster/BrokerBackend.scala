@@ -22,7 +22,7 @@ object BrokerBackend extends App {
   implicit val system = ActorSystem(systemName, config.resolve)
 
   // start Backend
-  val dslinkMgr = new ClusteredDSLinkManager
+  val dslinkMgr = new ClusteredDSLinkManager(false)
   system.actorOf(BackendActor.props(dslinkMgr), "backend")
 
   // start Root node 

@@ -4,7 +4,6 @@ import org.joda.time.DateTime
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
 import models.Settings
-import akka.cluster.Cluster
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -25,11 +24,6 @@ abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
   private var registered: Boolean = false
   private var lastConnected: Option[DateTime] = None
   private var lastDisconnected: Option[DateTime] = None
-
-  /**
-   * Returns `true` if the app is run in a cluster, `false` otherwise.
-   */
-  protected val isClusterMode = context.system.hasExtension(Cluster)
 
   /**
    * Called on link start up, logs the dslink status.
