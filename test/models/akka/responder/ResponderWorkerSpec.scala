@@ -1,4 +1,4 @@
-package models.akka
+package models.akka.responder
 
 import scala.concurrent.duration.DurationInt
 
@@ -8,6 +8,7 @@ import akka.routing.{ Broadcast, ConsistentHashingPool }
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import models.{ Origin, ResponseEnvelope }
+import models.akka.AbstractActorSpec
 import models.rpc.DSAResponse
 import models.rpc.DSAValue.{ longToNumericValue, obj }
 

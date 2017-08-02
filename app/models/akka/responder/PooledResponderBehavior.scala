@@ -1,9 +1,10 @@
-package models.akka
+package models.akka.responder
 
 import akka.actor.{ ActorRef, actorRef2Scala }
 import akka.routing.{ Broadcast, ConsistentHashingPool }
 import models.{ Origin, Settings }
 import models.rpc.DSAResponse
+import models.akka.AbstractDSLinkActor
 
 /**
  * Handles communication with a remote DSLink in Responder mode using a router and a pool of workers

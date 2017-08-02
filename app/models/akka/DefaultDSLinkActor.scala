@@ -1,10 +1,11 @@
 package models.akka
 
 import akka.actor.{ ActorRef, ActorSystem, Props }
+import akka.cluster.Cluster
 import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
 import models.Settings
 import models.akka._
-import akka.cluster.Cluster
+import models.akka.responder.PooledResponderBehavior
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint actor.

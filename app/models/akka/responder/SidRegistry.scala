@@ -1,4 +1,6 @@
-package models.akka
+package models.akka.responder
+
+import models.akka.IntCounter
 
 /**
  * Request registry tied to SID.

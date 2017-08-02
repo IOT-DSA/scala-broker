@@ -1,4 +1,6 @@
-package models.akka
+package models.akka.responder
+
+import models.akka.AbstractActorSpec
 
 /**
  * SidRegistry test suite.
