@@ -7,7 +7,14 @@ import controllers.ConnectionRequest
  */
 case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, isResponder: Boolean,
                           linkData: Option[String] = None, version: String = "",
-                          formats: List[String] = Nil, compression: Boolean = false)
+                          formats: List[String] = Nil, compression: Boolean = false) {
+  val mode = (isRequester, isResponder) match {
+    case (true, true)  => DSLinkMode.Dual
+    case (true, false) => DSLinkMode.Requester
+    case (false, true) => DSLinkMode.Responder
+    case _             => throw new IllegalArgumentException("DSLink must be Requester, Responder or Dual")
+  }
+}
 
 /**
  * Factory for [[ConnectionInfo]] instances.
@@ -40,3 +47,11 @@ class IntCounter(init: Int = 0) {
  * An envelope for message routing, that provides the entityId for the shard coordinator.
  */
 final case class EntityEnvelope(entityId: String, msg: Any)
+
+/**
+ * DSA Link mode.
+ */
+object DSLinkMode extends Enumeration {
+  type DSLinkMode = Value
+  val Responder, Requester, Dual = Value
+}

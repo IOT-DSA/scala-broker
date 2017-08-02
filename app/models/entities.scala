@@ -12,7 +12,7 @@ case class RequestEnvelope(requests: Seq[DSARequest]) {
    * Outputs only the first request for compact logging.
    */
   override def toString = if (requests.size < 2)
-    s"RequestEnvelope($requests})"
+    s"RequestEnvelope($requests)"
   else
     s"RequestEnvelope(List(${requests.head},...${requests.size - 1} more))"
 }

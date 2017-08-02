@@ -1,4 +1,4 @@
-package models.akka
+package models.akka.local
 
 import akka.testkit._
 import org.scalatest._
@@ -11,7 +11,7 @@ import akka.util.Timeout
 import models.Settings
 import play.api.Configuration
 import com.typesafe.config.ConfigFactory
-import models.akka.local.DownstreamActor
+import models.akka.AbstractActorSpec
 
 /**
  * DownstreamActor test suite.
@@ -25,36 +25,16 @@ class DownstreamActorSpec extends AbstractActorSpec {
   val downstream = system.actorOf(props, Settings.Nodes.Downstream)
 
   "CreateDSLink" should {
-    "create a new requester" in {
-      val ci = ConnectionInfo(dsId, "requester", true, false)
-      whenReady(downstream ? CreateDSLink(ci)) { result =>
+    "create a new dslink" in {
+      whenReady(downstream ? CreateDSLink("requester")) { result =>
         result mustBe a[ActorRef]
         val link = result.asInstanceOf[ActorRef]
         link.path.parent mustBe downstream.path
         link.path.name mustBe "requester"
       }
     }
-    "create a new responder" in {
-      val ci = ConnectionInfo(dsId, "responder", false, true)
-      whenReady(downstream ? CreateDSLink(ci)) { result =>
-        result mustBe a[ActorRef]
-        val link = result.asInstanceOf[ActorRef]
-        link.path.parent mustBe downstream.path
-        link.path.name mustBe "responder"
-      }
-    }
-    "create a new dual link" in {
-      val ci = ConnectionInfo(dsId, "dual", true, true)
-      whenReady(downstream ? CreateDSLink(ci)) { result =>
-        result mustBe a[ActorRef]
-        val link = result.asInstanceOf[ActorRef]
-        link.path.parent mustBe downstream.path
-        link.path.name mustBe "dual"
-      }
-    }
     "fail to create a duplicate DSLink actor" in {
-      val ci = ConnectionInfo(dsId, "dual", true, true)
-      val future = downstream ? CreateDSLink(ci)
+      val future = downstream ? CreateDSLink("requester")
       future.failed.futureValue mustBe an[InvalidActorNameException]
     }
   }
@@ -81,44 +61,19 @@ class DownstreamActorSpec extends AbstractActorSpec {
 
   "GetOrCreateDSLink" should {
     "get existing DSLink actor" in {
-      val ci = ConnectionInfo(dsId, "responder", false, true)
-      whenReady(downstream ? GetOrCreateDSLink(ci)) { result =>
+      whenReady(downstream ? GetOrCreateDSLink("requester")) { result =>
+        result mustBe a[ActorRef]
+        val link = result.asInstanceOf[ActorRef]
+        link.path.parent mustBe downstream.path
+        link.path.name mustBe "requester"
+      }
+    }
+    "create a new DSLink actor" in {
+      whenReady(downstream ? GetOrCreateDSLink("responder")) { result =>
         result mustBe a[ActorRef]
         val link = result.asInstanceOf[ActorRef]
         link.path.parent mustBe downstream.path
         link.path.name mustBe "responder"
-      }
-    }
-    "create a new DSLink actor" in {
-      val ci = ConnectionInfo(dsId, "responder2", false, true)
-      whenReady(downstream ? GetOrCreateDSLink(ci)) { result =>
-        result mustBe a[ActorRef]
-        val link = result.asInstanceOf[ActorRef]
-        link.path.parent mustBe downstream.path
-        link.path.name mustBe "responder2"
-      }
-    }
-  }
-
-  "GetDSLinkCount" should {
-    "return the number of DSLink actors" in {
-      whenReady(downstream ? GetDSLinkCount) { _ mustBe 4 }
-    }
-  }
-
-  "FindDSLinks" should {
-    "find existing links" in {
-      whenReady(downstream ? FindDSLinks(".*", 100)) { result =>
-        result.asInstanceOf[Iterable[_]].toSet mustBe Set("dual", "requester", "responder", "responder2")
-      }
-      whenReady(downstream ? FindDSLinks("r.*", 100)) { result =>
-        result.asInstanceOf[Iterable[_]].toSet mustBe Set("requester", "responder", "responder2")
-      }
-      whenReady(downstream ? FindDSLinks("res.*", 1, 1)) { result =>
-        result.asInstanceOf[Iterable[_]].toSet mustBe Set("responder2")
-      }
-      whenReady(downstream ? FindDSLinks("xyz.*", 100)) { result =>
-        result.asInstanceOf[Iterable[_]] mustBe empty
       }
     }
   }

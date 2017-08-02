@@ -1,21 +1,21 @@
-package models.akka.cluster
+package models.akka
 
-import akka.actor.{ Actor, ActorLogging, Props, TypedActor, actorRef2Scala }
+import akka.actor._
+import akka.cluster.singleton._
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka._
 import models.api.DSANode
 import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ StringValue, array, obj }
 
 /**
- * Handles requests to the top broker node.
+ * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
  */
 class RootNodeActor extends Actor with ActorLogging {
-  import RootNodeActor._
   import context.dispatcher
   import models.Settings.Nodes._
   import models.rpc.StreamState._
 
+  // create children
   private val dataNode = createDataNode
   private val defsNode = createDefsNode
   private val usersNode = createUsersNode
@@ -44,6 +44,9 @@ class RootNodeActor extends Actor with ActorLogging {
       DSAResponse(rid = req.rid, error = Some(DSAError(msg = Some("Unsupported"))))
   }
 
+  /**
+   * Creates the root nodes.
+   */
   private val rootNodes = {
     val config = rows(is("dsa/broker"), "$downstream" -> Downstream)
     val children = List(defsNode, dataNode, usersNode, sysNode) map { node =>
@@ -117,8 +120,36 @@ class RootNodeActor extends Actor with ActorLogging {
  * Factory for [[RootNodeActor]] instances.
  */
 object RootNodeActor {
+  import models.Settings.Nodes._
+
   /**
    * Creates a new instance of [[RootNodeActor]] props.
    */
   def props = Props(new RootNodeActor)
+
+  /**
+   * Starts a Singleton Manager and returns the cluster-wide unique instance of [[RootNodeActor]].
+   */
+  def singletonStart(implicit system: ActorSystem): ActorRef = system.actorOf(
+    ClusterSingletonManager.props(
+      singletonProps = props,
+      terminationMessage = PoisonPill,
+      settings = ClusterSingletonManagerSettings(system).withRole("backend")),
+    name = Root)
+
+  /**
+   * Returns a [[RootNodeActor]] proxy on the current cluster node.
+   */
+  def singletonProxy(implicit system: ActorSystem): ActorRef = system.actorOf(
+    ClusterSingletonProxy.props(
+      singletonManagerPath = "/user/" + Root,
+      settings = ClusterSingletonProxySettings(system).withRole("backend")),
+    name = Root)
+
+  /**
+   * Returns a proxy for a child node of the singleton [[RootNodeActor]].
+   */
+  def childProxy(path: String)(implicit system: ActorSystem): ActorRef = system.actorOf(
+    ClusterSingletonProxy.props("/user/" + Root,
+      settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + path)))
 }

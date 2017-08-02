@@ -59,4 +59,11 @@ package object models {
       result
     }
   }
+
+  /**
+   * A helper for converting a Boolean to Option. Eg. `condition.option("111")`
+   */
+  implicit class RichBoolean(val b: Boolean) extends AnyVal {
+    final def option[A](a: => A): Option[A] = if (b) Some(a) else None
+  }
 }
