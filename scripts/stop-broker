@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+echo "Stopping DSA Broker"
+
+kill $(cat /var/run/scala-broker/play.pid)
+
+echo "done!"

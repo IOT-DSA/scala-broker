@@ -28,12 +28,12 @@ package object akka {
   }
   
   /**
-   * A tuple for $is->"node" config.
+   * A tuple for \$is->"node" config.
    */
   val IsNode = is("node")
 
   /**
-   * Creates a tuple for `$is` config.
+   * Creates a tuple for \$is config.
    */
   def is(str: String): (String, StringValue) = "$is" -> StringValue(str)
 

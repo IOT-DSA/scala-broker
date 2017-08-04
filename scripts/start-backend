@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Usage:
+# start-backend <port>            - start a broker on a specific port
+# start-backend or stop-backend 0 - start a broker on a non-specific port
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+if [ -z "$1" ] || [ $1 -eq 0 ]
+  then
+    echo "Starting DSA Broker Backend on a non-specific port. Some seed nodes must already be running"
+  else
+    echo "Starting DSA Broker Backend at port $1"
+fi
+
+nohup $DIR/scala-broker -Dconfig.file=$DIR/../conf/backend.conf -main models.akka.cluster.BrokerBackend $1 > /dev/null &
+PID=$!
+echo $PID >> "/var/run/scala-broker/backend$1.pid"

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+echo "Stopping DSA Broker Frontend"
+
+kill $(cat /var/run/scala-broker/frontend.pid)
+
+echo "done!"

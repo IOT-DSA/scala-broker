@@ -18,6 +18,14 @@ scalacOptions ++= Seq("-feature", "-unchecked", "-deprecation", "-Xlint:_,-missi
 
 // packaging
 enablePlugins(JavaAppPackaging)
+javaOptions in Universal ++= Seq(s"-Dpidfile.path=/var/run/${packageName.value}/play.pid")
+mappings in Universal ++= Seq(
+  file("scripts/start-broker") -> "bin/start-broker",
+  file("scripts/stop-broker") -> "bin/stop-broker",
+  file("scripts/start-backend") -> "bin/start-backend",
+  file("scripts/stop-backend") -> "bin/stop-backend",
+  file("scripts/start-frontend") -> "bin/start-frontend",
+  file("scripts/stop-frontend") -> "bin/stop-frontend")
 
 // scoverage options
 coverageMinimum := 80

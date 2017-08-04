@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+echo "Starting DSA Broker Frontend"
+
+nohup $DIR/scala-broker -Dconfig.file=$DIR/../conf/frontend.conf -Dpidfile.path=/var/run/scala-broker/frontend.pid > /dev/null &

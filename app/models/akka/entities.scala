@@ -29,7 +29,7 @@ object ConnectionInfo {
 }
 
 /**
- * Similar to [[java.util.concurrent.atomic.AtomicInteger]], but not thread safe,
+ * Similar to java AtomicInteger, but not thread safe,
  * optimized for single threaded execution by an actor.
  */
 class IntCounter(init: Int = 0) {
