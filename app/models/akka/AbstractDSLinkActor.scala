@@ -6,7 +6,7 @@ import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated
 import models.Settings
 
 /**
- * Represents a DSLink endpoint, which may or may not be connected to a WebSocket.
+ * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
  */
 abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
   import Messages._
@@ -19,8 +19,9 @@ abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
   private var endpoint: Option[ActorRef] = None
 
   // initially an empty one, then set by ConnectEndpoint; can be changed by another ConnectEndpoint
-  private var connInfo = ConnectionInfo("", linkName, false, false)
+  private var connInfo = ConnectionInfo("", linkName, true, false)
 
+  private var registered: Boolean = false
   private var lastConnected: Option[DateTime] = None
   private var lastDisconnected: Option[DateTime] = None
 
@@ -30,9 +31,12 @@ abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
   override def preStart() = log.info(s"$ownId: initialized, not connected to Endpoint")
 
   /**
-   * Called on link shut down, logs the dslink status.
+   * Called on link shut down, unregisters from Backend and logs the dslink status.
    */
-  override def postStop() = log.info(s"$ownId: stopped")
+  override def postStop() = {
+    if (registered) sendToBackend(BackendActor.UnregisterDSLink(self.path.name))
+    log.info(s"$ownId: stopped")
+  }
 
   /**
    * Handles incoming messages, starting in DISCONNECTED state.
@@ -84,6 +88,14 @@ abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
     endpoint = Some(context.watch(ref))
     connInfo = ci
     lastConnected = Some(DateTime.now)
+
+    if (registered)
+      sendToBackend(BackendActor.DSLinkStateChanged(linkName, ci.mode, true))
+    else {
+      sendToBackend(BackendActor.RegisterDSLink(linkName, ci.mode, true))
+      registered = true
+    }
+
     log.debug(s"$ownId: unstashing all stored messages")
     unstashAll()
     context.become(connected)
@@ -99,6 +111,9 @@ abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
     }
     endpoint = None
     lastDisconnected = Some(DateTime.now)
+
+    sendToBackend(BackendActor.DSLinkStateChanged(linkName, connInfo.mode, false))
+
     context.become(disconnected)
   }
 
@@ -106,4 +121,9 @@ abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
    * Sends a message to the endpoint, if connected.
    */
   protected def sendToEndpoint(msg: Any): Unit = endpoint foreach (_ ! msg)
+
+  /**
+   * Sends a message to the backend actor.
+   */
+  protected def sendToBackend(msg: Any): Unit = context.actorSelection("/user/backend") ! msg
 }

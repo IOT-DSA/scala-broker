@@ -1,7 +1,8 @@
-package models.akka
+package models.akka.responder
 
 import akka.testkit.TestProbe
 import models.Origin
+import models.akka.AbstractActorSpec
 
 /**
  * RidRegistry test suite.

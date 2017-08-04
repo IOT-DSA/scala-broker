@@ -1,4 +1,4 @@
-package models.akka
+package models.akka.responder
 
 import akka.actor.{ Actor, ActorLogging, Props, actorRef2Scala }
 import models.Origin

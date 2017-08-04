@@ -1,4 +1,4 @@
-package models.akka
+package models.akka.responder
 
 import akka.event.LoggingAdapter
 import models.{ Origin, ResponseEnvelope }

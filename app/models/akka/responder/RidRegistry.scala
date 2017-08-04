@@ -1,8 +1,9 @@
-package models.akka
+package models.akka.responder
 
 import models.Origin
 import models.rpc.DSAMethod
 import models.rpc.DSAMethod.DSAMethod
+import models.akka.IntCounter
 
 /**
  * Request registry tied to RID.

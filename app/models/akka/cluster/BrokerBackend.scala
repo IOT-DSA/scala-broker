@@ -3,7 +3,7 @@ package models.akka.cluster
 import com.typesafe.config.ConfigFactory
 
 import akka.actor.ActorSystem
-import models.Settings
+import models.akka.{ BackendActor, RootNodeActor }
 
 /**
  * Broker backend application. Joins Akka cluster with "backend" role using
@@ -22,13 +22,11 @@ object BrokerBackend extends App {
   implicit val system = ActorSystem(systemName, config.resolve)
 
   // start Backend
-  system.actorOf(BackendActor.props, "backend")
-
-  // start DSLinks shard region
-  DSLinkActor.regionStart
+  val dslinkMgr = new ClusteredDSLinkManager(false)
+  system.actorOf(BackendActor.props(dslinkMgr), "backend")
 
   // start Root node 
-  system.actorOf(RootNodeActor.props, Settings.Nodes.Root)
+  RootNodeActor.singletonStart
 
   sys.addShutdownHook {
     system.terminate

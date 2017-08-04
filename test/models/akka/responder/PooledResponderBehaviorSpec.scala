@@ -1,10 +1,11 @@
-package models.akka
+package models.akka.responder
 
 import scala.concurrent.duration.DurationInt
 
 import akka.actor.Props
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.{ AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages }
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
 

@@ -1,7 +1,8 @@
-package models.akka
+package models.akka.responder
 
 import models.Origin
 import models.rpc.DSAResponse
+import models.akka.AbstractDSLinkActor
 
 /**
  * Handles communication with a remote DSLink in Responder mode using local maps

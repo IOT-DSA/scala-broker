@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# Usage:
+# stop-backend <port>            - stop a broker running on the specific port
+# stop-backend or stop-backend 0 - stop all brokers running on non-specific ports
+
+if [ -z "$1" ] || [ $1 -eq 0 ]
+  then
+    echo "Stopping all non-seed DSA Broker Backend nodes"
+  else
+    echo "Stopping seed DSA Broker Backend at port $1"
+fi
+
+PIDFILE="/var/run/scala-broker/backend$1.pid"
+if ! [ -w $PIDFILE ]
+  then
+    echo "PID file $PIDFILE does not exist, exiting"
+    exit
+fi
+
+while read p; do
+  kill $p
+done <$PIDFILE
+
+rm $PIDFILE
+
+echo "done!"
