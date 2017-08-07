@@ -42,12 +42,11 @@ object StandardActions {
    * Adds a child node.
    */
   val AddNode: DSAAction = DSAAction(ctx => {
-    val parent = ctx.node.parent.get
-    val name = ctx.args("name").value.toString
-
-    parent.addChild(name) foreach { node =>
-      node.profile = "broker/dataNode"
-      bindDataNodeActions(node)
+    ctx.node.parent foreach { parent =>
+      parent.addChild(ctx.args("name").value.toString) foreach { node =>
+        node.profile = "broker/dataNode"
+        bindDataNodeActions(node)
+      }
     }
   }, "name" -> DSAString)
 
@@ -86,7 +85,7 @@ object StandardActions {
 
     node.addAttributes(name -> value)
   }, "name" -> DSAString, "value" -> DSADynamic)
-  
+
   /**
    * Sets a node config.
    */

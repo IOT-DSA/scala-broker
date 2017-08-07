@@ -89,7 +89,7 @@ class BackendActor(linkMgr: DSLinkManager) extends Actor with ActorLogging {
    */
   def receivePrivate: Receive = {
     case state: CurrentClusterState =>
-      log.info("Received current cluster state, registering with frontends")
+      log.info("Received current cluster state, looking for frontends...")
       state.members.filter(_.status == Up) foreach register
 
     case MemberUp(m) =>

@@ -129,7 +129,7 @@ class DSANodeImpl(val parent: Option[DSANode])
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
-    val props = DSANode.props(Some(this))
+    val props = DSANode.props(Some(TypedActor.self))
     val child = TypedActor(TypedActor.context).typedActorOf(props, name)
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
