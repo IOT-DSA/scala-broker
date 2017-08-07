@@ -5,7 +5,7 @@ import akka.actor.{ ActorRef, actorRef2Scala }
 import models._
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
-import models.rpc.DSAValue.DSAVal
+import models.rpc.DSAValue._
 import models.splitPath
 import models.akka.AbstractDSLinkActor
 
@@ -205,8 +205,14 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
   private def handleNonSubscribeResponse: ResponseHandler = {
     case rsp if rsp.rid != 0 =>
       val result = ridRegistry.lookupByTargetId(rsp.rid) match {
-        case Some(LookupRecord(DSAMethod.List, _, _, _)) =>
-          deliverListResponse(rsp)
+        case Some(LookupRecord(DSAMethod.List, _, _, Some(path))) =>
+          // adjust response for stored attributes, if appropriate
+          val attrUpdates = attributes.getOrElse(path, Map.empty) map {
+            case (name, value) => array(name, value)
+          }
+          val oldUpdates = rsp.updates getOrElse Nil
+          val newResponse = rsp.copy(updates = Some(oldUpdates ++ attrUpdates))
+          deliverListResponse(newResponse)
           Nil
         case Some(rec @ LookupRecord(_, _, Some(origin), _)) =>
           if (rsp.stream == Some(StreamState.Closed))
