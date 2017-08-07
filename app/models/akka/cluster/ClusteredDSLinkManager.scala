@@ -44,7 +44,7 @@ class ClusteredDSLinkManager(frontendMode: Boolean)(implicit val system: ActorSy
     else
       sharding.start(
         Nodes.Downstream,
-        DefaultDSLinkActor.props(this),
+        DSLinkFactory.props(this),
         ClusterShardingSettings(system),
         extractEntityId,
         extractShardId)

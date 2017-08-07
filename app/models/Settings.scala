@@ -78,6 +78,7 @@ object Settings {
   object Responder {
     private val cfg = rootConfig.getConfig("broker.responder")
 
+    val GroupCallEngine = cfg.getString("group.call.engine")
     val ListPoolSize = cfg.getInt("list.pool.size")
     val SubscribePoolSize = cfg.getInt("subscribe.pool.size")
   }
