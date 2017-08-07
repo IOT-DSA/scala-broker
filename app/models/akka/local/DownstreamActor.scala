@@ -4,7 +4,7 @@ import scala.util.control.NonFatal
 
 import akka.actor.{ Actor, ActorLogging, Props, Status, actorRef2Scala }
 import models.Settings
-import models.akka.DefaultDSLinkActor
+import models.akka.DSLinkFactory
 
 /**
  * Actor for DSA `/downstream` node.
@@ -52,7 +52,7 @@ class DownstreamActor extends Actor with ActorLogging {
   /**
    * Creates a new DSLink actor.
    */
-  private def createDSLink(name: String) = context.actorOf(DefaultDSLinkActor.props(dslinkMgr), name)
+  private def createDSLink(name: String) = context.actorOf(DSLinkFactory.props(dslinkMgr), name)
 }
 
 /**

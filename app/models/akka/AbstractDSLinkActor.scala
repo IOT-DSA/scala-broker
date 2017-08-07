@@ -7,6 +7,11 @@ import models.Settings
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
+ * The Endpoint actor is supplied by the facade and can represent a WebSocket or TCP connection,
+ * HTTP response stream, a test actor etc.
+ *
+ * The facade initiates a session by sending `ConnectEndpoint` message to the actor. The session
+ * ends either when `DisconnectEndpoint` message is sent to an actor, or the endpoint actor terminates.
  */
 abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
   import Messages._
