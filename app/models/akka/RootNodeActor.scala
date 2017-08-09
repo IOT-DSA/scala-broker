@@ -77,7 +77,10 @@ class RootNodeActor extends Actor with ActorLogging {
       node.profile = "static"
       node.addChild("node")
       node.addChild("static")
-      node.addChild("dsa").foreach { _.addChild("broker") }
+      node.addChild("dsa").foreach { node => 
+        node.addChild("broker")
+        node.addChild("link")
+      }
       node.addChild("broker").foreach { node =>
         node.addChild("userNode")
         node.addChild("userRoot")
