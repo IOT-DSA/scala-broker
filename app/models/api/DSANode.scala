@@ -91,7 +91,7 @@ class DSANodeImpl(val parent: Option[DSANode])
   def profile = Await.result(config("$is").map(_.map(_.value.toString).getOrElse("node")), Duration.Inf)
   def profile_=(p: String) = addConfigs("$is" -> p)
 
-  private val _configs = collection.mutable.Map.empty[String, DSAVal]
+  private val _configs = collection.mutable.Map[String, DSAVal]("$is" -> "node")
   def configs = Future.successful(_configs.toMap)
   def config(name: String) = configs map (_.get(name))
   def addConfigs(configs: (String, DSAVal)*) = {
