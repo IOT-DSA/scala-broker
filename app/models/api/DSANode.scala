@@ -144,7 +144,14 @@ class DSANodeImpl(val parent: Option[DSANode])
 
   private var _action: Option[DSAAction] = None
   def action = _action
-  def action_=(a: DSAAction) = _action = Some(a)
+  def action_=(a: DSAAction) = {
+    _action = Some(a)
+    _configs("$params") = a.params map {
+      case (pName, pType) => obj("name" -> pName, "type" -> pType.toString)
+    }
+    _configs("$invokable") = "write"
+    profile = "static"
+  }
 
   def invoke(params: DSAMap) = _action foreach (_.handler(ActionContext(this, params)))
 
@@ -163,7 +170,7 @@ class DSANodeImpl(val parent: Option[DSANode])
 
     case e @ RequestEnvelope(requests) =>
       log.info(s"$ownId: received $e")
-      val responses = requests flatMap handleRequest
+      val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
 
     case msg @ _ => log.error("Unknown message: " + msg)
@@ -172,7 +179,7 @@ class DSANodeImpl(val parent: Option[DSANode])
   /**
    * Handles DSA requests by processing them and sending the response to itself.
    */
-  def handleRequest: PartialFunction[DSARequest, Iterable[DSAResponse]] = {
+  def handleRequest(sender: ActorRef): PartialFunction[DSARequest, Iterable[DSAResponse]] = {
 
     /* set */
 
@@ -208,7 +215,7 @@ class DSANodeImpl(val parent: Option[DSANode])
 
     case SubscribeRequest(rid, paths) =>
       assert(paths.size == 1, "Only a single path is allowed in Subscribe")
-      subscribe(paths.head.sid, TypedActor.context.self)
+      subscribe(paths.head.sid, sender)
       val head = DSAResponse(rid, Some(StreamState.Closed))
       val tail = if (_value != null) {
         val update = obj("sid" -> paths.head.sid, "value" -> _value, "ts" -> now)
@@ -225,14 +232,18 @@ class DSANodeImpl(val parent: Option[DSANode])
 
     /* list */
 
+    // TODO this needs to be rewritten to remove blocking
     case ListRequest(rid, _) =>
-      val cfgUpdates = _configs map (cfg => array(cfg._1, cfg._2))
-      val attrUpdates = _attributes map (attr => array(attr._1, attr._2))
-      val childUpdates = _children map (c => array(c._1,
-        obj("$is" -> c._2.profile, "$name" -> Await.result(c._2.displayName, Duration.Inf),
-          "$type" -> Await.result(c._2.valueType.map(_.toString), Duration.Inf))))
-      val updates = Nil ++ cfgUpdates ++ attrUpdates ++ childUpdates
-      DSAResponse(rid, Some(StreamState.Open), Some(updates)) :: Nil
+      list(rid, sender)
+      val cfgUpdates = array("$is", _configs("$is")) +: toUpdateRows(_configs - "$is")
+      val attrUpdates = toUpdateRows(_attributes)
+      val childUpdates = Await.result(Future.sequence(_children map {
+        case (name, node) => node.configs map (cfgs => name -> cfgs)
+      }), Duration.Inf) map {
+        case (name, cfgs) => array(name, cfgs)
+      }
+      val updates = cfgUpdates ++ attrUpdates ++ childUpdates
+      DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil
 
     /* close */
 
@@ -255,7 +266,7 @@ class DSANodeImpl(val parent: Option[DSANode])
     _sids foreach {
       case (sid, ref) =>
         val update = obj("sid" -> sid, "value" -> value, "ts" -> ts)
-        val response = DSAResponse(0, Some(StreamState.Open), Some(List(update)))
+        val response = ResponseEnvelope(DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil)
         ref ! response
     }
   }
@@ -264,13 +275,18 @@ class DSANodeImpl(val parent: Option[DSANode])
    * Sends DSAResponse instances to actors listening to LIST updates.
    */
   private def notifyListActors(updates: DSAVal*) = _rids foreach {
-    case (rid, ref) => ref ! DSAResponse(rid, Some(StreamState.Open), Some(updates.toList))
+    case (rid, ref) => ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
   }
 
   /**
    * Formats the current date/time as ISO.
    */
   private def now = DateTime.now.toString(ISODateTimeFormat.dateTime)
+
+  /**
+   * Converts data to a collection of DSAResponse-compatible update rows.
+   */
+  private def toUpdateRows(data: collection.Map[String, DSAVal]) = data map (cfg => array(cfg._1, cfg._2)) toSeq
 }
 
 /**
