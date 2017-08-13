@@ -195,7 +195,7 @@ package object rpc {
 
   def jsonMapToValues(fields: Map[String, JsValue]) = fields map { case (a, b) => a -> b.as[DSAVal] }
 
-  def jsonListToValues(items: Iterable[JsValue]) = items map (_.as[DSAVal])
+  def jsonListToValues(items: Iterable[JsValue]) = items map (_.as[DSAVal]) toList
 
   def valueMapToJson(fields: Map[String, DSAVal]) = fields map { case (a, b) => (a -> Json.toJson(b)) }
 
