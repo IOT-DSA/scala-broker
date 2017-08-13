@@ -77,15 +77,21 @@ class RootNodeActor extends Actor with ActorLogging {
       node.profile = "static"
       node.addChild("node")
       node.addChild("static")
-      node.addChild("dsa").foreach { node => 
+      node.addChild("dsa").foreach { node =>
         node.addChild("broker")
         node.addChild("link")
       }
       node.addChild("broker").foreach { node =>
         node.addChild("userNode")
         node.addChild("userRoot")
-        node.addChild("dataNode") foreach StandardActions.bindDataNodeActions
-        node.addChild("dataRoot") foreach StandardActions.bindDataRootActions
+        node.addChild("dataNode") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindDataNodeActions(node)
+        }
+        node.addChild("dataRoot") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindDataRootActions(node)
+        }
       }
     }
     defsNode

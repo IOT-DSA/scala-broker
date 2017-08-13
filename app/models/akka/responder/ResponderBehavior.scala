@@ -21,7 +21,7 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
   // stores call records for forward and reverse RID lookup
   private val ridRegistry = new RidRegistry
 
-  //stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
+  // stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
   private val sidRegistry = new SidRegistry
 
   // stores responder's nodes' attributes locally
@@ -206,11 +206,12 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
     case rsp if rsp.rid != 0 =>
       val result = ridRegistry.lookupByTargetId(rsp.rid) match {
         case Some(LookupRecord(DSAMethod.List, _, _, Some(path))) =>
-          // adjust response for stored attributes, if appropriate
+          // add stored attributes for this path
           val attrUpdates = attributes.getOrElse(path, Map.empty) map {
             case (name, value) => array(name, value)
           }
-          val oldUpdates = rsp.updates getOrElse Nil
+          // adjust $base
+          val oldUpdates = rsp.updates getOrElse Nil map (adjustBase.applyOrElse(_, identity[DSAVal]))
           val newResponse = rsp.copy(updates = Some(oldUpdates ++ attrUpdates))
           deliverListResponse(newResponse)
           Nil
@@ -231,6 +232,16 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
   private def translatePath(path: String) = {
     val chopped = path.drop(linkPath.size)
     if (!chopped.startsWith("/")) "/" + chopped else chopped
+  }
+
+  /**
+   * Extracts $base config from an update row.
+   */
+  val adjustBase: PartialFunction[DSAVal, DSAVal] = {
+    case v: ArrayValue if v.value.headOption == Some(StringValue("$base")) =>
+      array("$base", linkPath + v.value.tail.head.toString)
+    case v: MapValue if v.value.contains("$base") =>
+      MapValue(v.value + ("$base" -> (linkPath + v.value("$base").toString)))
   }
 
   /**

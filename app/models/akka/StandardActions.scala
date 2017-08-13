@@ -35,7 +35,6 @@ object StandardActions {
     case (name, displayName, action) => node.addChild(name).foreach { child =>
       child.displayName = displayName
       child.action = action
-      child.addConfigs("$actionGroup" -> displayName, "$actionGroupSubTitle" -> displayName)
     }
   }
 
