@@ -39,6 +39,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
+  "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
   "ch.qos.logback"           % "logback-classic"         % "1.1.7",
   "org.scalatest"           %% "scalatest"               % "2.2.1"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.12.1"        % "test",
