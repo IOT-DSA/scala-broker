@@ -24,7 +24,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
    * Sends handshake to the client and notifies the DSLink actor.
    */
   override def preStart() = {
-    log.info(s"$ownId: initialized, sending 'allowed' to client")
+    log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
     proxy tell ConnectEndpoint(self, config.connInfo)
   }
@@ -33,7 +33,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
    * Cleans up after the actor stops.
    */
   override def postStop() = {
-    log.info(s"$ownId: stopped")
+    log.info("{}: stopped", ownId)
   }
 
   /**
@@ -41,23 +41,23 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
    */
   def receive = {
     case EmptyMessage =>
-      log.debug(s"$ownId: received empty message from WebSocket, ignoring...")
+      log.debug("{}: received empty message from WebSocket, ignoring...", ownId)
     case PingMessage(msg, ack) =>
-      log.debug(s"$ownId: received ping from WebSocket with msg=$msg, acking...")
+      log.debug("{}: received ping from WebSocket with msg={}, acking...", ownId, msg)
       sendAck(msg)
     case m @ RequestMessage(msg, _, _) =>
-      log.info(s"$ownId: received $m from WebSocket")
+      log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       proxy tell m
     case m @ ResponseMessage(msg, _, _) =>
-      log.info(s"$ownId: received $m from WebSocket")
+      log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       proxy tell m
     case e @ RequestEnvelope(requests) =>
-      log.debug(s"$ownId: received $e")
+      log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
     case e @ ResponseEnvelope(responses) =>
-      log.debug(s"$ownId: received $e")
+      log.debug(s"{}: received {}", ownId, e)
       sendResponses(responses: _*)
   }
 
@@ -87,7 +87,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
    * Sends a DSAMessage to a WebSocket connection.
    */
   private def sendToSocket(msg: DSAMessage) = {
-    log.debug(s"$ownId: sending $msg to WebSocket")
+    log.debug("{}: sending {} to WebSocket", ownId, formatMessage(msg))
     out ! msg
   }
 }

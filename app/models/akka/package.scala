@@ -2,6 +2,7 @@ package models
 
 import scala.util.matching.Regex
 
+import models.rpc.DSAMessage
 import models.rpc.DSAValue.{ DSAVal, StringValue, array }
 
 /**
@@ -42,5 +43,14 @@ package object akka {
    */
   def rows(pairs: (String, DSAVal)*) = pairs map {
     case (key, value) => array(key, value)
-  } toList  
+  } toList
+  
+  /**
+   * Outputs the message either as raw JSON or as Scala object, according to 
+   * `broker.logging.show.ws.payload` config.
+   */
+  def formatMessage(msg: DSAMessage) = if (Settings.Logging.ShowWebSocketPayload)
+    play.api.libs.json.Json.toJson(msg).toString
+  else
+    msg.toString
 }
