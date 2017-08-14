@@ -87,4 +87,13 @@ object Settings {
    * The number of shards in the downstream pool.
    */
   val DownstreamShardCount = rootConfig.getInt("broker.downstream.shard.count")
+
+  /**
+   * Logging options.
+   */
+  object Logging {
+    private val cfg = rootConfig.getConfig("broker.logging")
+
+    val ShowWebSocketPayload = cfg.getBoolean("show.ws.payload")
+  }
 }
