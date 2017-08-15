@@ -20,6 +20,7 @@ scalacOptions ++= Seq("-feature", "-unchecked", "-deprecation", "-Xlint:_,-missi
 enablePlugins(JavaAppPackaging)
 javaOptions in Universal ++= Seq(s"-Dpidfile.path=/var/run/${packageName.value}/play.pid")
 mappings in Universal ++= Seq(
+  file("scripts/setup-influx") -> "bin/setup-influx",
   file("scripts/start-broker") -> "bin/start-broker",
   file("scripts/stop-broker") -> "bin/stop-broker",
   file("scripts/start-backend") -> "bin/start-backend",
