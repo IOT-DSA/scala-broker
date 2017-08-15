@@ -101,6 +101,9 @@ object Settings {
     } toMap
 
     val DefaultRetention = Retention.get("default").orNull
+    
+    val UseGeoIp = cfg.hasPath("geoip.db")
+    val GeoIpDb = if (UseGeoIp) cfg.getString("geoip.db") else null
   }
 
   /**
