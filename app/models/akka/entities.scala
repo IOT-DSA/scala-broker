@@ -7,7 +7,8 @@ import controllers.ConnectionRequest
  */
 case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, isResponder: Boolean,
                           linkData: Option[String] = None, version: String = "",
-                          formats: List[String] = Nil, compression: Boolean = false) {
+                          formats: List[String] = Nil, compression: Boolean = false,
+                          linkAddress: String = "", brokerAddress: String = "") {
   val mode = (isRequester, isResponder) match {
     case (true, true)  => DSLinkMode.Dual
     case (true, false) => DSLinkMode.Requester
@@ -23,9 +24,10 @@ object ConnectionInfo {
   /**
    * Creates a new [[ConnectionInfo]] instance by extracting information from a connection request.
    */
-  def apply(dsId: String, cr: ConnectionRequest): ConnectionInfo =
+  def apply(dsId: String, cr: ConnectionRequest, linkAddress: String, brokerAddress: String): ConnectionInfo =
     new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
-      cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression)
+      cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
+      linkAddress, brokerAddress)
 }
 
 /**

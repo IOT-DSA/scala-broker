@@ -11,4 +11,7 @@ class NullMetricLogger extends MetricLogger {
   def logHandshake(ts: DateTime,
                    linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
                    version: String, compression: Boolean, brokerAddress: String) = {}
+
+  def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
+                          linkAddress: String, mode: DSLinkMode, brokerAddress: String) = {}
 }

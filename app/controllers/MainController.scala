@@ -209,7 +209,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
    * Constructs a connection info instance from the incoming request.
    */
   private def buildConnectionInfo(request: Request[ConnectionRequest]) =
-    ConnectionInfo(getDsId(request), request.body)
+    ConnectionInfo(getDsId(request), request.body, request.remoteAddress, request.host)
 
   /**
    * Returns a future with the cluster information.

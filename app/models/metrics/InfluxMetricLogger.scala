@@ -4,9 +4,9 @@ import java.net.InetAddress
 
 import scala.util.Try
 
-import org.joda.time.DateTime
+import org.joda.time.{ DateTime, Interval }
 
-import com.paulgoldbaum.influxdbclient.{ Database, Point }
+import com.paulgoldbaum.influxdbclient.{ Database, Field, Point, Tag }
 import com.paulgoldbaum.influxdbclient.Parameter.Consistency.ANY
 import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
@@ -27,22 +27,65 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
                    version: String, compression: Boolean, brokerAddress: String) = {
 
     val baseTags = tags("mode" -> mode.toString, "version" -> version, "brokerAddress" -> brokerAddress)
-    val baseFields = fields( "compression" -> compression.toString)
+    val baseFields = fields("compression" -> compression)
 
-    val address = Try(InetAddress.getByName(linkAddress))
+    val (extraTags, extraFields) = addressData("link")(linkAddress)
 
-    val linkFields = address map { addr =>
-      fields("linkHost" -> addr.getHostName, "linkIp" -> addr.getHostAddress)
-    } getOrElse Nil
+    val point = Point("handshake", ts.getMillis, baseTags ++ extraTags, baseFields ++ extraFields)
+    savePoint(point)
+  }
 
-    val (geoTags, geoFields) = address flatMap GeoIp.resolve map { loc =>
-      val t = tags("continent" -> loc.continent, "country" -> loc.country, "city" -> loc.city)
-      val f = fields("latitude" -> loc.latitude, "longitude" -> loc.longitude)
+  /**
+   * Logs a WebSocket session.
+   */
+  def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
+                          linkAddress: String, mode: DSLinkMode, brokerAddress: String) = {
+
+    val baseTags = tags("mode" -> mode.toString, "brokerAddress" -> brokerAddress)
+    val baseFields = fields("endTime" -> endTime.getMillis, "duration" -> new Interval(startTime, endTime).toDurationMillis)
+
+    val (extraTags, extraFields) = addressData("link")(linkAddress)
+
+    val point = Point("ws_session", startTime.getMillis, baseTags ++ extraTags, baseFields ++ extraFields)
+    savePoint(point)
+  }
+
+  /**
+   * Extracts relevant address data and returns a list of Tags and Fields,
+   * names prefixed with the given prefix.
+   */
+  private def addressData(prefix: String)(address: String): (Seq[Tag], Seq[Field]) = {
+    val inetAddress = Try(InetAddress.getByName(address))
+
+    val hostFields = inetAddress map hostData(prefix) getOrElse Nil
+
+    val (geoTags, geoFields) = inetAddress map geoData(prefix) getOrElse Tuple2(Nil, Nil)
+
+    (geoTags, hostFields ++ geoFields)
+  }
+
+  /**
+   * Extracts host name and ip address from an internet address instance and returns a list
+   * of fields, names prefixed with the given prefix.
+   */
+  private def hostData(prefix: String)(address: InetAddress): Seq[Field] = {
+    def p(name: String) = if (prefix == "") name else prefix + name.capitalize
+
+    fields(p("host") -> address.getHostName, p("ip") -> address.getHostAddress)
+  }
+
+  /**
+   * Performs address lookup and returns a list of Tags and Fields containing the lookup data,
+   * names prefixed with the given prefix.
+   */
+  private def geoData(prefix: String)(address: InetAddress): (Seq[Tag], Seq[Field]) = {
+    def p(name: String) = if (prefix == "") name else prefix + name.capitalize
+
+    GeoIp.resolve(address) map { loc =>
+      val t = tags(p("continent") -> loc.continent, p("country") -> loc.country, p("city") -> loc.city)
+      val f = fields(p("latitude") -> loc.latitude, p("longitude") -> loc.longitude)
       (t, f)
     } getOrElse Tuple2(Nil, Nil)
-
-    val point = Point("handshake", ts.getMillis, baseTags ++ geoTags, baseFields ++ linkFields ++ geoFields)
-    savePoint(point)
   }
 
   /**

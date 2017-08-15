@@ -1,8 +1,11 @@
 package models.akka
 
+import org.joda.time.DateTime
+
 import Messages.ConnectEndpoint
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.metrics.MetricLogger
 import models.rpc._
 
 /**
@@ -15,10 +18,13 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, salt: Int)
  */
 class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConfig) extends Actor with ActorLogging {
 
-  protected val linkName = config.connInfo.linkName
+  protected val ci = config.connInfo
+  protected val linkName = ci.linkName
   protected val ownId = s"WSActor[$linkName]"
 
   private var localMsgId = new IntCounter(1)
+
+  private val startTime = DateTime.now
 
   /**
    * Sends handshake to the client and notifies the DSLink actor.
@@ -26,14 +32,15 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
   override def preStart() = {
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
-    proxy tell ConnectEndpoint(self, config.connInfo)
+    proxy tell ConnectEndpoint(self, ci)
   }
 
   /**
-   * Cleans up after the actor stops.
+   * Cleans up after the actor stops and logs session data.
    */
   override def postStop() = {
     log.info("{}: stopped", ownId)
+    MetricLogger.logWebSocketSession(startTime, DateTime.now, linkName, ci.linkAddress, ci.mode, ci.brokerAddress)
   }
 
   /**

@@ -16,6 +16,12 @@ trait MetricLogger {
   def logHandshake(ts: DateTime,
                    linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
                    version: String, compression: Boolean, brokerAddress: String): Unit
+
+  /**
+   * Logs a WebSocket session.
+   */
+  def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
+                          linkAddress: String, mode: DSLinkMode, brokerAddress: String): Unit
 }
 
 /**
@@ -35,4 +41,8 @@ object MetricLogger extends MetricLogger {
   def logHandshake(ts: DateTime, linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
                    version: String, compression: Boolean, brokerAddress: String) =
     logger.logHandshake(ts, linkId, linkName, linkAddress, mode, version, compression, brokerAddress)
+
+  def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
+                          linkAddress: String, mode: DSLinkMode, brokerAddress: String) =
+    logger.logWebSocketSession(startTime, endTime, linkName, linkAddress, mode, brokerAddress)
 }
