@@ -12,6 +12,7 @@ import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
 import models.akka.DSLinkMode.DSLinkMode
 import models.influx._
+import models.rpc.{ RequestMessage, ResponseMessage }
 
 /**
  * InfluxDB-based implementation of [[MetricLogger]].
@@ -27,7 +28,7 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
                    version: String, compression: Boolean, brokerAddress: String) = {
 
     val baseTags = tags("mode" -> mode.toString, "version" -> version, "brokerAddress" -> brokerAddress)
-    val baseFields = fields("compression" -> compression)
+    val baseFields = fields("linkName" -> linkName, "compression" -> compression)
 
     val (extraTags, extraFields) = addressData("link")(linkAddress)
 
@@ -42,11 +43,38 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
                           linkAddress: String, mode: DSLinkMode, brokerAddress: String) = {
 
     val baseTags = tags("mode" -> mode.toString, "brokerAddress" -> brokerAddress)
-    val baseFields = fields("endTime" -> endTime.getMillis, "duration" -> new Interval(startTime, endTime).toDurationMillis)
+    val baseFields = fields("linkName" -> linkName, "endTime" -> endTime.getMillis,
+      "duration" -> new Interval(startTime, endTime).toDurationMillis)
 
     val (extraTags, extraFields) = addressData("link")(linkAddress)
 
     val point = Point("ws_session", startTime.getMillis, baseTags ++ extraTags, baseFields ++ extraFields)
+    savePoint(point)
+  }
+
+  /**
+   * Logs a request message.
+   */
+  def logRequestMessage(ts: DateTime, linkName: String, linkAddress: String, message: RequestMessage) = {
+    val baseFields = fields("msgId" -> message.msg, "linkName" -> linkName,
+      "reqCount" -> message.requests.size)
+
+    val (extraTags, extraFields) = addressData("link")(linkAddress)
+
+    val point = Point("req_message", ts.getMillis, extraTags, baseFields ++ extraFields)
+    savePoint(point)
+  }
+
+  /**
+   * Logs a response message.
+   */
+  def logResponseMessage(ts: DateTime, linkName: String, linkAddress: String, message: ResponseMessage) = {
+    val baseFields = fields("msgId" -> message.msg, "linkName" -> linkName,
+      "rspCount" -> message.responses.size)
+
+    val (extraTags, extraFields) = addressData("link")(linkAddress)
+
+    val point = Point("rsp_message", ts.getMillis, extraTags, baseFields ++ extraFields)
     savePoint(point)
   }
 

@@ -4,6 +4,7 @@ import org.joda.time.DateTime
 
 import models.akka.DSLinkMode.DSLinkMode
 import models.influx.connectToInfluxDB
+import models.rpc.{ RequestMessage, ResponseMessage }
 
 /**
  * Logs various application metrics for subsequent retrieval and analysis.
@@ -22,6 +23,16 @@ trait MetricLogger {
    */
   def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
                           linkAddress: String, mode: DSLinkMode, brokerAddress: String): Unit
+
+  /**
+   * Logs a RequestMessage.
+   */
+  def logRequestMessage(ts: DateTime, linkName: String, linkAddress: String, message: RequestMessage): Unit
+
+  /**
+   * Logs a ResponseMessage.
+   */
+  def logResponseMessage(ts: DateTime, linkName: String, linkAddress: String, message: ResponseMessage): Unit
 }
 
 /**
@@ -45,4 +56,10 @@ object MetricLogger extends MetricLogger {
   def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
                           linkAddress: String, mode: DSLinkMode, brokerAddress: String) =
     logger.logWebSocketSession(startTime, endTime, linkName, linkAddress, mode, brokerAddress)
+
+  def logRequestMessage(ts: DateTime, linkName: String, linkAddress: String, message: RequestMessage) =
+    logger.logRequestMessage(ts, linkName, linkAddress, message)
+
+  def logResponseMessage(ts: DateTime, linkName: String, linkAddress: String, message: ResponseMessage) =
+    logger.logResponseMessage(ts, linkName, linkAddress, message)
 }

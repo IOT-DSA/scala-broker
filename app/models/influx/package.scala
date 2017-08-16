@@ -37,6 +37,7 @@ package object influx {
   implicit def tupleToStringField(tuple: (String, String)) = StringField(tuple._1, tuple._2)
   implicit def tupleToDoubleField(tuple: (String, Double)) = DoubleField(tuple._1, tuple._2)
   implicit def tupleToLongField(tuple: (String, Long)) = LongField(tuple._1, tuple._2)
+  implicit def tupleToIntField(tuple: (String, Int)) = LongField(tuple._1, tuple._2)
   implicit def tupleToBooleanField(tuple: (String, Boolean)) = BooleanField(tuple._1, tuple._2)
 
   /**

@@ -56,10 +56,12 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       proxy tell m
+      MetricLogger.logRequestMessage(DateTime.now, linkName, ci.linkAddress, m)
     case m @ ResponseMessage(msg, _, _) =>
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       proxy tell m
+      MetricLogger.logResponseMessage(DateTime.now, linkName, ci.linkAddress, m)
     case e @ RequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
