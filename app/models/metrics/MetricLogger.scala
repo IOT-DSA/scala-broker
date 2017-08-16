@@ -4,7 +4,7 @@ import org.joda.time.DateTime
 
 import models.akka.DSLinkMode.DSLinkMode
 import models.influx.connectToInfluxDB
-import models.rpc.{ RequestMessage, ResponseMessage, DSARequest }
+import models.rpc.{ RequestMessage, ResponseMessage, DSARequest, DSAResponse }
 
 /**
  * Logs various application metrics for subsequent retrieval and analysis.
@@ -38,6 +38,11 @@ trait MetricLogger {
    */
   def logRequests(ts: DateTime, srcLinkName: String, srcLinkAddress: String, tgtLinkName: String,
                   requests: DSARequest*): Unit
+
+  /**
+   * Logs multiple responses.
+   */
+  def logResponses(ts: DateTime, linkName: String, linkAddress: String, responses: DSAResponse*): Unit
 }
 
 /**
@@ -71,4 +76,7 @@ object MetricLogger extends MetricLogger {
   def logRequests(ts: DateTime, srcLinkName: String, srcLinkAddress: String, tgtLinkName: String,
                   requests: DSARequest*) =
     logger.logRequests(ts, srcLinkName, srcLinkAddress, tgtLinkName, requests: _*)
+
+  def logResponses(ts: DateTime, linkName: String, linkAddress: String, responses: DSAResponse*) =
+    logger.logResponses(ts, linkName, linkAddress, responses: _*)
 }

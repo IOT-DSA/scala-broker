@@ -1,13 +1,16 @@
 package models.akka.responder
 
 import scala.util.control.NonFatal
+
+import org.joda.time.DateTime
+
 import akka.actor.{ ActorRef, actorRef2Scala }
 import models._
+import models.akka.AbstractDSLinkActor
+import models.metrics.MetricLogger
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
-import models.rpc.DSAValue._
-import models.splitPath
-import models.akka.AbstractDSLinkActor
+import models.rpc.DSAValue.{ ArrayValue, DSAVal, MapValue, StringValue, array }
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
@@ -44,6 +47,7 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
       processResponses(responses) foreach {
         case (to, rsps) => to ! ResponseEnvelope(rsps)
       }
+      MetricLogger.logResponses(DateTime.now, linkName, connInfo.linkAddress, responses: _*)
   }
 
   /**

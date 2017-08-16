@@ -3,7 +3,7 @@ package models.metrics
 import org.joda.time.DateTime
 
 import models.akka.DSLinkMode.DSLinkMode
-import models.rpc.{ RequestMessage, ResponseMessage, DSARequest }
+import models.rpc.{ RequestMessage, ResponseMessage, DSARequest, DSAResponse }
 
 /**
  * An empty stub for [[MetricLogger]], used when metric collection is turned off.
@@ -23,4 +23,6 @@ class NullMetricLogger extends MetricLogger {
 
   def logRequests(ts: DateTime, srcLinkName: String, srcLinkAddress: String, tgtLinkName: String,
                   requests: DSARequest*) = {}
+
+  def logResponses(ts: DateTime, linkName: String, linkAddress: String, responses: DSAResponse*) = {}
 }

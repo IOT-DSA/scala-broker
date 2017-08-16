@@ -12,7 +12,7 @@ import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
 import models.akka.DSLinkMode.DSLinkMode
 import models.influx._
-import models.rpc.{ RequestMessage, ResponseMessage, DSARequest }
+import models.rpc.{ RequestMessage, ResponseMessage, DSARequest, DSAResponse }
 
 /**
  * InfluxDB-based implementation of [[MetricLogger]].
@@ -94,6 +94,24 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
       Point("request", ts.getMillis, baseTags ++ srcExtraTags, baseFields ++ srcExtraFields)
     }
 
+    savePoints(points)
+  }
+
+  /**
+   * Logs multiple responses.
+   */
+  def logResponses(ts: DateTime, linkName: String, linkAddress: String, responses: DSAResponse*) = {
+
+    val (extraTags, extraFields) = addressData("link")(linkAddress)
+
+    val points = responses map { response =>
+      val baseTags = response.stream.map(ss => tags("stream" -> ss.toString)).getOrElse(Nil)
+      val baseFields = fields("rid" -> response.rid, "linkName" -> linkName,
+        "updateCount" -> response.updates.map(_.size).getOrElse(0),
+        "error" -> response.error.isDefined)
+      Point("response", ts.getMillis, baseTags ++ extraTags, baseFields ++ extraFields)
+    }
+    
     savePoints(points)
   }
 
