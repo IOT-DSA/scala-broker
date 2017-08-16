@@ -24,7 +24,7 @@ abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
   private var endpoint: Option[ActorRef] = None
 
   // initially an empty one, then set by ConnectEndpoint; can be changed by another ConnectEndpoint
-  private var connInfo = ConnectionInfo("", linkName, true, false)
+  protected var connInfo = ConnectionInfo("", linkName, true, false)
 
   private var registered: Boolean = false
   private var lastConnected: Option[DateTime] = None

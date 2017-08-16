@@ -4,7 +4,7 @@ import org.joda.time.DateTime
 
 import models.akka.DSLinkMode.DSLinkMode
 import models.influx.connectToInfluxDB
-import models.rpc.{ RequestMessage, ResponseMessage }
+import models.rpc.{ RequestMessage, ResponseMessage, DSARequest }
 
 /**
  * Logs various application metrics for subsequent retrieval and analysis.
@@ -14,8 +14,7 @@ trait MetricLogger {
   /**
    * Logs a handshake attempt.
    */
-  def logHandshake(ts: DateTime,
-                   linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
+  def logHandshake(ts: DateTime, linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
                    version: String, compression: Boolean, brokerAddress: String): Unit
 
   /**
@@ -33,6 +32,12 @@ trait MetricLogger {
    * Logs a ResponseMessage.
    */
   def logResponseMessage(ts: DateTime, linkName: String, linkAddress: String, message: ResponseMessage): Unit
+
+  /**
+   * Logs multiple requests.
+   */
+  def logRequests(ts: DateTime, srcLinkName: String, srcLinkAddress: String, tgtLinkName: String,
+                  requests: DSARequest*): Unit
 }
 
 /**
@@ -62,4 +67,8 @@ object MetricLogger extends MetricLogger {
 
   def logResponseMessage(ts: DateTime, linkName: String, linkAddress: String, message: ResponseMessage) =
     logger.logResponseMessage(ts, linkName, linkAddress, message)
+
+  def logRequests(ts: DateTime, srcLinkName: String, srcLinkAddress: String, tgtLinkName: String,
+                  requests: DSARequest*) =
+    logger.logRequests(ts, srcLinkName, srcLinkAddress, tgtLinkName, requests: _*)
 }

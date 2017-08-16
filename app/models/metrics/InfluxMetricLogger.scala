@@ -12,7 +12,7 @@ import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
 import models.akka.DSLinkMode.DSLinkMode
 import models.influx._
-import models.rpc.{ RequestMessage, ResponseMessage }
+import models.rpc.{ RequestMessage, ResponseMessage, DSARequest }
 
 /**
  * InfluxDB-based implementation of [[MetricLogger]].
@@ -56,6 +56,7 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
    * Logs a request message.
    */
   def logRequestMessage(ts: DateTime, linkName: String, linkAddress: String, message: RequestMessage) = {
+
     val baseFields = fields("msgId" -> message.msg, "linkName" -> linkName,
       "reqCount" -> message.requests.size)
 
@@ -69,6 +70,7 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
    * Logs a response message.
    */
   def logResponseMessage(ts: DateTime, linkName: String, linkAddress: String, message: ResponseMessage) = {
+
     val baseFields = fields("msgId" -> message.msg, "linkName" -> linkName,
       "rspCount" -> message.responses.size)
 
@@ -76,6 +78,23 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
 
     val point = Point("rsp_message", ts.getMillis, extraTags, baseFields ++ extraFields)
     savePoint(point)
+  }
+
+  /**
+   * Logs multiple requests.
+   */
+  def logRequests(ts: DateTime, srcLinkName: String, srcLinkAddress: String, tgtLinkName: String,
+                  requests: DSARequest*) = {
+
+    val (srcExtraTags, srcExtraFields) = addressData("srcLink")(srcLinkAddress)
+
+    val points = requests map { request =>
+      val baseTags = tags("method" -> request.method.toString)
+      val baseFields = fields("rid" -> request.rid, "srcLinkName" -> srcLinkName, "tgtLinkName" -> tgtLinkName)
+      Point("request", ts.getMillis, baseTags ++ srcExtraTags, baseFields ++ srcExtraFields)
+    }
+
+    savePoints(points)
   }
 
   /**

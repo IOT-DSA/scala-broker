@@ -2,7 +2,10 @@ package models.akka
 
 import scala.util.control.NonFatal
 
+import org.joda.time.DateTime
+
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.metrics.MetricLogger
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
@@ -93,7 +96,22 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
         val envelope = RequestEnvelope(reqs.toSeq)
         log.debug(s"$ownId: sending $envelope to [$to]")
         dsaSend(to, envelope)
+        logRequestBatch(to, envelope.requests)
     }
+  }
+
+  /**
+   * Logs requests.
+   */
+  private def logRequestBatch(to: String, requests: Seq[DSARequest]) = {
+    import models.Settings.Paths._
+
+    val tgtLinkName = if (to.startsWith(Downstream) && to != Downstream)
+      to drop Downstream.size + 1
+    else
+      "broker"
+
+    MetricLogger.logRequests(DateTime.now, linkName, connInfo.linkAddress, tgtLinkName, requests: _*)
   }
 
   /**
