@@ -139,8 +139,8 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
 
     cache.set(ci.dsId, ci)
 
-    MetricLogger.logHandshake(DateTime.now, ci.dsId, ci.linkName, request.remoteAddress,
-      ci.mode, ci.version, ci.compression, request.host)
+    MetricLogger.logConnectionEvent(DateTime.now, "handshake", "-", ci.dsId, ci.linkName,
+      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
 
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)

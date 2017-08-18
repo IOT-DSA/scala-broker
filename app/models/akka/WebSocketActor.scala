@@ -33,6 +33,8 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
     proxy tell ConnectEndpoint(self, ci)
+    MetricLogger.logConnectionEvent(startTime, "connect", sessionId, ci.dsId, linkName,
+      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
   }
 
   /**
@@ -40,7 +42,10 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
    */
   override def postStop() = {
     log.info("{}: stopped", ownId)
-    MetricLogger.logWebSocketSession(startTime, DateTime.now, linkName, ci.linkAddress, ci.mode, ci.brokerAddress)
+    val endTime = DateTime.now
+    MetricLogger.logConnectionEvent(endTime, "disconnect", sessionId, ci.dsId, linkName,
+      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+    MetricLogger.logWebSocketSession(startTime, endTime, linkName, ci.linkAddress, ci.mode, ci.brokerAddress)
   }
 
   /**
@@ -99,6 +104,11 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
     log.debug("{}: sending {} to WebSocket", ownId, formatMessage(msg))
     out ! msg
   }
+  
+  /**
+   * Returns the unique WebSocket session identifier.
+   */
+  private val sessionId = linkName + "-" + math.abs(System.identityHashCode(this))
 }
 
 /**

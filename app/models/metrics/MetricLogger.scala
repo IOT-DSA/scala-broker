@@ -12,10 +12,11 @@ import models.rpc.{ RequestMessage, ResponseMessage, DSARequest, DSAResponse }
 trait MetricLogger {
 
   /**
-   * Logs a handshake attempt.
+   * Logs a connection event.
    */
-  def logHandshake(ts: DateTime, linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
-                   version: String, compression: Boolean, brokerAddress: String): Unit
+  def logConnectionEvent(ts: DateTime, event: String, sessionId: String,
+                         linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
+                         version: String, compression: Boolean, brokerAddress: String): Unit
 
   /**
    * Logs a WebSocket session.
@@ -59,9 +60,10 @@ object MetricLogger extends MetricLogger {
 
   sys.addShutdownHook { dbConn foreach (_.close) }
 
-  def logHandshake(ts: DateTime, linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
-                   version: String, compression: Boolean, brokerAddress: String) =
-    logger.logHandshake(ts, linkId, linkName, linkAddress, mode, version, compression, brokerAddress)
+  def logConnectionEvent(ts: DateTime, event: String, sessionId: String,
+                         linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
+                         version: String, compression: Boolean, brokerAddress: String) =
+    logger.logConnectionEvent(ts, event, sessionId, linkId, linkName, linkAddress, mode, version, compression, brokerAddress)
 
   def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
                           linkAddress: String, mode: DSLinkMode, brokerAddress: String) =

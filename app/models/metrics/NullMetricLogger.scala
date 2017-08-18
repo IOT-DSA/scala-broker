@@ -10,9 +10,9 @@ import models.rpc.{ RequestMessage, ResponseMessage, DSARequest, DSAResponse }
  */
 class NullMetricLogger extends MetricLogger {
 
-  def logHandshake(ts: DateTime,
-                   linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
-                   version: String, compression: Boolean, brokerAddress: String) = {}
+  def logConnectionEvent(ts: DateTime, event: String, sessionId: String,
+                         linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
+                         version: String, compression: Boolean, brokerAddress: String) = {}
 
   def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
                           linkAddress: String, mode: DSLinkMode, brokerAddress: String) = {}

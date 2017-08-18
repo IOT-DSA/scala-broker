@@ -21,18 +21,18 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
   import models.Settings.Metrics._
 
   /**
-   * Logs a handshake attempt.
+   * Logs a connection event.
    */
-  def logHandshake(ts: DateTime,
-                   linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
-                   version: String, compression: Boolean, brokerAddress: String) = {
+  def logConnectionEvent(ts: DateTime, event: String, sessionId: String,
+                         linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
+                         version: String, compression: Boolean, brokerAddress: String) = {
 
-    val baseTags = tags("mode" -> mode.toString, "version" -> version, "brokerAddress" -> brokerAddress)
-    val baseFields = fields("linkName" -> linkName, "compression" -> compression)
+    val baseTags = tags("event" -> event, "mode" -> mode.toString, "version" -> version, "brokerAddress" -> brokerAddress)
+    val baseFields = fields("sessionId" -> sessionId, "linkName" -> linkName, "compression" -> compression)
 
     val (extraTags, extraFields) = addressData("link")(linkAddress)
 
-    val point = Point("handshake", ts.getMillis, baseTags ++ extraTags, baseFields ++ extraFields)
+    val point = Point("connection", ts.getMillis, baseTags ++ extraTags, baseFields ++ extraFields)
     savePoint(point)
   }
 
@@ -111,7 +111,7 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
         "error" -> response.error.isDefined)
       Point("response", ts.getMillis, baseTags ++ extraTags, baseFields ++ extraFields)
     }
-    
+
     savePoints(points)
   }
 
