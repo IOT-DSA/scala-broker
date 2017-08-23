@@ -21,6 +21,17 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
   import models.Settings.Metrics._
 
   /**
+   * Logs a cluster member event.
+   */
+  def logMemberEvent(ts: DateTime, role: String, address: String, state: String) = {
+    val baseTags = tags("role" -> role, "address" -> address)
+    val baseFields = fields("state" -> state)
+
+    val point = Point("cluster", ts.getMillis, baseTags, baseFields)
+    savePoint(point)
+  }
+
+  /**
    * Logs a connection event.
    */
   def logConnectionEvent(ts: DateTime, event: String, sessionId: String,

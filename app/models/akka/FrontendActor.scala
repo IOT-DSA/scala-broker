@@ -1,14 +1,19 @@
 package models.akka
 
+import java.net.InetAddress
+
 import scala.concurrent.Future
 import scala.reflect.ClassTag
+
+import org.joda.time.DateTime
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, Status, Terminated, actorRef2Scala }
 import akka.pattern.{ ask, pipe }
 import akka.cluster.Cluster
+import akka.pattern.ask
 import akka.util.Timeout
-import models.{ RichBoolean, Settings }
-import models.RequestEnvelope
+import models.{ RequestEnvelope, RichBoolean, Settings }
+import models.metrics.MetricLogger
 
 /**
  * This actor is responsible for communicating with the facade. It can be deployed both in local
@@ -16,8 +21,8 @@ import models.RequestEnvelope
  */
 class FrontendActor extends Actor with ActorLogging {
   import BackendActor._
-  import Messages._
   import context.dispatcher
+  import Messages._
 
   if (self.path != self.path.root / "user" / "frontend") {
     val msg = "FrontendActor must be deployed under /user/frontend"
@@ -31,9 +36,15 @@ class FrontendActor extends Actor with ActorLogging {
 
   private var backends = IndexedSeq.empty[ActorRef]
 
-  override def preStart() = log.info("FrontendActor started at {}", self.path.address)
+  override def preStart() = {
+    log.info("FrontendActor started at {}", self.path.address)
+    MetricLogger.logMemberEvent(DateTime.now, "frontend", extractHostPort(self), "started")
+  }
 
-  override def postStop() = log.info("FrontendActor stopped at {}", self.path.address)
+  override def postStop() = {
+    log.info("FrontendActor stopped at {}", self.path.address)
+    MetricLogger.logMemberEvent(DateTime.now, "frontend", extractHostPort(self), "stopped")
+  }
 
   /**
    * Handles incoming messages.
@@ -92,9 +103,11 @@ class FrontendActor extends Actor with ActorLogging {
       context watch sender
       backends = backends :+ sender
       log.info("{} added to the backend collection", sender.path)
+      MetricLogger.logMemberEvent(DateTime.now, "backend", extractHostPort(sender), "started")
     case Terminated(a) =>
       backends = backends.filterNot(_ == a)
       log.info("{} removed from backend collection", sender.path)
+      MetricLogger.logMemberEvent(DateTime.now, "backend", extractHostPort(sender), "stopped")
   }
 
   /**
@@ -119,6 +132,16 @@ class FrontendActor extends Actor with ActorLogging {
    * Returns a failure to the sender in case no backends are available.
    */
   private def noBackendsError() = sender ! Status.Failure(new IllegalStateException("No unavailable backends"))
+
+  /**
+   * Extract host/port information from the actor reference (for logging).
+   */
+  private def extractHostPort(ref: ActorRef) = {
+    val address = ref.path.address
+    address.host map { h =>
+      address.port.map(p => s"$h:$p").getOrElse(h)
+    } getOrElse InetAddress.getLocalHost.getHostAddress
+  }
 }
 
 /**

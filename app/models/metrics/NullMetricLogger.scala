@@ -10,6 +10,8 @@ import models.rpc.{ RequestMessage, ResponseMessage, DSARequest, DSAResponse }
  */
 class NullMetricLogger extends MetricLogger {
 
+  def logMemberEvent(ts: DateTime, role: String, address: String, state: String) = {}
+
   def logConnectionEvent(ts: DateTime, event: String, sessionId: String,
                          linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
                          version: String, compression: Boolean, brokerAddress: String) = {}

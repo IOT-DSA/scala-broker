@@ -12,6 +12,11 @@ import models.rpc.{ RequestMessage, ResponseMessage, DSARequest, DSAResponse }
 trait MetricLogger {
 
   /**
+   * Logs a cluster member event.
+   */
+  def logMemberEvent(ts: DateTime, role: String, address: String, state: String): Unit
+
+  /**
    * Logs a connection event.
    */
   def logConnectionEvent(ts: DateTime, event: String, sessionId: String,
@@ -59,6 +64,9 @@ object MetricLogger extends MetricLogger {
   private val logger = db map (new InfluxMetricLogger(_)) getOrElse (new NullMetricLogger)
 
   sys.addShutdownHook { dbConn foreach (_.close) }
+
+  def logMemberEvent(ts: DateTime, role: String, address: String, state: String) =
+    logger.logMemberEvent(ts, role, address, state)
 
   def logConnectionEvent(ts: DateTime, event: String, sessionId: String,
                          linkId: String, linkName: String, linkAddress: String, mode: DSLinkMode,
