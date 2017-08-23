@@ -12,8 +12,10 @@ import com.maxmind.geoip2.DatabaseReader
  * Encapsulates geographic location information.
  */
 case class GeoLocation(latitude: Double, longitude: Double,
-                       continent: String, country: String, postalCode: String,
-                       city: String, subdivision: String, timeZone: String)
+                       continentCode: String, continentName: String,
+                       countryCode: String, countryName: String,
+                       stateCode: String, stateName: String,
+                       city: String, postalCode: String, timeZone: String)
 
 /**
  * Defines access methods to retrieve geographic information about a particular IP address.
@@ -50,11 +52,14 @@ class GeoLite(db: File) extends GeoIp {
     GeoLocation(
       latitude = record.getLocation.getLatitude,
       longitude = record.getLocation.getLongitude,
-      continent = record.getContinent.getName,
-      country = record.getCountry.getName,
+      continentCode = record.getContinent.getCode,
+      continentName = record.getContinent.getName,
+      countryCode = record.getCountry.getIsoCode,
+      countryName = record.getCountry.getName,
+      stateCode = record.getMostSpecificSubdivision.getIsoCode,
+      stateName = record.getMostSpecificSubdivision.getName,
       postalCode = record.getPostal.getCode,
       city = record.getCity.getName,
-      subdivision = record.getMostSpecificSubdivision.getName,
       timeZone = record.getLocation.getTimeZone)
   }
 

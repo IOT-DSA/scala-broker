@@ -42,9 +42,15 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
   def logWebSocketSession(startTime: DateTime, endTime: DateTime, linkName: String,
                           linkAddress: String, mode: DSLinkMode, brokerAddress: String) = {
 
+    val duration = new Interval(startTime, endTime).toDuration
+
     val baseTags = tags("mode" -> mode.toString, "brokerAddress" -> brokerAddress)
     val baseFields = fields("linkName" -> linkName, "endTime" -> endTime.getMillis,
-      "duration" -> new Interval(startTime, endTime).toDurationMillis)
+      "durationMs" -> duration.getMillis,
+      "durationSec" -> duration.getStandardSeconds,
+      "durationMin" -> duration.getStandardMinutes,
+      "durationHr" -> duration.getStandardHours,
+      "durationDay" -> duration.getStandardDays)
 
     val (extraTags, extraFields) = addressData("link")(linkAddress)
 
@@ -134,7 +140,7 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
    * of fields, names prefixed with the given prefix.
    */
   private def hostData(prefix: String)(address: InetAddress): Seq[Field] = {
-    def p(name: String) = if (prefix == "") name else prefix + name.capitalize
+    val p = addPrefix(prefix) _
 
     fields(p("host") -> address.getHostName, p("ip") -> address.getHostAddress)
   }
@@ -144,14 +150,26 @@ class InfluxMetricLogger(db: Database) extends MetricLogger {
    * names prefixed with the given prefix.
    */
   private def geoData(prefix: String)(address: InetAddress): (Seq[Tag], Seq[Field]) = {
-    def p(name: String) = if (prefix == "") name else prefix + name.capitalize
+    val p = addPrefix(prefix) _
 
     GeoIp.resolve(address) map { loc =>
-      val t = tags(p("continent") -> loc.continent, p("country") -> loc.country, p("city") -> loc.city)
+      val t = tags(
+        p("continentCode") -> loc.continentCode,
+        p("continentName") -> loc.continentName,
+        p("countryCode") -> loc.countryCode,
+        p("countryName") -> loc.countryName,
+        p("stateCode") -> loc.stateCode,
+        p("stateName") -> loc.stateName,
+        p("city") -> loc.city)
       val f = fields(p("latitude") -> loc.latitude, p("longitude") -> loc.longitude)
       (t, f)
     } getOrElse Tuple2(Nil, Nil)
   }
+
+  /**
+   * Adds a prefix and capitalizes the name, if prefix is not empty.
+   */
+  private def addPrefix(prefix: String)(name: String) = if (prefix.isEmpty) name else prefix + name.capitalize
 
   /**
    * Saves a point into InfluxDB. It uses MILLISECONDS precision; the retention policy is taken
