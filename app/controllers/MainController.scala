@@ -14,7 +14,9 @@ import models.Settings
 import models.akka.{ BackendActor, ConnectionInfo, FrontendActor, RootNodeActor, WebSocketActor, WebSocketActorConfig }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.{ DownstreamActor, LocalDSLinkManager }
+import models.metrics.MetricLogger
 import models.rpc.{ DSAMessage, DSAMessageFormat }
+import org.joda.time.DateTime
 import play.api.Logger
 import play.api.cache.CacheApi
 import play.api.inject.ApplicationLifecycle
@@ -137,6 +139,9 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
 
     cache.set(ci.dsId, ci)
 
+    MetricLogger.logConnectionEvent(DateTime.now, "handshake", "-", ci.dsId, ci.linkName,
+      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)
   }
@@ -204,7 +209,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
    * Constructs a connection info instance from the incoming request.
    */
   private def buildConnectionInfo(request: Request[ConnectionRequest]) =
-    ConnectionInfo(getDsId(request), request.body)
+    ConnectionInfo(getDsId(request), request.body, request.remoteAddress, request.host)
 
   /**
    * Returns a future with the cluster information.

@@ -1,5 +1,6 @@
 package models
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
 
 import com.typesafe.config.ConfigFactory
@@ -87,6 +88,34 @@ object Settings {
    * The number of shards in the downstream pool.
    */
   val DownstreamShardCount = rootConfig.getInt("broker.downstream.shard.count")
+
+  /**
+   * Metrics collector configuration
+   */
+  object Metrics {
+    private val cfg = rootConfig.getConfig("broker.metrics")
+
+    val Collect = cfg.getBoolean("collect")
+    val Retention = cfg.getConfig("retention").entrySet.asScala map { entry =>
+      entry.getKey -> entry.getValue.unwrapped.toString
+    } toMap
+
+    val DefaultRetention = Retention.get("default").orNull
+    
+    val UseGeoIp = cfg.hasPath("geoip.db")
+    val GeoIpDb = if (UseGeoIp) cfg.getString("geoip.db") else null
+  }
+
+  /**
+   * InfluxDB configuration.
+   */
+  object Influx {
+    private val cfg = rootConfig.getConfig("influx")
+
+    val Host = cfg.getString("host")
+    val Port = cfg.getInt("port")
+    val DbName = cfg.getString("database")
+  }
 
   /**
    * Logging options.

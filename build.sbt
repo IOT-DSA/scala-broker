@@ -20,6 +20,7 @@ scalacOptions ++= Seq("-feature", "-unchecked", "-deprecation", "-Xlint:_,-missi
 enablePlugins(JavaAppPackaging)
 javaOptions in Universal ++= Seq(s"-Dpidfile.path=/var/run/${packageName.value}/play.pid")
 mappings in Universal ++= Seq(
+  file("scripts/setup-influx") -> "bin/setup-influx",
   file("scripts/start-broker") -> "bin/start-broker",
   file("scripts/stop-broker") -> "bin/stop-broker",
   file("scripts/start-backend") -> "bin/start-backend",
@@ -39,6 +40,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
+  "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
+  "com.maxmind.geoip2"       % "geoip2"                  % "2.9.0",
   "ch.qos.logback"           % "logback-classic"         % "1.1.7",
   "org.scalatest"           %% "scalatest"               % "2.2.1"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.12.1"        % "test",
