@@ -17,8 +17,14 @@ scalacOptions ++= Seq("-feature", "-unchecked", "-deprecation", "-Xlint:_,-missi
   "-Ywarn-dead-code", "-language:_", "-target:jvm-1.7", "-encoding", "UTF-8", "-Xexperimental")
 
 // packaging
-enablePlugins(JavaAppPackaging)
+enablePlugins(DockerPlugin, JavaAppPackaging)
 javaOptions in Universal ++= Seq(s"-Dpidfile.path=/var/run/${packageName.value}/play.pid")
+dockerBaseImage := "java:latest"
+maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
+packageName in Docker := "iotdsa/broker-scala"
+dockerExposedPorts := Seq(9000, 9443, 2551)
+dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
+
 mappings in Universal ++= Seq(
   file("scripts/setup-influx") -> "bin/setup-influx",
   file("scripts/start-broker") -> "bin/start-broker",
