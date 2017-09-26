@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]
+  then
+    echo "Usage: start_frontend <name>. Eg. 'start_frontend frontend01'"
+    exit -1
+fi
+
+VERSION="0.3.0-SNAPSHOT"
+
+VOLUMES="-v $PWD/conf:/opt/docker/conf"
+NETWORK="--net dsa -h $1 -p 9000:9000 -e HOST=$1"
+APP_ARGS="-Dconfig.file=/opt/docker/conf/frontend.conf"
+
+docker run -d --name $1 $VOLUMES $NETWORK iotdsa/broker-scala:$VERSION $APP_ARGS
