@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+VERSION="0.3.0-SNAPSHOT"
+PORTS="-p 9000:9000"
+VOLUMES="-v $PWD/conf:/opt/docker/conf"
+
+docker run -d --name scala-broker $PORTS $VOLUMES iotdsa/broker-scala:$VERSION
+
