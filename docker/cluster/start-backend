@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+VERSION="0.3.0-SNAPSHOT"
+
+VOLUMES="-v $PWD/conf:/opt/docker/conf -v /opt/geolite:/opt/docker/geolite"
+NETWORK="--net dsa -h dsa-backend -p 2551:2551"
+APP_ARGS="-main models.akka.cluster.BrokerBackend -Dconfig.file=/opt/docker/conf/backend.conf 2551"
+
+docker run -d --name dsa-backend $NETWORK $VOLUMES iotdsa/broker-scala:$VERSION $APP_ARGS

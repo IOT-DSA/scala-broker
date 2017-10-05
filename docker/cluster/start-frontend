@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+VERSION="0.3.0-SNAPSHOT"
+
+VOLUMES="-v $PWD/conf:/opt/docker/conf"
+NETWORK="--net dsa -h dsa-frontend -p 9000:9000"
+APP_ARGS="-Dconfig.file=/opt/docker/conf/frontend.conf"
+
+docker run -d --name dsa-frontend $VOLUMES $NETWORK iotdsa/broker-scala:$VERSION $APP_ARGS

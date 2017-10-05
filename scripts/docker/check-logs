@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-docker run -it --rm --volumes-from scala-broker ubuntu /bin/bash

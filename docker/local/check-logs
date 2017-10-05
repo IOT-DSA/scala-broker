@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]
+  then
+    echo "Usage: check-logs <name>. Eg. 'check-logs dsa-broker'"
+    exit -1
+fi
+
+docker run -it --rm --volumes-from $1 ubuntu /bin/bash
