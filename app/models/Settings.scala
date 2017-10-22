@@ -95,13 +95,13 @@ object Settings {
   object Metrics {
     private val cfg = rootConfig.getConfig("broker.metrics")
 
-    val Collect = cfg.getBoolean("collect")
+    val Collector = cfg.getString("collector")
     val Retention = cfg.getConfig("retention").entrySet.asScala map { entry =>
       entry.getKey -> entry.getValue.unwrapped.toString
     } toMap
 
     val DefaultRetention = Retention.get("default").orNull
-    
+
     val UseGeoIp = cfg.hasPath("geoip.db")
     val GeoIpDb = if (UseGeoIp) cfg.getString("geoip.db") else null
   }
@@ -109,8 +109,8 @@ object Settings {
   /**
    * InfluxDB configuration.
    */
-  object Influx {
-    private val cfg = rootConfig.getConfig("influx")
+  object InfluxDb {
+    private val cfg = rootConfig.getConfig("influxdb")
 
     val Host = cfg.getString("host")
     val Port = cfg.getInt("port")

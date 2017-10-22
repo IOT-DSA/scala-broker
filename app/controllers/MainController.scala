@@ -14,7 +14,7 @@ import models.Settings
 import models.akka.{ BackendActor, ConnectionInfo, FrontendActor, RootNodeActor, WebSocketActor, WebSocketActorConfig }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.{ DownstreamActor, LocalDSLinkManager }
-import models.metrics.MetricLogger
+import models.metrics.MetricDao._
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import org.joda.time.DateTime
 import play.api.Logger
@@ -139,8 +139,8 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
 
     cache.set(ci.dsId, ci)
 
-    MetricLogger.logConnectionEvent(DateTime.now, "handshake", "-", ci.dsId, ci.linkName,
-      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", "-", ci.dsId,
+      ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
 
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)

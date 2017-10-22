@@ -1,4 +1,4 @@
-package models
+package models.metrics
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -6,11 +6,12 @@ import org.slf4j.LoggerFactory
 
 import com.paulgoldbaum.influxdbclient._
 
+import models.Settings.InfluxDb.{ Host, Port }
+
 /**
  * InfluxDB helper methods.
  */
-package object influx {
-  import models.Settings.Influx._
+package object influxdb {
 
   private val log = LoggerFactory.getLogger(getClass)
 
