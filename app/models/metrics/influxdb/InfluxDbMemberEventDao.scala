@@ -1,6 +1,12 @@
 package models.metrics.influxdb
 
-import com.paulgoldbaum.influxdbclient.{ Database, Point }
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
+import org.joda.time.DateTime
+
+import com.paulgoldbaum.influxdbclient._
+import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
 import models.metrics.{ MemberEvent, MemberEventDao }
 
@@ -18,5 +24,40 @@ class InfluxDbMemberEventDao(db: Database) extends InfluxDbGenericDao(db) with M
 
     val point = Point("cluster", evt.ts.getMillis, baseTags, baseFields)
     savePoint(point)
+  }
+
+  /**
+   * Filters 'cluster' measurement for records satisfying the criteria.
+   */
+  def findMemberEvents(role: Option[String], address: Option[String],
+                       from: Option[DateTime], to: Option[DateTime]): Future[List[MemberEvent]] = {
+    val pRole = role map (x => s"role = '$x'")
+    val pAddress = address map (x => s"address = '$x'")
+    val pFrom = from map (_.getMillis) map (x => s"time >= $x")
+    val pTo = to map (_.getMillis) map (x => s"time <= $x")
+
+    val filters = List(pRole, pAddress, pFrom, pTo) collect { case Some(f) => f }
+    val where = if (!filters.isEmpty)
+      filters.mkString(" WHERE ", " AND ", "")
+    else
+      ""
+
+    val query = "SELECT * FROM cluster" + where + " ORDER BY time DESC"
+    val fqr = db.query(query, MILLISECONDS)
+    fqr map { qr =>
+      val records = qr.series.flatMap(_.records)
+      records map recordToMemberEvent
+    }
+  }
+
+  /**
+   * Converts an InfluxDB record into a member event instance.
+   */
+  private def recordToMemberEvent(record: Record) = {
+    val ts = new DateTime(record("time").asInstanceOf[Number].longValue)
+    val role = record("role").asInstanceOf[String]
+    val address = record("address").asInstanceOf[String]
+    val state = record("state").asInstanceOf[String]
+    MemberEvent(ts, role, address, state)
   }
 }

@@ -10,11 +10,14 @@ import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
 import models.Settings.Metrics.{ DefaultRetention, Retention }
 import models.metrics.GeoIp
+import play.api.Logger
 
 /**
  * Base class for InfluxDB-based DAOs, contains helper methods for subclasses.
  */
 abstract class InfluxDbGenericDao(db: Database) {
+
+  protected val log = Logger(getClass)
 
   /**
    * Extracts relevant address data and returns a list of Tags and Fields,

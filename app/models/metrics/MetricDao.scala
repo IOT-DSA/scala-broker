@@ -1,5 +1,9 @@
 package models.metrics
 
+import scala.concurrent.Future
+
+import org.joda.time.DateTime
+
 import models.Settings.{ InfluxDb, Metrics }
 import models.metrics.influxdb._
 
@@ -39,6 +43,9 @@ object MetricDao {
 
   class NullMemberEventDao extends MemberEventDao {
     def saveMemberEvent(evt: MemberEvent): Unit = {}
+    def findMemberEvents(role: Option[String], address: Option[String],
+                         from: Option[DateTime],
+                         to: Option[DateTime]): Future[List[MemberEvent]] = Future.successful(Nil)
   }
 
   class NullDSLinkEventDao extends DSLinkEventDao {
