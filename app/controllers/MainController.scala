@@ -19,7 +19,6 @@ import models.rpc.{ DSAMessage, DSAMessageFormat }
 import org.joda.time.DateTime
 import play.api.Logger
 import play.api.cache.CacheApi
-import play.api.inject.ApplicationLifecycle
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
@@ -30,14 +29,14 @@ import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
  */
 @Singleton
 class MainController @Inject() (implicit actorSystem: ActorSystem,
-                                materializer: Materializer, cache: CacheApi,
-                                life: ApplicationLifecycle) extends Controller {
-  import models.akka.FrontendActor._
+                                materializer: Materializer, cache: CacheApi) extends Controller {
   import models.akka.Messages._
 
   private val log = Logger(getClass)
 
   implicit private val timeout = Timeout(Settings.QueryTimeout)
+  
+  implicit val ConnectionRequestReads = Json.reads[ConnectionRequest]
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 

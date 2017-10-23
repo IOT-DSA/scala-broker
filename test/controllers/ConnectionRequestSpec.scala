@@ -7,6 +7,8 @@ import play.api.libs.json._
  * Test suite for ConnectionRequest.
  */
 class ConnectionRequestSpec extends PlaySpec {
+  
+  implicit val ConnectionRequestReads = Json.reads[ConnectionRequest]
 
   "ConnectionRequest" should {
     "read from JSON (no linkData)" in {
@@ -18,7 +20,6 @@ class ConnectionRequestSpec extends PlaySpec {
         "formats":["msgpack","json"],
         "enableWebSocketCompression": true
         }"""
-      val req = Json.parse(str).asOpt[ConnectionRequest]
       Json.parse(str).validate[ConnectionRequest] match {
         case JsSuccess(req, _) =>
           req.publicKey mustBe "BEACGownMzthVjNFT7Ry-RPX395kPSoUqhQ"
@@ -41,7 +42,6 @@ class ConnectionRequestSpec extends PlaySpec {
         "formats":["msgpack","json"],
         "enableWebSocketCompression": true
         }"""
-      val req = Json.parse(str).asOpt[ConnectionRequest]
       Json.parse(str).validate[ConnectionRequest] match {
         case JsSuccess(req, _) =>
           req.publicKey mustBe "BEACGownMzthVjNFT7Ry-RPX395kPSoUqhQ"
