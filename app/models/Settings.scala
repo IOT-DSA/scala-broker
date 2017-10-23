@@ -118,6 +118,16 @@ object Settings {
   }
 
   /**
+   * JDBC configuration.
+   */
+  object JDBC {
+    private val cfg = rootConfig.getConfig("db")
+
+    val Driver = cfg.getString("default.driver")
+    val Url = cfg.getString("default.url")
+  }
+
+  /**
    * Logging options.
    */
   object Logging {
