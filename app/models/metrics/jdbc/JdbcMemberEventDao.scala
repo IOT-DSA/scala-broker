@@ -22,7 +22,7 @@ class JdbcMemberEventDao(conn: Connection) extends JdbcGenericDao(conn) with Mem
    * Saves a member event as a record in 'member_events' table.
    */
   def saveMemberEvent(evt: MemberEvent): Unit = {
-    SQL"""INSERT INTO member_events (ts, role, address, state) 
+    SQL"""INSERT INTO member_event (ts, role, address, state) 
       VALUES (${evt.ts}, ${evt.role}, ${evt.address}, ${evt.state})""".executeUpdate
   }
 
@@ -36,7 +36,7 @@ class JdbcMemberEventDao(conn: Connection) extends JdbcGenericDao(conn) with Mem
       le("time", to))
 
     Future {
-      val query = "SELECT * FROM member_events" + where + " ORDER BY ts DESC"
+      val query = "SELECT * FROM member_event" + where + " ORDER BY ts DESC"
       val result = SQL(query).executeQuery
       result.as(memberEventParser.*)
     }

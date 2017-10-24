@@ -1,4 +1,4 @@
-CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS member_events (
+CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS member_event (
 	ts TIMESTAMP,
 	role VARCHAR,
 	address VARCHAR,
@@ -28,4 +28,24 @@ CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS link_session (
 	mode VARCHAR, 
 	broker_address VARCHAR,
 	PRIMARY KEY (link_name, start_ts)
+);
+
+CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS req_message (
+	ts TIMESTAMP,
+	inbound BOOLEAN,
+	link_name VARCHAR,
+	link_address VARCHAR,
+	msg_id VARCHAR,
+	req_count INT,
+	PRIMARY KEY (link_name, msg_id, ts)
+);
+
+CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS req_batch (
+	ts TIMESTAMP,
+	src_link_name VARCHAR,
+	src_link_address VARCHAR,
+	tgt_link_name VARCHAR,
+	method VARCHAR,
+	size INT,
+	PRIMARY KEY (src_link_name, tgt_link_name, method, ts)
 );
