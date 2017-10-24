@@ -4,6 +4,8 @@ import java.net.InetAddress
 
 import scala.util.Try
 
+import org.joda.time.DateTime
+
 import com.paulgoldbaum.influxdbclient._
 import com.paulgoldbaum.influxdbclient.Parameter.Consistency.ANY
 import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
@@ -85,4 +87,30 @@ abstract class InfluxDbGenericDao(db: Database) {
   protected def savePoints(points: Seq[Point]) = points.headOption foreach { point =>
     db.bulkWrite(points, MILLISECONDS, ANY, Retention.getOrElse(point.key, DefaultRetention))
   }
+
+  /**
+   * Builds a WHERE clause using the defined filters.
+   */
+  protected def buildWhere(filters: Option[String]*) = {
+    val validFilters = filters collect { case Some(x) => x }
+    if (!validFilters.isEmpty)
+      filters.mkString(" WHERE ", " AND ", "")
+    else
+      ""
+  }
+
+  /**
+   * Bulds a clause that compares a column with a string value for equality.
+   */
+  protected def eq(colName: String, str: Option[String]) = str map (x => s"$colName = '$x'")
+
+  /**
+   * Bulds a clause that compares a column with a date value for less-than-or-equal.
+   */
+  protected def le(colName: String, ts: Option[DateTime]) = ts map (_.getMillis) map (x => s"$colName <= $x")
+
+  /**
+   * Bulds a clause that compares a column with a date value for greater-than-or-equal.
+   */
+  protected def ge(colName: String, ts: Option[DateTime]) = ts map (_.getMillis) map (x => s"$colName >= $x")
 }

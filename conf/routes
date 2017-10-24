@@ -3,18 +3,20 @@
 # https://www.playframework.com/documentation/latest/ScalaRouting
 # ~~~~
 
-GET    /                  controllers.MainController.index
-GET    /data              controllers.MainController.dataExplorer
-GET    /cluster           controllers.MainController.clusterInfo
-GET    /links             controllers.MainController.findDslinks(regex ?= ".*", limit: Int ?= 100, offset: Int ?= 0)
-POST   /disconnect        controllers.MainController.disconnectWS(link)
-POST   /remove            controllers.MainController.removeLink(link)
-GET    /upstream          controllers.MainController.upstream
-GET    /config            controllers.MainController.viewConfig
-POST   /conn              controllers.MainController.conn
-GET    /ws                controllers.MainController.ws
+GET    /                      controllers.MainController.index
+GET    /data                  controllers.MainController.dataExplorer
+GET    /cluster               controllers.MainController.clusterInfo
+GET    /links                 controllers.MainController.findDslinks(regex ?= ".*", limit: Int ?= 100, offset: Int ?= 0)
+POST   /disconnect            controllers.MainController.disconnectWS(link)
+POST   /remove                controllers.MainController.removeLink(link)
+GET    /upstream              controllers.MainController.upstream
+GET    /config                controllers.MainController.viewConfig
+POST   /conn                  controllers.MainController.conn
+GET    /ws                    controllers.MainController.ws
 
-GET    /metrics/cluster   controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
+GET    /metrics/cluster       controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
+GET    /metrics/connections   controllers.MetricController.connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
+GET    /metrics/sessions      controllers.MetricController.sessionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
 
 # Map static resources from the /public folder to the /assets URL path
-GET    /assets/*file      controllers.Assets.versioned(path="/public", file: Asset)
+GET    /assets/*file          controllers.Assets.versioned(path="/public", file: Asset)

@@ -31,16 +31,9 @@ class InfluxDbMemberEventDao(db: Database) extends InfluxDbGenericDao(db) with M
    */
   def findMemberEvents(role: Option[String], address: Option[String],
                        from: Option[DateTime], to: Option[DateTime]): Future[List[MemberEvent]] = {
-    val pRole = role map (x => s"role = '$x'")
-    val pAddress = address map (x => s"address = '$x'")
-    val pFrom = from map (_.getMillis) map (x => s"time >= $x")
-    val pTo = to map (_.getMillis) map (x => s"time <= $x")
 
-    val filters = List(pRole, pAddress, pFrom, pTo) collect { case Some(f) => f }
-    val where = if (!filters.isEmpty)
-      filters.mkString(" WHERE ", " AND ", "")
-    else
-      ""
+    val where = buildWhere(eq("role", role), eq("address", address),
+      ge("time", from), le("time", to))
 
     val query = "SELECT * FROM cluster" + where + " ORDER BY time DESC"
     val fqr = db.query(query, MILLISECONDS)

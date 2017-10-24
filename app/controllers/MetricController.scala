@@ -1,12 +1,16 @@
 package controllers
 
+import scala.concurrent.Future
+
 import org.joda.time.DateTime
 
 import akka.actor.ActorSystem
 import javax.inject.{ Inject, Singleton }
-import models.metrics.{ MemberEvent, MetricDao }
+import models.metrics.{ ConnectionEvent, MemberEvent }
+import models.metrics.MetricDao.{ dslinkEventDao, memberEventDao }
 import play.api.libs.json.{ JsValue, Json, Writes }
 import play.api.mvc.{ Action, Controller, Result }
+import models.metrics.LinkSessionEvent
 
 /**
  * Handles statistics requests.
@@ -18,22 +22,54 @@ class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Con
 
   implicit val dateWrites = Writes.jodaDateWrites("yyyy-MM-dd HH:mm:ss.SSS")
 
-  implicit val MemberEventWrites = Json.writes[MemberEvent]
+  implicit val memberEventWrites = Json.writes[MemberEvent]
 
-  val dao = MetricDao.memberEventDao
+  implicit val connectionEventWrites = Json.writes[ConnectionEvent]
+
+  implicit val sessionEventWrites = Json.writes[LinkSessionEvent]
 
   /**
    * Displays cluster member events.
    */
   def memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long]) = Action.async {
-    val tsFrom = from.map(millis => new DateTime(millis))
-    val tsTo = to.map(millis => new DateTime(millis))
-    val fEvents = dao.findMemberEvents(role, address, tsFrom, tsTo)
-    fEvents.map(Json.toJson(_): Result)
+    val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
+    memberEventDao.findMemberEvents(role, address, tsFrom, tsTo): Future[Result]
+  }
+
+  /**
+   * Display dslink connection events.
+   */
+  def connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long]) = Action.async {
+    val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
+    dslinkEventDao.findConnectionEvents(linkName, tsFrom, tsTo): Future[Result]
+  }
+
+  /**
+   * Display dslink session events.
+   */
+  def sessionEvents(linkName: Option[String], from: Option[Long], to: Option[Long]) = Action.async {
+    val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
+    dslinkEventDao.findSessionEvents(linkName, tsFrom, tsTo): Future[Result]
   }
 
   /**
    * Converts a JSON value into a (pretty-printed) HTTP Result.
    */
   implicit protected def json2result(json: JsValue): Result = Ok(Json.prettyPrint(json)).as(JSON)
+
+  /**
+   * Converts a value into a HTTP Result as a JSON entity.
+   */
+  implicit protected def model2result[T](obj: T)(implicit writes: Writes[T]): Result = Json.toJson(obj): Result
+
+  /**
+   * Converts a future value into a future HTTP Result.
+   */
+  implicit protected def futureModel2Result[T](fo: Future[T])(implicit writes: Writes[T]): Future[Result] =
+    fo.map(model2result(_))
+
+  /**
+   * Converts an optional long value into an optional DateTime.
+   */
+  def optDateTime(om: Option[Long]) = om.map(new DateTime(_))
 }

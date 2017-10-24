@@ -14,9 +14,7 @@ import models.metrics.{ ListResult, MemberEvent, MemberEventDao }
 /**
  * JDBC-based implementation of [[MemberEventDao]].
  */
-class JdbcMemberEventDao(conn: Connection) extends MemberEventDao {
-
-  implicit private val connection = conn
+class JdbcMemberEventDao(conn: Connection) extends JdbcGenericDao(conn) with MemberEventDao {
 
   private val memberEventParser = Macro.namedParser[MemberEvent]
 
@@ -33,16 +31,9 @@ class JdbcMemberEventDao(conn: Connection) extends MemberEventDao {
    */
   def findMemberEvents(role: Option[String], address: Option[String],
                        from: Option[DateTime], to: Option[DateTime]): ListResult[MemberEvent] = {
-    val pRole = role map (x => s"role = '$x'")
-    val pAddress = address map (x => s"address = '$x'")
-    val pFrom = from map (_.getMillis) map (x => s"time >= $x")
-    val pTo = to map (_.getMillis) map (x => s"time <= $x")
 
-    val filters = List(pRole, pAddress, pFrom, pTo) collect { case Some(f) => f }
-    val where = if (!filters.isEmpty)
-      filters.mkString(" WHERE ", " AND ", "")
-    else
-      ""
+    val where = buildWhere(eq("role", role), eq("address", address), ge("time", from),
+      le("time", to))
 
     Future {
       val query = "SELECT * FROM member_events" + where + " ORDER BY ts DESC"

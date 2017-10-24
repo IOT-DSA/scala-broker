@@ -66,7 +66,11 @@ object MetricDao {
 
   class NullDSLinkEventDao extends DSLinkEventDao {
     def saveConnectionEvent(evt: ConnectionEvent): Unit = {}
+    def findConnectionEvents(linkName: Option[String], from: Option[DateTime],
+                             to: Option[DateTime], limit: Int): ListResult[ConnectionEvent] = Future.successful(Nil)
     def saveSessionEvent(evt: LinkSessionEvent): Unit = {}
+    def findSessionEvents(linkName: Option[String], from: Option[DateTime],
+                          to: Option[DateTime], limit: Int): ListResult[LinkSessionEvent] = Future.successful(Nil)
   }
 
   class NullRequestEventDao extends RequestEventDao {

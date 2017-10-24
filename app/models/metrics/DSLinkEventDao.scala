@@ -25,6 +25,12 @@ trait DSLinkEventDao {
       mode, version, compression, brokerAddress))
 
   /**
+   * Finds connection events using the specified criteria.
+   */
+  def findConnectionEvents(linkName: Option[String], from: Option[DateTime],
+                           to: Option[DateTime], limit: Int = 100): ListResult[ConnectionEvent]
+
+  /**
    * Saves a dslink session data after the session ends.
    */
   def saveSessionEvent(evt: LinkSessionEvent): Unit
@@ -35,4 +41,10 @@ trait DSLinkEventDao {
   def saveSessionEvent(startTime: DateTime, endTime: DateTime, linkName: String,
                        linkAddress: String, mode: DSLinkMode, brokerAddress: String): Unit =
     saveSessionEvent(LinkSessionEvent(startTime, endTime, linkName, linkAddress, mode, brokerAddress))
+
+  /**
+   * Finds dslink session events using the specified criteria.
+   */
+  def findSessionEvents(linkName: Option[String], from: Option[DateTime],
+                        to: Option[DateTime], limit: Int = 100): ListResult[LinkSessionEvent]
 }
