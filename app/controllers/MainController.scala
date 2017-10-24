@@ -23,6 +23,7 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
+import java.util.UUID
 
 /**
  * Handles main web requests.
@@ -35,7 +36,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
   private val log = Logger(getClass)
 
   implicit private val timeout = Timeout(Settings.QueryTimeout)
-  
+
   implicit val ConnectionRequestReads = Json.reads[ConnectionRequest]
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
@@ -138,8 +139,8 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
 
     cache.set(ci.dsId, ci)
 
-    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", "-", ci.dsId,
-      ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", UUID.randomUUID.toString,
+      ci.dsId, ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
 
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)

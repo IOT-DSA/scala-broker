@@ -24,12 +24,8 @@ class JdbcMemberEventDao(conn: Connection) extends MemberEventDao {
    * Saves a member event as a record in 'member_events' table.
    */
   def saveMemberEvent(evt: MemberEvent): Unit = {
-    val ts = evt.ts
-    val role = evt.role
-    val address = evt.address
-    val state = evt.state
     SQL"""INSERT INTO member_events (ts, role, address, state) 
-      VALUES ($ts, $role, $address, $state)""".executeUpdate
+      VALUES (${evt.ts}, ${evt.role}, ${evt.address}, ${evt.state})""".executeUpdate
   }
 
   /**
