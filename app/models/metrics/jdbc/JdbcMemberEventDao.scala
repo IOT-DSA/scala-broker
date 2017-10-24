@@ -9,7 +9,7 @@ import org.joda.time.DateTime
 
 import anorm.{ Macro, SQL, SqlStringInterpolation, sqlToSimple }
 import anorm.JodaParameterMetaData.JodaDateTimeMetaData
-import models.metrics.{ MemberEvent, MemberEventDao }
+import models.metrics.{ ListResult, MemberEvent, MemberEventDao }
 
 /**
  * JDBC-based implementation of [[MemberEventDao]].
@@ -32,7 +32,7 @@ class JdbcMemberEventDao(conn: Connection) extends MemberEventDao {
    * Finds member_events records satisfying the criteria.
    */
   def findMemberEvents(role: Option[String], address: Option[String],
-                       from: Option[DateTime], to: Option[DateTime]): Future[List[MemberEvent]] = {
+                       from: Option[DateTime], to: Option[DateTime]): ListResult[MemberEvent] = {
     val pRole = role map (x => s"role = '$x'")
     val pAddress = address map (x => s"address = '$x'")
     val pFrom = from map (_.getMillis) map (x => s"time >= $x")

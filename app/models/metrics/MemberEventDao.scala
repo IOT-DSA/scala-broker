@@ -1,7 +1,5 @@
 package models.metrics
 
-import scala.concurrent.Future
-
 import org.joda.time.DateTime
 
 /**
@@ -24,5 +22,5 @@ trait MemberEventDao {
    * Finds cluster member events satisfying the criteria.
    */
   def findMemberEvents(role: Option[String], address: Option[String],
-                       from: Option[DateTime], to: Option[DateTime]): Future[List[MemberEvent]]
+                       from: Option[DateTime], to: Option[DateTime]): ListResult[MemberEvent]
 }
