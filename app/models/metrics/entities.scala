@@ -34,22 +34,27 @@ case class LinkSessionEvent(startTime: DateTime, endTime: DateTime, linkName: St
 }
 
 /**
- * Generates when a request message is received from a requester DSLink (`inbound == true`),
+ * Generated when a request message is received from a requester DSLink (`inbound == true`),
  * or when a request message is sent to a responder dslink (`inbound == false`).
  */
 case class RequestMessageEvent(ts: DateTime, inbound: Boolean, linkName: String,
                                linkAddress: String, msgId: Int, requestCount: Int) extends Event
 
 /**
- * Generates when a request batch from one dslink is sent to another dslink.
+ * Generated when a request batch from one dslink is sent to another dslink.
  */
 case class RequestBatchEvent(ts: DateTime, srcLinkName: String, srcLinkAddress: String,
                              tgtLinkName: String, method: DSAMethod, size: Int) extends Event
 
 /**
- * Generates when a response message is received from a responder DSLink (`inbound == true`),
+ * Generated when a response message is received from a responder DSLink (`inbound == true`),
  * or when a response message is sent to a requester dslink (`inbound == false`).
  */
 case class ResponseMessageEvent(ts: DateTime, inbound: Boolean, linkName: String,
                                 linkAddress: String, msgId: Int, responseCount: Int,
                                 totalUpdates: Int, totalErrors: Int) extends Event
+
+/**
+ * Encapsulates request statistics.
+ */
+case class RequestStatsByLink(linkName: String, inbound: Boolean, msgCount: Int, reqCount: Int)

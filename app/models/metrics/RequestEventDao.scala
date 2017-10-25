@@ -31,6 +31,11 @@ trait RequestEventDao {
     saveRequestMessageEvent(ts, inbound, linkName, linkAddress, message.msg, message.requests.size)
 
   /**
+   * Returns request statistics.
+   */
+  def getRequestStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByLink]
+
+  /**
    * Saves a request batch event.
    */
   def saveRequestBatchEvent(evt: RequestBatchEvent): Unit

@@ -61,20 +61,24 @@ object MetricDao {
     def saveMemberEvent(evt: MemberEvent): Unit = {}
     def findMemberEvents(role: Option[String], address: Option[String],
                          from: Option[DateTime],
-                         to: Option[DateTime]): Future[List[MemberEvent]] = Future.successful(Nil)
+                         to:   Option[DateTime]): Future[List[MemberEvent]] = Future.successful(Nil)
   }
 
   class NullDSLinkEventDao extends DSLinkEventDao {
     def saveConnectionEvent(evt: ConnectionEvent): Unit = {}
     def findConnectionEvents(linkName: Option[String], from: Option[DateTime],
-                             to: Option[DateTime], limit: Int): ListResult[ConnectionEvent] = Future.successful(Nil)
+                             to:    Option[DateTime],
+                             limit: Int): ListResult[ConnectionEvent] = Future.successful(Nil)
     def saveSessionEvent(evt: LinkSessionEvent): Unit = {}
     def findSessionEvents(linkName: Option[String], from: Option[DateTime],
-                          to: Option[DateTime], limit: Int): ListResult[LinkSessionEvent] = Future.successful(Nil)
+                          to:    Option[DateTime],
+                          limit: Int): ListResult[LinkSessionEvent] = Future.successful(Nil)
   }
 
   class NullRequestEventDao extends RequestEventDao {
     def saveRequestMessageEvent(evt: RequestMessageEvent): Unit = {}
+    def getRequestStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByLink] =
+      Future.successful(Nil)
     def saveRequestBatchEvent(evt: RequestBatchEvent): Unit = {}
   }
 

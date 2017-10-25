@@ -2,14 +2,21 @@ package models.metrics.jdbc
 
 import java.sql.Connection
 
-import models.metrics.{ RequestBatchEvent, RequestEventDao, RequestMessageEvent }
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
+import org.joda.time.DateTime
+
 import anorm.{ Macro, SQL, SqlStringInterpolation, sqlToSimple }
 import anorm.JodaParameterMetaData.JodaDateTimeMetaData
+import models.metrics._
 
 /**
  * JDBC-based implementation of [[RequestEventDao]].
  */
 class JdbcRequestEventDao(conn: Connection) extends JdbcGenericDao(conn) with RequestEventDao {
+
+  private val reqStatsByLinkParser = Macro.indexedParser[RequestStatsByLink]
 
   /**
    * Saves a request message event as a record in 'req_message' table.
@@ -18,6 +25,20 @@ class JdbcRequestEventDao(conn: Connection) extends JdbcGenericDao(conn) with Re
     SQL"""INSERT INTO req_message (ts, inbound, link_name, link_address, msg_id, req_count)
       VALUES (${evt.ts}, ${evt.inbound}, ${evt.linkName}, ${evt.linkAddress}, 
       ${evt.msgId}, ${evt.requestCount})""".executeUpdate
+  }
+
+  /**
+   * Returns request statistics.
+   */
+  def getRequestStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByLink] = {
+    val where = buildWhere(ge("time", from), le("time", to))
+
+    Future {
+      val query = """SELECT link_name, inbound, COUNT(msg_id) AS msg_count, 
+        SUM(req_count) AS req_count FROM req_message""" + where + " GROUP BY link_name, inbound"
+      val result = SQL(query).executeQuery
+      result.as(reqStatsByLinkParser.*)
+    }
   }
 
   /**

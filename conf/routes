@@ -17,6 +17,7 @@ GET    /ws                    controllers.MainController.ws
 GET    /metrics/cluster       controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
 GET    /metrics/connections   controllers.MetricController.connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
 GET    /metrics/sessions      controllers.MetricController.sessionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
+GET    /metrics/requests      controllers.MetricController.requestStatsByLink(from: Option[Long], to: Option[Long])
 
 # Map static resources from the /public folder to the /assets URL path
 GET    /assets/*file          controllers.Assets.versioned(path="/public", file: Asset)

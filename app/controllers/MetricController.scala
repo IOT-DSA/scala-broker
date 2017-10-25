@@ -6,11 +6,10 @@ import org.joda.time.DateTime
 
 import akka.actor.ActorSystem
 import javax.inject.{ Inject, Singleton }
-import models.metrics.{ ConnectionEvent, MemberEvent }
-import models.metrics.MetricDao.{ dslinkEventDao, memberEventDao }
+import models.metrics._
+import models.metrics.MetricDao.{ dslinkEventDao, memberEventDao, requestEventDao }
 import play.api.libs.json.{ JsValue, Json, Writes }
 import play.api.mvc.{ Action, Controller, Result }
-import models.metrics.LinkSessionEvent
 
 /**
  * Handles statistics requests.
@@ -27,6 +26,8 @@ class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Con
   implicit val connectionEventWrites = Json.writes[ConnectionEvent]
 
   implicit val sessionEventWrites = Json.writes[LinkSessionEvent]
+
+  implicit val reqStatsByLinkWrites = Json.writes[RequestStatsByLink]
 
   /**
    * Displays cluster member events.
@@ -50,6 +51,14 @@ class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Con
   def sessionEvents(linkName: Option[String], from: Option[Long], to: Option[Long]) = Action.async {
     val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
     dslinkEventDao.findSessionEvents(linkName, tsFrom, tsTo): Future[Result]
+  }
+
+  /**
+   * Displays request statistics.
+   */
+  def requestStatsByLink(from: Option[Long], to: Option[Long]) = Action.async {
+    val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
+    requestEventDao.getRequestStats(tsFrom, tsTo): Future[Result]
   }
 
   /**
