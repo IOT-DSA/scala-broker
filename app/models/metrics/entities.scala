@@ -55,6 +55,11 @@ case class ResponseMessageEvent(ts: DateTime, inbound: Boolean, linkName: String
                                 totalUpdates: Int, totalErrors: Int) extends Event
 
 /**
- * Encapsulates request statistics.
+ * Request statistics by link.
  */
 case class RequestStatsByLink(linkName: String, inbound: Boolean, msgCount: Int, reqCount: Int)
+
+/**
+ * Request statistics for the source and target links.
+ */
+case class RequestStatsByMethod(srcLinkName: String, tgtLinkName: String, counts: Map[String, Int])

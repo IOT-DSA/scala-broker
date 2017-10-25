@@ -29,6 +29,8 @@ class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Con
 
   implicit val reqStatsByLinkWrites = Json.writes[RequestStatsByLink]
 
+  implicit val reqStatsByMethodWrites = Json.writes[RequestStatsByMethod]
+
   /**
    * Displays cluster member events.
    */
@@ -59,6 +61,14 @@ class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Con
   def requestStatsByLink(from: Option[Long], to: Option[Long]) = Action.async {
     val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
     requestEventDao.getRequestStats(tsFrom, tsTo): Future[Result]
+  }
+
+  /**
+   * Displays request batch statistics.
+   */
+  def requestStatsByMethod(from: Option[Long], to: Option[Long]) = Action.async {
+    val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
+    requestEventDao.getRequestBatchStats(tsFrom, tsTo): Future[Result]
   }
 
   /**

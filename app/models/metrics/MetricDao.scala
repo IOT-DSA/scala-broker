@@ -80,6 +80,8 @@ object MetricDao {
     def getRequestStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByLink] =
       Future.successful(Nil)
     def saveRequestBatchEvent(evt: RequestBatchEvent): Unit = {}
+    def getRequestBatchStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByMethod] =
+      Future.successful(Nil)
   }
 
   class NullResponseEventDao extends ResponseEventDao {

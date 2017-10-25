@@ -51,11 +51,36 @@ class InfluxDbRequestEventDao(db: Database) extends InfluxDbGenericDao(db) with 
   def saveRequestBatchEvent(evt: RequestBatchEvent): Unit = {
     val (srcExtraTags, srcExtraFields) = addressData("srcLink")(evt.srcLinkAddress)
 
-    val baseTags = tags("method" -> evt.method.toString)
-    val baseFields = fields("srcLinkName" -> evt.srcLinkName, "tgtLinkName" -> evt.tgtLinkName,
-      "size" -> evt.size)
+    val baseTags = tags("srcLinkName" -> evt.srcLinkName, "tgtLinkName" -> evt.tgtLinkName,
+      "method" -> evt.method.toString)
+    val baseFields = fields("size" -> evt.size)
 
     val point = Point("req_batch", evt.ts.getMillis, baseTags ++ srcExtraTags, baseFields ++ srcExtraFields)
     savePoint(point)
+  }
+
+  /**
+   * Returns request statistics by method.
+   */
+  def getRequestBatchStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByMethod] = {
+    val where = buildWhere(ge("time", from), le("time", to))
+
+    val query = "SELECT SUM(size) AS size FROM req_batch" + where +
+      " GROUP BY srcLinkName, tgtLinkName, method"
+    val fqr = db.query(query, MILLISECONDS)
+    fqr map { qr =>
+      val rows = qr.series map { series =>
+        val srcLinkName = series.tags("srcLinkName").asInstanceOf[String]
+        val tgtLinkName = series.tags("tgtLinkName").asInstanceOf[String]
+        val method = series.tags("method").asInstanceOf[String]
+        val size = series.records.head("size").asInstanceOf[BigDecimal].intValue
+        (srcLinkName, tgtLinkName, method, size)
+      }
+      rows groupBy (r => (r._1, r._2)) mapValues {
+        _.map(t => t._3 -> t._4).toMap
+      } map {
+        case ((srcLinkName, tgtLinkName), byMethod) => RequestStatsByMethod(srcLinkName, tgtLinkName, byMethod)
+      } toList
+    }
   }
 }

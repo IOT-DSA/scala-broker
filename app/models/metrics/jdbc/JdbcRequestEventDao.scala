@@ -7,8 +7,9 @@ import scala.concurrent.Future
 
 import org.joda.time.DateTime
 
-import anorm.{ Macro, SQL, SqlStringInterpolation, sqlToSimple }
+import anorm._
 import anorm.JodaParameterMetaData.JodaDateTimeMetaData
+import anorm.SqlParser.{ flatten, int, str }
 import models.metrics._
 
 /**
@@ -28,7 +29,7 @@ class JdbcRequestEventDao(conn: Connection) extends JdbcGenericDao(conn) with Re
   }
 
   /**
-   * Returns request statistics.
+   * Returns request statistics by link.
    */
   def getRequestStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByLink] = {
     val where = buildWhere(ge("time", from), le("time", to))
@@ -48,5 +49,25 @@ class JdbcRequestEventDao(conn: Connection) extends JdbcGenericDao(conn) with Re
     SQL"""INSERT INTO req_batch (ts, src_link_name, src_link_address, tgt_link_name,
       method, size) VALUES (${evt.ts}, ${evt.srcLinkName}, ${evt.srcLinkAddress},
       ${evt.tgtLinkName}, ${evt.method.toString}, ${evt.size})""".executeUpdate
+  }
+
+  /**
+   * Returns request statistics by method.
+   */
+  def getRequestBatchStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByMethod] = {
+    val where = buildWhere(ge("time", from), le("time", to))
+
+    Future {
+      val query = """SELECT src_link_name, tgt_link_name, method, SUM(size) AS size 
+        FROM req_batch""" + where + " GROUP BY src_link_name, tgt_link_name, method"
+      val result = SQL(query).executeQuery
+      val rows = result.as(str("src_link_name") ~ str("tgt_link_name") ~ str("method") ~
+        int("size") map flatten *)
+      rows groupBy (r => (r._1, r._2)) mapValues {
+        _.map(t => t._3 -> t._4).toMap
+      } map {
+        case ((srcLinkName, tgtLinkName), byMethod) => RequestStatsByMethod(srcLinkName, tgtLinkName, byMethod)
+      } toList
+    }
   }
 }
