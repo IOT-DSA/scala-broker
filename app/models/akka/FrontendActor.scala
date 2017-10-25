@@ -13,7 +13,7 @@ import akka.cluster.Cluster
 import akka.pattern.ask
 import akka.util.Timeout
 import models.{ RequestEnvelope, RichBoolean, Settings }
-import models.metrics.MetricLogger
+import models.metrics.MetricDao.memberEventDao
 
 /**
  * This actor is responsible for communicating with the facade. It can be deployed both in local
@@ -38,12 +38,12 @@ class FrontendActor extends Actor with ActorLogging {
 
   override def preStart() = {
     log.info("FrontendActor started at {}", self.path.address)
-    MetricLogger.logMemberEvent(DateTime.now, "frontend", extractHostPort(self), "started")
+    memberEventDao.saveMemberEvent(DateTime.now, "frontend", extractHostPort(self), "started")
   }
 
   override def postStop() = {
     log.info("FrontendActor stopped at {}", self.path.address)
-    MetricLogger.logMemberEvent(DateTime.now, "frontend", extractHostPort(self), "stopped")
+    memberEventDao.saveMemberEvent(DateTime.now, "frontend", extractHostPort(self), "stopped")
   }
 
   /**
@@ -103,11 +103,11 @@ class FrontendActor extends Actor with ActorLogging {
       context watch sender
       backends = backends :+ sender
       log.info("{} added to the backend collection", sender.path)
-      MetricLogger.logMemberEvent(DateTime.now, "backend", extractHostPort(sender), "started")
+      memberEventDao.saveMemberEvent(DateTime.now, "backend", extractHostPort(sender), "started")
     case Terminated(a) =>
       backends = backends.filterNot(_ == a)
       log.info("{} removed from backend collection", sender.path)
-      MetricLogger.logMemberEvent(DateTime.now, "backend", extractHostPort(sender), "stopped")
+      memberEventDao.saveMemberEvent(DateTime.now, "backend", extractHostPort(sender), "stopped")
   }
 
   /**

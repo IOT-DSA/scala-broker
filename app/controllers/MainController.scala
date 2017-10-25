@@ -14,30 +14,30 @@ import models.Settings
 import models.akka.{ BackendActor, ConnectionInfo, FrontendActor, RootNodeActor, WebSocketActor, WebSocketActorConfig }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.{ DownstreamActor, LocalDSLinkManager }
-import models.metrics.MetricLogger
+import models.metrics.MetricDao._
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import org.joda.time.DateTime
 import play.api.Logger
 import play.api.cache.CacheApi
-import play.api.inject.ApplicationLifecycle
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
+import java.util.UUID
 
 /**
  * Handles main web requests.
  */
 @Singleton
 class MainController @Inject() (implicit actorSystem: ActorSystem,
-                                materializer: Materializer, cache: CacheApi,
-                                life: ApplicationLifecycle) extends Controller {
-  import models.akka.FrontendActor._
+                                materializer: Materializer, cache: CacheApi) extends Controller {
   import models.akka.Messages._
 
   private val log = Logger(getClass)
 
   implicit private val timeout = Timeout(Settings.QueryTimeout)
+
+  implicit val ConnectionRequestReads = Json.reads[ConnectionRequest]
 
   private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
@@ -139,8 +139,8 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
 
     cache.set(ci.dsId, ci)
 
-    MetricLogger.logConnectionEvent(DateTime.now, "handshake", "-", ci.dsId, ci.linkName,
-      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", UUID.randomUUID.toString,
+      ci.dsId, ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
 
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)

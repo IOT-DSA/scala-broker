@@ -13,8 +13,16 @@ lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
-scalacOptions ++= Seq("-feature", "-unchecked", "-deprecation", "-Xlint:_,-missing-interpolator", 
-  "-Ywarn-dead-code", "-language:_", "-target:jvm-1.7", "-encoding", "UTF-8", "-Xexperimental")
+scalacOptions ++= Seq(
+  "-feature", 
+  "-unchecked", 
+  "-deprecation", 
+  "-Yno-adapted-args", 
+  "-Ywarn-dead-code", 
+  "-language:_", 
+  "-target:jvm-1.8", 
+  "-encoding", "UTF-8", 
+  "-Xexperimental")
 
 // packaging
 enablePlugins(DockerPlugin, JavaAppPackaging)
@@ -41,12 +49,14 @@ coverageFailOnMinimum := true
 // dependencies
 libraryDependencies ++= Seq(
   cache,
+  jdbc,
   "com.typesafe.akka"       %% "akka-cluster"            % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-metrics"    % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
   "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
+  "com.typesafe.play"       %% "anorm"                   % "2.5.1",
   "com.maxmind.geoip2"       % "geoip2"                  % "2.9.0",
   "ch.qos.logback"           % "logback-classic"         % "1.1.7",
   "org.scalatest"           %% "scalatest"               % "2.2.1"         % "test",

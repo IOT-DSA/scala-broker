@@ -5,7 +5,7 @@ import org.joda.time.DateTime
 import Messages.ConnectEndpoint
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.metrics.MetricLogger
+import models.metrics.MetricDao.{ dslinkEventDao, requestEventDao, responseEventDao }
 import models.rpc._
 
 /**
@@ -22,7 +22,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
   protected val linkName = ci.linkName
   protected val ownId = s"WSActor[$linkName]"
 
-  private var localMsgId = new IntCounter(1)
+  private val localMsgId = new IntCounter(1)
 
   private val startTime = DateTime.now
 
@@ -33,7 +33,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
     proxy tell ConnectEndpoint(self, ci)
-    MetricLogger.logConnectionEvent(startTime, "connect", sessionId, ci.dsId, linkName,
+    dslinkEventDao.saveConnectionEvent(startTime, "connect", sessionId, ci.dsId, linkName,
       ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
   }
 
@@ -43,9 +43,10 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
   override def postStop() = {
     log.info("{}: stopped", ownId)
     val endTime = DateTime.now
-    MetricLogger.logConnectionEvent(endTime, "disconnect", sessionId, ci.dsId, linkName,
+    dslinkEventDao.saveConnectionEvent(endTime, "disconnect", sessionId, ci.dsId, linkName,
       ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
-    MetricLogger.logWebSocketSession(startTime, endTime, linkName, ci.linkAddress, ci.mode, ci.brokerAddress)
+    dslinkEventDao.saveSessionEvent(startTime, endTime, linkName, ci.linkAddress, ci.mode,
+      ci.brokerAddress)
   }
 
   /**
@@ -61,12 +62,12 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       proxy tell m
-      MetricLogger.logRequestMessage(DateTime.now, linkName, ci.linkAddress, m)
+      requestEventDao.saveRequestMessageEvent(DateTime.now, true, linkName, ci.linkAddress, m)
     case m @ ResponseMessage(msg, _, _) =>
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       proxy tell m
-      MetricLogger.logResponseMessage(DateTime.now, linkName, ci.linkAddress, m)
+      responseEventDao.saveResponseMessageEvent(DateTime.now, true, linkName, ci.linkAddress, m)
     case e @ RequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
@@ -78,14 +79,20 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
   /**
    * Sends the response message to the client.
    */
-  private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty)
-    sendToSocket(ResponseMessage(localMsgId.inc, None, responses.toList))
+  private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty) {
+    val msg = ResponseMessage(localMsgId.inc, None, responses.toList)
+    sendToSocket(msg)
+    responseEventDao.saveResponseMessageEvent(DateTime.now, false, linkName, ci.linkAddress, msg)
+  }
 
   /**
    * Sends the request message back to the client.
    */
-  private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty)
-    sendToSocket(RequestMessage(localMsgId.inc, None, requests.toList))
+  private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty) {
+    val msg = RequestMessage(localMsgId.inc, None, requests.toList)
+    sendToSocket(msg)
+    requestEventDao.saveRequestMessageEvent(DateTime.now, false, linkName, ci.linkAddress, msg)
+  }
 
   /**
    * Sends 'allowed' message to the client.
@@ -104,7 +111,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
     log.debug("{}: sending {} to WebSocket", ownId, formatMessage(msg))
     out ! msg
   }
-  
+
   /**
    * Returns the unique WebSocket session identifier.
    */

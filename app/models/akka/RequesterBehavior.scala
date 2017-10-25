@@ -5,7 +5,7 @@ import scala.util.control.NonFatal
 import org.joda.time.DateTime
 
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.metrics.MetricLogger
+import models.metrics.MetricDao._
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
@@ -111,7 +111,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     else
       "broker"
 
-    MetricLogger.logRequests(DateTime.now, linkName, connInfo.linkAddress, tgtLinkName, requests: _*)
+    requestEventDao.saveRequestBatchEvents(DateTime.now, linkName, connInfo.linkAddress,
+      tgtLinkName, requests: _*)
   }
 
   /**

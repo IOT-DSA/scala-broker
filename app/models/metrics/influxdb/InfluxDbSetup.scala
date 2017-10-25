@@ -1,4 +1,4 @@
-package models.influx
+package models.metrics.influxdb
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -7,11 +7,12 @@ import org.slf4j.LoggerFactory
 
 import com.paulgoldbaum.influxdbclient.{ Database, InfluxDB }
 
+import models.Settings.InfluxDb.DbName
+
 /**
  * Creates and initializes InfluxDB database.
  */
-object InfluxDBSetup extends App {
-  import models.Settings.Influx._
+object InfluxDbSetup extends App {
 
   private val log = LoggerFactory.getLogger(getClass)
 
