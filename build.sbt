@@ -13,8 +13,16 @@ lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
-scalacOptions ++= Seq("-feature", "-unchecked", "-deprecation", "-Xlint:_,-missing-interpolator", 
-  "-Ywarn-dead-code", "-language:_", "-target:jvm-1.7", "-encoding", "UTF-8", "-Xexperimental")
+scalacOptions ++= Seq(
+  "-feature", 
+  "-unchecked", 
+  "-deprecation", 
+  "-Yno-adapted-args", 
+  "-Ywarn-dead-code", 
+  "-language:_", 
+  "-target:jvm-1.8", 
+  "-encoding", "UTF-8", 
+  "-Xexperimental")
 
 // packaging
 enablePlugins(DockerPlugin, JavaAppPackaging)
