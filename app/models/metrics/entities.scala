@@ -52,7 +52,11 @@ case class RequestBatchEvent(ts: DateTime, srcLinkName: String, srcLinkAddress: 
  */
 case class ResponseMessageEvent(ts: DateTime, inbound: Boolean, linkName: String,
                                 linkAddress: String, msgId: Int, responseCount: Int,
-                                totalUpdates: Int, totalErrors: Int) extends Event
+                                totalUpdates: Int, totalErrors: Int) extends Event {
+  val hasResponses = responseCount > 0
+  val hasUpdates = totalUpdates > 0
+  val hasErrors = totalErrors > 0
+}
 
 /**
  * Request statistics by link.
@@ -63,3 +67,9 @@ case class RequestStatsByLink(linkName: String, inbound: Boolean, msgCount: Int,
  * Request statistics for the source and target links.
  */
 case class RequestStatsByMethod(srcLinkName: String, tgtLinkName: String, counts: Map[String, Int])
+
+/**
+ * Response statistics by link.
+ */
+case class ResponseStatsByLink(linkName: String, inbound: Boolean, msgCount: Int, rspCount: Int,
+                               updateCount: Int, errorCount: Int)

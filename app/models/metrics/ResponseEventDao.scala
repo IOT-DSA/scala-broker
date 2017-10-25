@@ -32,4 +32,9 @@ trait ResponseEventDao {
       message.msg, message.responses.size,
       message.responses.map(_.updates.map(_.size).getOrElse(0)).sum,
       message.responses.filter(_.error.isDefined).size)
+
+  /**
+   * Returns response statistics by link.
+   */
+  def getResponseStats(from: Option[DateTime], to: Option[DateTime]): ListResult[ResponseStatsByLink]
 }

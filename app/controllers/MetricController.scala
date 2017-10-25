@@ -7,7 +7,7 @@ import org.joda.time.DateTime
 import akka.actor.ActorSystem
 import javax.inject.{ Inject, Singleton }
 import models.metrics._
-import models.metrics.MetricDao.{ dslinkEventDao, memberEventDao, requestEventDao }
+import models.metrics.MetricDao.{ dslinkEventDao, memberEventDao, requestEventDao, responseEventDao }
 import play.api.libs.json.{ JsValue, Json, Writes }
 import play.api.mvc.{ Action, Controller, Result }
 
@@ -30,6 +30,8 @@ class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Con
   implicit val reqStatsByLinkWrites = Json.writes[RequestStatsByLink]
 
   implicit val reqStatsByMethodWrites = Json.writes[RequestStatsByMethod]
+
+  implicit val rspStatsByLinkWrites = Json.writes[ResponseStatsByLink]
 
   /**
    * Displays cluster member events.
@@ -69,6 +71,14 @@ class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Con
   def requestStatsByMethod(from: Option[Long], to: Option[Long]) = Action.async {
     val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
     requestEventDao.getRequestBatchStats(tsFrom, tsTo): Future[Result]
+  }
+
+  /**
+   * Displays response statistics.
+   */
+  def responseStatsByLink(from: Option[Long], to: Option[Long]) = Action.async {
+    val (tsFrom, tsTo) = (optDateTime(from), optDateTime(to))
+    responseEventDao.getResponseStats(tsFrom, tsTo): Future[Result]
   }
 
   /**

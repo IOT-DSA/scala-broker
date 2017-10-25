@@ -86,5 +86,7 @@ object MetricDao {
 
   class NullResponseEventDao extends ResponseEventDao {
     def saveResponseMessageEvent(evt: ResponseMessageEvent): Unit = {}
+    def getResponseStats(from: Option[DateTime], to: Option[DateTime]): ListResult[ResponseStatsByLink] =
+      Future.successful(Nil)
   }
 }

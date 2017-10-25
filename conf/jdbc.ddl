@@ -49,3 +49,15 @@ CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS req_batch (
 	size INT,
 	PRIMARY KEY (src_link_name, tgt_link_name, method, ts)
 );
+
+CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS rsp_message (
+	ts TIMESTAMP,
+	inbound BOOLEAN,
+	link_name VARCHAR,
+	link_address VARCHAR,
+	msg_id VARCHAR,
+	rsp_count INT,
+	update_count INT,
+	error_count INT,
+	PRIMARY KEY (link_name, msg_id, ts)
+);
