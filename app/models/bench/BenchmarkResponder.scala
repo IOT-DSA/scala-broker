@@ -2,6 +2,7 @@ package models.bench
 
 import org.joda.time.DateTime
 
+import BenchmarkResponder.BenchmarkResponderConfig
 import akka.actor.Props
 import models.akka.{ CommProxy, DSLinkMode, RegexContext }
 import models.rpc._
@@ -12,8 +13,7 @@ import models.rpc._
  * - action "incCounter" on each node, which increments the node's value
  * - action "resetCounter" on each node, which sets the node's value back to 0
  */
-class BenchmarkResponder(linkName: String, proxy: CommProxy,
-                         config: BenchmarkResponder.BenchmarkResponderConfig)
+class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkResponderConfig)
   extends AbstractEndpointActor(linkName, DSLinkMode.Responder, proxy) {
 
   private val data = Array.fill(config.nodeCount)(0)
