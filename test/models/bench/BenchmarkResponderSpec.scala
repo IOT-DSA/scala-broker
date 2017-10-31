@@ -19,7 +19,8 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
   val linkName = "BenchRsp"
   val probe = TestProbe()
   val proxy = new ActorRefProxy(probe.ref)
-  val config = BenchmarkResponderConfig(2)
+  val stats = TestProbe()
+  val config = BenchmarkResponderConfig(2, 100 milliseconds, Some(stats.ref))
   val responder = system.actorOf(BenchmarkResponder.props(linkName, proxy, config))
 
   "BenchmarkResponder" should {
@@ -54,6 +55,12 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
           row.asInstanceOf[MapValue].value("sid") mustBe (101: NumericValue)
           row.asInstanceOf[DSAValue.MapValue].value("value") mustBe (0: NumericValue)
       }
+    }
+    "emit statistics" in {
+      val records = stats.receiveWhile(500 milliseconds) {
+        case ResponderStats(_, _, _, _) => 1
+      }
+      records.sum must be > 2
     }
     "handle Unsubscribe request" in {
       val req = UnsubscribeRequest(14, List(101))
