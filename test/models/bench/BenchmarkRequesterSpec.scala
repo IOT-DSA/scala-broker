@@ -23,7 +23,8 @@ class BenchmarkRequesterSpec extends AbstractActorSpec with Inside {
   val reqName = "BenchRQ"
   val probe = TestProbe()
   val proxy = new ActorRefProxy(probe.ref)
-  val config = BenchmarkRequesterConfig(nodePath, 5, 200 milliseconds)
+  val stats = TestProbe()
+  val config = BenchmarkRequesterConfig(nodePath, 5, 200 milliseconds, 100 milliseconds, Some(stats.ref))
   val requester = system.actorOf(BenchmarkRequester.props(reqName, proxy, config))
 
   "BenchmarkRequester" should {
@@ -43,6 +44,12 @@ class BenchmarkRequesterSpec extends AbstractActorSpec with Inside {
       reqs.foreach(inside(_) {
         case InvokeRequest(_, ActionPath, _, _) =>
       })
+    }
+    "emit statistics" in {
+      val records = stats.receiveWhile(500 milliseconds) {
+        case RequesterStats(_, _, _, _) => 1
+      }
+      records.sum must be > 2
     }
     "unsubscribe from events on stop" in {
       requester ! PoisonPill
