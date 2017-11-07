@@ -21,11 +21,11 @@ abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, proxy: 
 
   override def preStart() = {
     proxy tell ConnectEndpoint(self, connInfo)
-    log.info("Endpoint[{}] started", linkName)
+    log.info("[{}] started", linkName)
   }
 
   override def postStop() = {
     proxy tell DisconnectEndpoint
-    log.info("Endpoint[{}] stopped", linkName)
+    log.info("[{}] stopped", linkName)
   }
 }
