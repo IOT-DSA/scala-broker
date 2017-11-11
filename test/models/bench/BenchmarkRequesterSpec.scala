@@ -47,7 +47,7 @@ class BenchmarkRequesterSpec extends AbstractActorSpec with Inside {
     }
     "emit statistics" in {
       val records = stats.receiveWhile(500 milliseconds) {
-        case RequesterStats(_, _, _, _) => 1
+        case ReqStatsSample(_, _, _, _) => 1
       }
       records.sum must be > 2
     }
