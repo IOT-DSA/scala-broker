@@ -140,7 +140,7 @@ class FrontendActor extends Actor with ActorLogging {
     val address = ref.path.address
     address.host map { h =>
       address.port.map(p => s"$h:$p").getOrElse(h)
-    } getOrElse InetAddress.getLocalHost.getHostAddress
+    } getOrElse "127.0.0.1"
   }
 }
 
