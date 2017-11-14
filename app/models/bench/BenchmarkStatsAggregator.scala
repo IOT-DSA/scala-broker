@@ -18,8 +18,6 @@ class BenchmarkStatsAggregator extends Actor with ActorLogging {
   private val rspStatsById = collection.mutable.Map.empty[String, ResponderStats]
   private var lastRspStatsSample: Option[RspStatsSample] = None
 
-  private var startedAt = DateTime.now
-
   override def preStart() = resetStats
 
   def receive = {
@@ -41,16 +39,15 @@ class BenchmarkStatsAggregator extends Actor with ActorLogging {
 
     case GetGlobalStats =>
       val now = DateTime.now
-      val duration = new JodaDuration(startedAt, now)
       val reqStats = {
         val invokesSent = reqStatsById.values.map(_.invokesSent).sum
         val updatesRcvd = reqStatsById.values.map(_.updatesRcvd).sum
-        RequesterStats(lastReqStatsSample, duration, invokesSent, updatesRcvd)
+        RequesterStats(lastReqStatsSample, totalReqDuration, invokesSent, updatesRcvd)
       }
       val rspStats = {
         val invokesRcvd = rspStatsById.values.map(_.invokesRcvd).sum
         val updatesSent = rspStatsById.values.map(_.updatesSent).sum
-        ResponderStats(lastRspStatsSample, duration, invokesRcvd, updatesSent)
+        ResponderStats(lastRspStatsSample, totalRspDuration, invokesRcvd, updatesSent)
       }
       sender ! GlobalStats(reqStats, rspStats)
 
@@ -63,9 +60,17 @@ class BenchmarkStatsAggregator extends Actor with ActorLogging {
 
     rspStatsById.clear
     lastRspStatsSample = None
-
-    startedAt = DateTime.now
   }
+
+  private def totalReqDuration = if (!reqStatsById.isEmpty)
+    new JodaDuration(reqStatsById.values.map(_.duration.getMillis).max)
+  else
+    JodaDuration.ZERO
+
+  private def totalRspDuration = if (!rspStatsById.isEmpty)
+    new JodaDuration(rspStatsById.values.map(_.duration.getMillis).max)
+  else
+    JodaDuration.ZERO
 }
 
 /**

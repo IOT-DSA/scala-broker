@@ -35,35 +35,34 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
   override def receive = super.receive orElse {
     case msg @ RequestEnvelope(requests) =>
       log.debug("[{}]: received {}", linkName, msg)
-      requests foreach processRequest
+      val responses = requests flatMap processRequest
+      sender ! ResponseMessage(localMsgId.inc, None, responses.toList)
 
     case msg => log.warning("[{}]: received unknown message - {}", linkName, msg)
   }
 
-  private def processRequest: PartialFunction[DSARequest, Unit] = {
+  private def processRequest: PartialFunction[DSARequest, Seq[DSAResponse]] = {
     case SubscribeRequest(rid, paths) =>
       paths foreach { path =>
         subscriptions += path.path -> path.sid
       }
-      sender ! emptyResponseMessage(rid)
+      List(emptyResponse(rid))
 
     case UnsubscribeRequest(rid, sids) =>
       val keys = subscriptions.collect {
         case (path, sid) if sids.contains(sid) => path
       }
       subscriptions --= keys
-      sender ! emptyResponseMessage(rid)
+      List(emptyResponse(rid))
 
     case req: InvokeRequest => processInvokeRequest(req)
   }
 
   private def processInvokeRequest(req: InvokeRequest) = req.path match {
     case r"/data(\d+)$index/incCounter" =>
-      replyToInvoke(req)
-      incCounter(index.toInt)
+      replyToInvoke(req) +: incCounter(index.toInt)
     case r"/data(\d+)$index/resetCounter" =>
-      replyToInvoke(req)
-      resetCounter(index.toInt)
+      replyToInvoke(req) +: resetCounter(index.toInt)
   }
 
   private def incCounter(index: Int) = {
@@ -78,17 +77,17 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
 
   private def replyToInvoke(req: InvokeRequest) = {
     invokesRcvd += 1
-    sender ! emptyResponseMessage(req.rid)
+    emptyResponse(req.rid)
   }
 
-  private def notifySubs(index: Int) = subscriptions.get("/data" + index) foreach { sid =>
+  private def notifySubs(index: Int) = subscriptions.get("/data" + index) map { sid =>
     val update = DSAValue.obj("sid" -> sid, "value" -> data(index - 1), "ts" -> DateTime.now.toString)
-    proxy ! ResponseMessage(localMsgId.inc, None, List(DSAResponse(0, Some(StreamState.Open), Some(List(update)))))
     updatesSent += 1
-  }
 
-  private def emptyResponseMessage(rid: Int) =
-    ResponseMessage(localMsgId.inc, None, List(DSAResponse(rid, Some(StreamState.Closed))))
+    DSAResponse(0, Some(StreamState.Open), Some(List(update)))
+  } toSeq
+
+  private def emptyResponse(rid: Int) = DSAResponse(rid, Some(StreamState.Closed))
 
   protected def reportStats() = {
     val interval = new Interval(lastReported.interval.getEnd, DateTime.now)
