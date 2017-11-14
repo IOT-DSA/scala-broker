@@ -15,9 +15,13 @@ import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
-import models.bench.{ BenchmarkRequester, BenchmarkResponder, BenchmarkStatsAggregator }
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
-import play.api.libs.json.{ JsValue, Json, Writes }
+import models.bench.BenchmarkRequester
+import models.bench.BenchmarkRequester.ReqStatsSample
+import models.bench.BenchmarkResponder
+import models.bench.BenchmarkResponder.RspStatsSample
+import models.bench.BenchmarkStatsAggregator
+import play.api.libs.json.{ JsObject, JsValue, Json, Writes }
 import play.api.mvc.{ Action, Controller, Result }
 
 /**
@@ -40,14 +44,20 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, material
     Json.toJson(periodFmt.print(interval.toPeriod))
   }
 
-  implicit val reqStatsBehaviorWrites = Writes[ReqStatsBehavior] { rsb =>
-    Json.obj("invokesSent" -> rsb.invokesSent, "invokesSentPerSec" -> rsb.invokesSentPerSec.toInt,
-      "updatesRcvd" -> rsb.updatesRcvd, "updatesRcvdPerSec" -> rsb.updatesRcvdPerSec.toInt)
+  implicit val reqStatsSampleWrites = Writes[ReqStatsSample] { sample =>
+    Json.obj("id" -> sample.id, "interval" -> sample.interval) ++ reqStats2json(sample)
   }
 
-  implicit val rspStatsBehaviorWrites = Writes[RspStatsBehavior] { rsb =>
-    Json.obj("invokesRcvd" -> rsb.invokesRcvd, "invokesRcvdPerSec" -> rsb.invokesRcvdPerSec.toInt,
-      "updatesSent" -> rsb.updatesSent, "updatesSentPerSec" -> rsb.updatesSentPerSec.toInt)
+  implicit val rspStatsSampleWrites = Writes[RspStatsSample] { sample =>
+    Json.obj("id" -> sample.id, "interval" -> sample.interval) ++ rspStats2json(sample)
+  }
+
+  implicit val reqStatsWrites = Writes[RequesterStats] { rs =>
+    Json.obj("last" -> rs.lastSample, "duration" -> rs.duration) ++ reqStats2json(rs)
+  }
+
+  implicit val rspStatsWrites = Writes[ResponderStats] { rs =>
+    Json.obj("last" -> rs.lastSample, "duration" -> rs.duration) ++ rspStats2json(rs)
   }
 
   implicit val allStatsWrites = Json.writes[AllStats]
@@ -158,4 +168,18 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, material
    * Converts a JSON value into a (pretty-printed) HTTP Result.
    */
   implicit protected def json2result(json: JsValue): Result = Ok(Json.prettyPrint(json)).as(JSON)
+
+  /**
+   * Converts REQ stats behavior to JSON.
+   */
+  private def reqStats2json(rsb: ReqStatsBehavior): JsObject = Json.obj(
+    "invokesSent" -> rsb.invokesSent, "invokesSentPerSec" -> rsb.invokesSentPerSec.toInt,
+    "updatesRcvd" -> rsb.updatesRcvd, "updatesRcvdPerSec" -> rsb.updatesRcvdPerSec.toInt)
+
+  /**
+   * Converts RSP stats behavior to JSON.
+   */
+  private def rspStats2json(rsb: RspStatsBehavior): JsObject = Json.obj(
+    "invokesRcvd" -> rsb.invokesRcvd, "invokesRcvdPerSec" -> rsb.invokesRcvdPerSec.toInt,
+    "updatesSent" -> rsb.updatesSent, "updatesSentPerSec" -> rsb.updatesSentPerSec.toInt)
 }
