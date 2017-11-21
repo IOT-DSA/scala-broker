@@ -9,6 +9,7 @@ import akka.actor.{ ActorRef, Props }
 import models.RequestEnvelope
 import models.akka.{ CommProxy, DSLinkMode, RegexContext }
 import models.rpc._
+import net.sf.ehcache.{ Cache, CacheManager, Element }
 
 /**
  * Simulates a responder which contains:
@@ -19,17 +20,32 @@ import models.rpc._
 class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkResponderConfig)
   extends AbstractEndpointActor(linkName, DSLinkMode.Responder, proxy, config) {
 
+  private type Action = Function0[Seq[DSAResponse]]
+
   private val data = Array.fill(config.nodeCount)(0)
   private val subscriptions = collection.mutable.Map.empty[String, Int]
 
-  private var lastReported: RspStatsSample = _
+  private var lastReportedAt: DateTime = _
   private var invokesRcvd = 0
   private var updatesSent = 0
+
+  private val cacheName = linkName + "_actions"
+  private val actionCache = {
+    val cacheManager = CacheManager.getInstance
+    cacheManager.addCache(new Cache(cacheName, config.nodeCount * 2, false, false, 0, 60))
+    cacheManager.getEhcache(cacheName)
+  }
 
   override def preStart() = {
     super.preStart
 
-    lastReported = RspStatsSample(linkName, new Interval(DateTime.now, DateTime.now), 0, 0)
+    lastReportedAt = DateTime.now
+  }
+
+  override def postStop() = {
+    CacheManager.getInstance.removeCache(cacheName)
+    
+    super.postStop
   }
 
   override def receive = super.receive orElse {
@@ -58,11 +74,23 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
     case req: InvokeRequest => processInvokeRequest(req)
   }
 
-  private def processInvokeRequest(req: InvokeRequest) = req.path match {
-    case r"/data(\d+)$index/incCounter" =>
-      replyToInvoke(req) +: incCounter(index.toInt)
-    case r"/data(\d+)$index/resetCounter" =>
-      replyToInvoke(req) +: resetCounter(index.toInt)
+  private def processInvokeRequest(req: InvokeRequest) = {
+    val action = Option(actionCache.get(req.path)).map(_.getObjectValue.asInstanceOf[Action]).getOrElse {
+      val a = createAction(req.path)
+      val element = new Element(req.path, a)
+      actionCache.put(element)
+      a
+    }
+    replyToInvoke(req) +: action()
+  }
+
+  private def createAction(path: String): Action = path match {
+    case r"/data(\d+)$index/incCounter" => new Action {
+      def apply = incCounter(index.toInt)
+    }
+    case r"/data(\d+)$index/resetCounter" => new Action {
+      def apply = resetCounter(index.toInt)
+    }
   }
 
   private def incCounter(index: Int) = {
@@ -90,12 +118,14 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
   private def emptyResponse(rid: Int) = DSAResponse(rid, Some(StreamState.Closed))
 
   protected def reportStats() = {
-    val interval = new Interval(lastReported.interval.getEnd, DateTime.now)
-    val stats = RspStatsSample(linkName, interval, invokesRcvd - lastReported.invokesRcvd,
-      updatesSent - lastReported.updatesSent)
+    val now = DateTime.now
+    val interval = new Interval(lastReportedAt, now)
+    val stats = RspStatsSample(linkName, interval, invokesRcvd, updatesSent)
     log.debug("[{}]: collected {}", linkName, stats)
     config.statsCollector foreach (_ ! stats)
-    lastReported = stats
+    lastReportedAt = now
+    invokesRcvd = 0
+    updatesSent = 0
   }
 }
 
