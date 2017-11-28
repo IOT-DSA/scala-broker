@@ -25,11 +25,11 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
    */
   val requesterBehavior: Receive = {
     case m @ RequestMessage(msg, ack, requests) =>
-      log.debug(s"$ownId: received $m")
+      log.debug("{}: received {}", ownId, m)
       processRequests(requests)
       requests.lastOption foreach (req => lastRid = req.rid)
     case e @ ResponseEnvelope(responses) =>
-      log.debug(s"$ownId: received $e")
+      log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
       sendToEndpoint(e)
   }
@@ -60,10 +60,10 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       cacheRequestTarget(request, target)
       List(target -> request)
     } catch {
-      case NonFatal(e) => log.error(s"$ownId: RID/SID not found for $request"); Nil
+      case NonFatal(e) => log.error("{}: RID/SID not found for {}", ownId, request); Nil
     })
 
-    log.debug(s"RID targets: ${targetsByRid.size}, SID targets: ${targetsBySid.size}")
+    log.debug("RID targets: {}, SID targets: {}", targetsByRid.size, targetsBySid.size)
 
     batchAndRoute(results)
   }
@@ -84,7 +84,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       case DSAResponse(rid, _, _, _, _) if rid != 0 => targetsByRid.remove(rid)
     }
 
-    log.debug(s"RID targets: ${targetsByRid.size}, SID targets: ${targetsBySid.size}")
+    log.debug("RID targets: {}, SID targets: {}", targetsByRid.size, targetsBySid.size)
   }
 
   /**
@@ -94,7 +94,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) =>
         val envelope = RequestEnvelope(reqs.toSeq)
-        log.debug(s"$ownId: sending $envelope to [$to]")
+        log.debug("{}: sending {} to [{}]", ownId, envelope, to)
         dsaSend(to, envelope)
         logRequestBatch(to, envelope.requests)
     }

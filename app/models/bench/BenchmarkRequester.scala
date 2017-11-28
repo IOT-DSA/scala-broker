@@ -24,14 +24,14 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
   private val ridGen = new IntCounter(1)
   private var invokeJob: Cancellable = null
 
-  private var lastReported: ReqStatsSample = _
+  private var lastReportedAt: DateTime = _
   private val invokesSent = new AtomicInteger(0)
   private val updatesRcvd = new AtomicInteger(0)
 
   override def preStart() = {
     super.preStart
-
-    lastReported = ReqStatsSample(linkName, new Interval(DateTime.now, DateTime.now), 0, 0)
+    
+    lastReportedAt = DateTime.now
 
     // subscribe to path events
     val subReq = SubscribeRequest(ridGen.inc, SubscriptionPath(config.path, 101))
@@ -69,12 +69,12 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
   }
 
   protected def reportStats() = {
-    val interval = new Interval(lastReported.interval.getEnd, DateTime.now)
-    val stats = ReqStatsSample(linkName, interval, invokesSent.get - lastReported.invokesSent,
-      updatesRcvd.get - lastReported.updatesRcvd)
+    val now = DateTime.now
+    val interval = new Interval(lastReportedAt, now)
+    val stats = ReqStatsSample(linkName, interval, invokesSent.getAndSet(0), updatesRcvd.getAndSet(0))
     log.debug("[{}]: collected {}", linkName, stats)
     config.statsCollector foreach (_ ! stats)
-    lastReported = stats
+    lastReportedAt = now
   }
 }
 

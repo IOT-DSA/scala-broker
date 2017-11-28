@@ -5,7 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration.{ DurationInt, DurationLong, FiniteDuration }
 import scala.util.Random
 
-import org.joda.time.format.PeriodFormat
+import org.joda.time.DateTime
+import org.joda.time.format.{ DateTimeFormat, PeriodFormat }
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill }
 import akka.cluster.Cluster
@@ -16,9 +17,8 @@ import javax.inject.{ Inject, Singleton }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
-import models.bench.BenchmarkRequester
+import models.bench.{ BenchmarkRequester, BenchmarkResponder }
 import models.bench.BenchmarkRequester.ReqStatsSample
-import models.bench.BenchmarkResponder
 import models.bench.BenchmarkResponder.RspStatsSample
 import models.bench.BenchmarkStatsAggregator
 import play.api.libs.json.{ JsObject, JsValue, Json, Writes }
@@ -28,20 +28,20 @@ import play.api.mvc.{ Action, Controller, Result }
  * Performs broker load test.
  */
 @Singleton
-class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, materializer: Materializer)
-  extends Controller {
+class BenchmarkController @Inject() (implicit actorSystem: ActorSystem) extends Controller {
   import actorSystem.dispatcher
-  import models.bench.BenchmarkStatsAggregator._
+  import BenchmarkStatsAggregator._
 
   implicit val timeout = Timeout(5 seconds)
 
+  private val dateFmt = DateTimeFormat.mediumTime
   private val periodFmt = PeriodFormat.getDefault
 
   implicit val durationWrites = Writes[org.joda.time.Duration] { duration =>
     Json.toJson(periodFmt.print(duration.toPeriod))
   }
   implicit val intervalWrites = Writes[org.joda.time.Interval] { interval =>
-    Json.toJson(periodFmt.print(interval.toPeriod))
+    Json.toJson(periodFmt.print(interval.toPeriod) + " starting at " + dateFmt.print(interval.getStart))
   }
 
   implicit val reqStatsSampleWrites = Writes[ReqStatsSample] { sample =>
@@ -73,13 +73,15 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, material
   private val testRunning = new AtomicBoolean(false)
   def isTestRunning = testRunning.get
 
-  val statsInterval = 5 seconds
-  val rspNamePrefix = "BenchRSP"
-  val reqNamePrefix = "BenchREQ"
+  private val statsInterval = 5 seconds
+  private val rspNamePrefix = "BenchRSP"
+  private val reqNamePrefix = "BenchREQ"
 
-  val aggregator = actorSystem.actorOf(BenchmarkStatsAggregator.props)
-  var responders: Iterable[ActorRef] = Nil
-  var requesters: Iterable[ActorRef] = Nil
+  val aggregator = actorSystem.actorOf(BenchmarkStatsAggregator.props, "benchmarkAggregator")
+  private var responders: Iterable[ActorRef] = Nil
+  private var requesters: Iterable[ActorRef] = Nil
+  private var expectedInvokeRate: Int = _
+  private var expectedUpdateToInvokeRatio: Double = _
 
   /**
    * Starts benchmark.
@@ -89,12 +91,26 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, material
     else {
       aggregator ! ResetStats
 
+      expectedInvokeRate = (reqCount * batchSize * 1000L / timeout).toInt
+
       responders = (1 to rspCount) map { index =>
         createBenchResponder(rspNamePrefix + index, rspNodeCount, statsInterval)
       }
 
-      requesters = (1 to reqCount) map { index =>
-        createBenchRequester(reqNamePrefix + index, batchSize, timeout milliseconds, statsInterval, rspCount, rspNodeCount)
+      val reqTargets = (1 to reqCount) map { index =>
+        val rspIndex = Random.nextInt(rspCount) + 1
+        val nodeIndex = Random.nextInt(rspNodeCount) + 1
+        val path = s"/downstream/$rspNamePrefix$rspIndex/data$nodeIndex"
+        val req = createBenchRequester(reqNamePrefix + index, batchSize, timeout milliseconds, statsInterval, path)
+        Tuple2(req, (rspIndex, nodeIndex))
+      }
+
+      requesters = reqTargets.map(_._1)
+
+      expectedUpdateToInvokeRatio = {
+        val targets = reqTargets.map(_._2)
+        val expectedEvents = targets.groupBy(identity).map(_._2.size).map(a => a * a).sum
+        expectedEvents * 1.0 / reqCount
       }
 
       testRunning.set(true)
@@ -135,7 +151,11 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, material
     } yield {
       val jsAll = Json.toJson(allStats)
       val jsGlobal = Json.toJson(globalStats)
-      Json.obj("running" -> isTestRunning, "global" -> jsGlobal, "all" -> jsAll): Result
+      Json.obj(
+        "now" -> dateFmt.print(DateTime.now),
+        "running" -> isTestRunning, "expectedInvokesSentPerSec" -> expectedInvokeRate,
+        "expectedUpdateToInvokeRatio" -> expectedUpdateToInvokeRatio,
+        "global" -> jsGlobal, "all" -> jsAll): Result
     }
   }
 
@@ -153,11 +173,8 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, material
    * Creates a benchmark requester.
    */
   private def createBenchRequester(name: String, batchSize: Int, timeout: FiniteDuration,
-                                   statsInterval: FiniteDuration, rspCount: Int, rspNodeCount: Int) = {
+                                   statsInterval: FiniteDuration, path: String) = {
     val proxy = dslinkMgr.getCommProxy(name)
-    val rspIndex = Random.nextInt(rspCount) + 1
-    val nodeIndex = Random.nextInt(rspNodeCount) + 1
-    val path = s"/downstream/$rspNamePrefix$rspIndex/data$nodeIndex"
     val config = BenchmarkRequester.BenchmarkRequesterConfig(path, batchSize, timeout,
       statsInterval, Some(aggregator))
     val props = BenchmarkRequester.props(name, proxy, config)

@@ -32,7 +32,7 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
    */
   val responderBehavior: Receive = {
     case env @ RequestEnvelope(requests) =>
-      log.info(s"$ownId: received $env from $sender")
+      log.info("{}: received {} from {}", ownId, env, sender)
       val result = processRequests(requests)
       if (!result.requests.isEmpty)
         sendToEndpoint(RequestEnvelope(result.requests))
@@ -40,7 +40,7 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
         sender ! ResponseEnvelope(result.responses)
 
     case m @ ResponseMessage(_, _, responses) =>
-      log.debug(s"$ownId: received $m")
+      log.debug("{}: received {}", ownId, m)
       processResponses(responses) foreach {
         case (to, rsps) => to ! ResponseEnvelope(rsps)
       }
