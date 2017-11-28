@@ -52,8 +52,8 @@ class JdbcDSLinkEventDao(conn: Connection) extends JdbcGenericDao(conn) with DSL
    * Saves a session event as a record in 'link_session' measurement.
    */
   def saveSessionEvent(evt: LinkSessionEvent): Unit = {
-    SQL"""INSERT INTO link_session (start_ts, end_ts, link_name, link_address, mode, broker_address)
-      VALUES (${evt.startTime}, ${evt.endTime}, ${evt.linkName}, ${evt.linkAddress},
+    SQL"""INSERT INTO link_session (session_id, start_ts, end_ts, link_name, link_address, mode, broker_address)
+      VALUES (${evt.sessionId}, ${evt.startTime}, ${evt.endTime}, ${evt.linkName}, ${evt.linkAddress},
       ${evt.mode.toString}, ${evt.brokerAddress})""".executeUpdate
   }
 
