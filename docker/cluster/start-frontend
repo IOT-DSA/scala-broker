@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="0.3.0-SNAPSHOT"
+VERSION="0.3.0"
 
 VOLUMES="-v $PWD/conf:/opt/docker/conf"
 NETWORK="--net dsa -h dsa-frontend -p 9000:9000"

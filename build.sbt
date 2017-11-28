@@ -1,5 +1,5 @@
 // properties
-val APP_VERSION = "0.3.0-SNAPSHOT"
+val APP_VERSION = "0.3.0"
 val SCALA_VERSION = "2.11.8"
 val AKKA_VERSION = "2.4.12"
 
@@ -26,7 +26,7 @@ scalacOptions ++= Seq(
 
 // packaging
 enablePlugins(DockerPlugin, JavaAppPackaging)
-javaOptions in Universal ++= Seq(s"-Dpidfile.path=/var/run/${packageName.value}/play.pid")
+//javaOptions in Universal ++= Seq(s"-Dpidfile.path=/var/run/${packageName.value}/play.pid")
 dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"

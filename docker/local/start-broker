@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="0.3.0-SNAPSHOT"
+VERSION="0.3.0"
 
 PORTS="-p 9000:9000"
 VOLUMES="-v $PWD/conf:/opt/docker/conf"

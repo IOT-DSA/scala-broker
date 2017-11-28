@@ -6,7 +6,7 @@ if [ -z "$1" ] || [ -z "$2" ]
     exit -1
 fi
 
-VERSION="0.3.0-SNAPSHOT"
+VERSION="0.3.0"
 
 VOLUMES="-v $PWD/conf:/opt/docker/conf"
 NETWORK="--net dsa -h $1 -p $2:2551 -e HOST=$1"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="0.3.0-SNAPSHOT"
+VERSION="0.3.0"
 
 VOLUMES="-v $PWD/conf:/opt/docker/conf -v /opt/geolite:/opt/docker/geolite"
 NETWORK="--net dsa -h dsa-backend -p 2551:2551"
