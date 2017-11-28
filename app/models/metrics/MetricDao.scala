@@ -54,9 +54,12 @@ object MetricDao {
     new NullRequestEventDao, new NullResponseEventDao)
 
   /*
-   * Null DAOs (empty implementation).
+   * /dev/null DAOs (empty implementation).
    */
 
+  /**
+   * Null MemberEvent DAO.
+   */
   class NullMemberEventDao extends MemberEventDao {
     def saveMemberEvent(evt: MemberEvent): Unit = {}
     def findMemberEvents(role: Option[String], address: Option[String],
@@ -64,6 +67,9 @@ object MetricDao {
                          to:   Option[DateTime]): Future[List[MemberEvent]] = Future.successful(Nil)
   }
 
+  /**
+   * Null DSLinkEvent DAO.
+   */
   class NullDSLinkEventDao extends DSLinkEventDao {
     def saveConnectionEvent(evt: ConnectionEvent): Unit = {}
     def findConnectionEvents(linkName: Option[String], from: Option[DateTime],
@@ -75,6 +81,9 @@ object MetricDao {
                           limit: Int): ListResult[LinkSessionEvent] = Future.successful(Nil)
   }
 
+  /**
+   * Null RequestEvent DAO.
+   */
   class NullRequestEventDao extends RequestEventDao {
     def saveRequestMessageEvent(evt: RequestMessageEvent): Unit = {}
     def getRequestStats(from: Option[DateTime], to: Option[DateTime]): ListResult[RequestStatsByLink] =
@@ -84,6 +93,9 @@ object MetricDao {
       Future.successful(Nil)
   }
 
+  /**
+   * Null ResponseEvent DAO.
+   */
   class NullResponseEventDao extends ResponseEventDao {
     def saveResponseMessageEvent(evt: ResponseMessageEvent): Unit = {}
     def getResponseStats(from: Option[DateTime], to: Option[DateTime]): ListResult[ResponseStatsByLink] =
