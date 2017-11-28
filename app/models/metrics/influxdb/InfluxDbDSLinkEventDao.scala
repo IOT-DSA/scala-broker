@@ -52,7 +52,8 @@ class InfluxDbDSLinkEventDao(db: Database) extends InfluxDbGenericDao(db) with D
     val duration = new Interval(evt.startTime, evt.endTime).toDuration
 
     val baseTags = tags("mode" -> evt.mode.toString, "brokerAddress" -> evt.brokerAddress)
-    val baseFields = fields("linkName" -> evt.linkName, "endTime" -> evt.endTime.getMillis,
+    val baseFields = fields("sessionId" -> evt.sessionId, "linkName" -> evt.linkName,
+      "endTime" -> evt.endTime.getMillis,
       "durationMs" -> duration.getMillis,
       "durationSec" -> duration.getStandardSeconds,
       "durationMin" -> duration.getStandardMinutes,
@@ -104,10 +105,11 @@ class InfluxDbDSLinkEventDao(db: Database) extends InfluxDbGenericDao(db) with D
   private def recordToSessionEvent(record: Record) = {
     val startTime = new DateTime(record("time").asInstanceOf[Number].longValue)
     val endTime = new DateTime(record("endTime").asInstanceOf[Number].longValue)
+    val sessionId = record("sessionId").asInstanceOf[String]
     val linkName = record("linkName").asInstanceOf[String]
     val linkAddress = record("linkIp").asInstanceOf[String]
     val mode = DSLinkMode.withName(record("mode").asInstanceOf[String])
     val brokerAddress = record("brokerAddress").asInstanceOf[String]
-    LinkSessionEvent(startTime, endTime, linkName, linkAddress, mode, brokerAddress)
+    LinkSessionEvent(sessionId, startTime, endTime, linkName, linkAddress, mode, brokerAddress)
   }
 }

@@ -21,6 +21,7 @@ CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS link_conn (
 ); 
 
 CREATE MEMORY TEMPORARY TABLE IF NOT EXISTS link_session (
+	session_id VARCHAR,
 	start_ts TIMESTAMP,
 	end_ts TIMESTAMP, 
 	link_name VARCHAR,

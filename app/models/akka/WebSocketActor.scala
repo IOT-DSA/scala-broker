@@ -11,7 +11,7 @@ import models.rpc._
 /**
  * Encapsulates WebSocket actor configuration.
  */
-case class WebSocketActorConfig(connInfo: ConnectionInfo, salt: Int)
+case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, salt: Int)
 
 /**
  * Represents a WebSocket connection and communicates to the DSLink actor.
@@ -33,7 +33,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
     proxy tell ConnectEndpoint(self, ci)
-    dslinkEventDao.saveConnectionEvent(startTime, "connect", sessionId, ci.dsId, linkName,
+    dslinkEventDao.saveConnectionEvent(startTime, "connect", config.sessionId, ci.dsId, linkName,
       ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
   }
 
@@ -43,9 +43,9 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
   override def postStop() = {
     log.info("{}: stopped", ownId)
     val endTime = DateTime.now
-    dslinkEventDao.saveConnectionEvent(endTime, "disconnect", sessionId, ci.dsId, linkName,
+    dslinkEventDao.saveConnectionEvent(endTime, "disconnect", config.sessionId, ci.dsId, linkName,
       ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
-    dslinkEventDao.saveSessionEvent(startTime, endTime, linkName, ci.linkAddress, ci.mode,
+    dslinkEventDao.saveSessionEvent(config.sessionId, startTime, endTime, linkName, ci.linkAddress, ci.mode,
       ci.brokerAddress)
   }
 
@@ -111,11 +111,6 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConf
     log.debug("{}: sending {} to WebSocket", ownId, formatMessage(msg))
     out ! msg
   }
-
-  /**
-   * Returns the unique WebSocket session identifier.
-   */
-  private val sessionId = linkName + "-" + math.abs(System.identityHashCode(this))
 }
 
 /**

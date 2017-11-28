@@ -1,6 +1,9 @@
 package controllers
 
 import scala.concurrent.Future
+import scala.util.Random
+
+import org.joda.time.DateTime
 
 import akka.actor._
 import akka.cluster.Cluster
@@ -11,19 +14,17 @@ import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ BackendActor, ConnectionInfo, FrontendActor, RootNodeActor, WebSocketActor, WebSocketActorConfig }
+import models.akka._
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.{ DownstreamActor, LocalDSLinkManager }
-import models.metrics.MetricDao._
+import models.metrics.MetricDao.dslinkEventDao
 import models.rpc.{ DSAMessage, DSAMessageFormat }
-import org.joda.time.DateTime
 import play.api.Logger
 import play.api.cache.CacheApi
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{ JsError, Json, Reads }
 import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
-import java.util.UUID
 
 /**
  * Handles main web requests.
@@ -137,9 +138,11 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
     val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
     val json = Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
 
-    cache.set(ci.dsId, ci)
+    val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
 
-    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", UUID.randomUUID.toString,
+    cache.set(ci.dsId, DSLinkSessionInfo(ci, sessionId))
+
+    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", sessionId,
       ci.dsId, ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
 
     log.debug(s"Conn response sent: ${json.toString}")
@@ -152,10 +155,10 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
   def ws = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
     log.debug(s"WS request received: $request")
     val dsId = getDsId(request)
-    val connInfo = cache.get[ConnectionInfo](dsId)
-    log.debug(s"Conn info retrieved for $dsId: $connInfo")
+    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+    log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
-    Future.successful(connInfo.map(createWSFlow(_)).toRight(Forbidden))
+    Future.successful(sessionInfo.map(createWSFlow(_)).toRight(Forbidden))
   }(transformer)
 
   /**
@@ -171,15 +174,17 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
   /**
    * Creates a new WebSocket flow bound to a newly created WSActor.
    */
-  private def createWSFlow(ci: ConnectionInfo,
-                           bufferSize: Int = 16, overflow: OverflowStrategy = OverflowStrategy.dropNew) = {
+  private def createWSFlow(
+    sessionInfo: DSLinkSessionInfo,
+    bufferSize:  Int               = 16, overflow: OverflowStrategy = OverflowStrategy.dropNew) = {
     import akka.actor.Status._
 
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
 
-    val proxy = dslinkMgr.getCommProxy(ci.linkName)
-    val wsProps = WebSocketActor.props(toSocket, proxy, WebSocketActorConfig(ci, Settings.Salt))
+    val proxy = dslinkMgr.getCommProxy(sessionInfo.ci.linkName)
+    val wsProps = WebSocketActor.props(toSocket, proxy,
+      WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
     val fromSocket = actorSystem.actorOf(Props(new Actor {
       val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))

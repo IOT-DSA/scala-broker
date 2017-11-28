@@ -38,9 +38,9 @@ trait DSLinkEventDao {
   /**
    * Saves a dslink session data after the session ends.
    */
-  def saveSessionEvent(startTime: DateTime, endTime: DateTime, linkName: String,
+  def saveSessionEvent(sessionId: String, startTime: DateTime, endTime: DateTime, linkName: String,
                        linkAddress: String, mode: DSLinkMode, brokerAddress: String): Unit =
-    saveSessionEvent(LinkSessionEvent(startTime, endTime, linkName, linkAddress, mode, brokerAddress))
+    saveSessionEvent(LinkSessionEvent(sessionId, startTime, endTime, linkName, linkAddress, mode, brokerAddress))
 
   /**
    * Finds dslink session events using the specified criteria.

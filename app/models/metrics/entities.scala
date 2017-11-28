@@ -28,7 +28,7 @@ case class ConnectionEvent(ts: DateTime, event: String, sessionId: String,
 /**
  * A DSLink session event.
  */
-case class LinkSessionEvent(startTime: DateTime, endTime: DateTime, linkName: String,
+case class LinkSessionEvent(sessionId: String, startTime: DateTime, endTime: DateTime, linkName: String,
                             linkAddress: String, mode: DSLinkMode, brokerAddress: String) extends Event {
   val ts = startTime
 }
