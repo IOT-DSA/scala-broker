@@ -11,6 +11,7 @@ import net.sf.ehcache.{ Cache, CacheManager, Element }
  */
 package object akka {
 
+  // TODO cache startup takes a very long time. need to investigate, and replace perhaps with Guava
   private val pathCache = {
     val cacheManager = CacheManager.getInstance
     cacheManager.addCache(new Cache("resolved_paths", 1000, false, false, 0, 60))

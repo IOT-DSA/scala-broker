@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-VERSION="0.3.0"
+VERSION="0.3.1"
 
-VOLUMES="-v $PWD/conf:/opt/docker/conf"
+VOLUMES="-v $PWD/conf:/opt/docker/conf -v /opt/geolite:/opt/docker/geolite"
 NETWORK="--net dsa -h dsa-frontend -p 9000:9000"
 APP_ARGS="-Dconfig.file=/opt/docker/conf/frontend.conf"
 

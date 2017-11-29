@@ -6,9 +6,9 @@ if [ -z "$1" ] || [ -z "$2" ]
     exit -1
 fi
 
-VERSION="0.3.0"
+VERSION="0.3.1"
 
-VOLUMES="-v $PWD/conf:/opt/docker/conf"
+VOLUMES="-v $PWD/conf:/opt/docker/conf -v /opt/geolite:/opt/docker/geolite"
 NETWORK="--net dsa -h $1 -p $2:2551 -e HOST=$1"
 APP_ARGS="-main models.akka.cluster.BrokerBackend -Dconfig.file=/opt/docker/conf/backend.conf 2551"
 

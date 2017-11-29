@@ -13,7 +13,7 @@ class WebSocketActorSpec extends AbstractActorSpec {
 
   val salt = 1234
   val ci = ConnectionInfo("", "ws", true, false)
-  val config = WebSocketActorConfig(ci, salt)
+  val config = WebSocketActorConfig(ci, "session", salt)
   val link = TestProbe()
   val wsActor = system.actorOf(WebSocketActor.props(testActor, new ActorRefProxy(link.ref), config))
 

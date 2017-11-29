@@ -29,6 +29,7 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
   private var invokesRcvd = 0
   private var updatesSent = 0
 
+  // TODO cache startup takes a very long time. need to investigate, and replace perhaps with Guava
   private val cacheName = linkName + "_actions"
   private val actionCache = {
     val cacheManager = CacheManager.getInstance

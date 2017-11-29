@@ -39,9 +39,10 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
       val req = InvokeRequest(12, "/data1/incCounter")
       val env = RequestEnvelope(List(req))
       probe.send(responder, env)
-      probe.expectMsg(ResponseMessage(2, None, List(DSAResponse(12, Some(StreamState.Closed)))))
       inside(probe.receiveOne(5 seconds)) {
-        case ResponseMessage(3, None, DSAResponse(0, Some(StreamState.Open), Some(row :: Nil), _, _) :: Nil) =>
+        case ResponseMessage(2, None, List(
+          DSAResponse(12, Some(StreamState.Closed), _, _, _),
+          DSAResponse(0, Some(StreamState.Open), Some(row :: Nil), _, _))) =>
           row.asInstanceOf[MapValue].value("sid") mustBe (101: NumericValue)
           row.asInstanceOf[DSAValue.MapValue].value("value") mustBe (1: NumericValue)
       }
@@ -50,9 +51,10 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
       val req = InvokeRequest(13, "/data1/resetCounter")
       val env = RequestEnvelope(List(req))
       probe.send(responder, env)
-      probe.expectMsg(ResponseMessage(4, None, List(DSAResponse(13, Some(StreamState.Closed)))))
       inside(probe.receiveOne(5 seconds)) {
-        case ResponseMessage(5, None, DSAResponse(0, Some(StreamState.Open), Some(row :: Nil), _, _) :: Nil) =>
+        case ResponseMessage(3, None, List(
+          DSAResponse(13, Some(StreamState.Closed), _, _, _),
+          DSAResponse(0, Some(StreamState.Open), Some(row :: Nil), _, _))) =>
           row.asInstanceOf[MapValue].value("sid") mustBe (101: NumericValue)
           row.asInstanceOf[DSAValue.MapValue].value("value") mustBe (0: NumericValue)
       }
@@ -67,7 +69,7 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
       val req = UnsubscribeRequest(14, List(101))
       val env = RequestEnvelope(List(req))
       probe.send(responder, env)
-      probe.expectMsg(ResponseMessage(6, None, List(DSAResponse(14, Some(StreamState.Closed)))))
+      probe.expectMsg(ResponseMessage(4, None, List(DSAResponse(14, Some(StreamState.Closed)))))
     }
   }
 }

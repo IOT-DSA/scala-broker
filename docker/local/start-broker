@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-VERSION="0.3.0"
+VERSION="0.3.1"
 
-PORTS="-p 9000:9000"
-VOLUMES="-v $PWD/conf:/opt/docker/conf"
+PORTS="--net dsa -p 9000:9000"
+VOLUMES="-v $PWD/conf:/opt/docker/conf -v /opt/geolite:/opt/docker/geolite"
 
 docker run -d --name dsa-broker $PORTS $VOLUMES iotdsa/broker-scala:$VERSION
 
