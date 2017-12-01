@@ -6,7 +6,7 @@ if [ -z "$1" ] || [ -z "$2" ]
     exit -1
 fi
 
-VERSION="0.3.1"
+VERSION="0.4.0-SNAPSHOT"
 
 VOLUMES="-v $PWD/conf:/opt/docker/conf -v /opt/geolite:/opt/docker/geolite"
 NETWORK="--net dsa -h $1 -p $2:2551 -e HOST=$1"
