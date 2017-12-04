@@ -10,7 +10,7 @@ import models.RequestEnvelope
 import models.akka.{ CommProxy, DSLinkMode, RegexContext }
 import models.rpc._
 import models.metrics.MetricDao.{ requestEventDao, responseEventDao }
-import net.sf.ehcache.{ Cache, CacheManager, Element }
+import models.util.SimpleCache
 
 /**
  * Simulates a responder which contains:
@@ -32,24 +32,12 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
 
   private val linkAddress = "localhost"
 
-  // TODO cache startup takes a very long time. need to investigate, and replace perhaps with Guava
-  private val cacheName = linkName + "_actions"
-  private val actionCache = {
-    val cacheManager = CacheManager.getInstance
-    cacheManager.addCache(new Cache(cacheName, config.nodeCount * 2, false, false, 0, 60))
-    cacheManager.getEhcache(cacheName)
-  }
+  private val actionCache = new SimpleCache[String, Action](100, 1)
 
   override def preStart() = {
     super.preStart
 
     lastReportedAt = DateTime.now
-  }
-
-  override def postStop() = {
-    CacheManager.getInstance.removeCache(cacheName)
-
-    super.postStop
   }
 
   override def receive = super.receive orElse {
@@ -81,12 +69,7 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
   }
 
   private def processInvokeRequest(req: InvokeRequest) = {
-    val action = Option(actionCache.get(req.path)).map(_.getObjectValue.asInstanceOf[Action]).getOrElse {
-      val a = createAction(req.path)
-      val element = new Element(req.path, a)
-      actionCache.put(element)
-      a
-    }
+    val action = actionCache.getOrElseUpdate(req.path, createAction(req.path))
     replyToInvoke(req) +: action()
   }
 
