@@ -1,22 +1,18 @@
 package models
 
+import scala.concurrent.duration.DurationInt
 import scala.util.matching.Regex
 
 import models.rpc.DSAMessage
 import models.rpc.DSAValue.{ DSAVal, StringValue, array }
-import net.sf.ehcache.{ Cache, CacheManager, Element }
+import models.util.SimpleCache
 
 /**
  * Types and utility functions for DSA actors.
  */
 package object akka {
 
-  // TODO cache startup takes a very long time. need to investigate, and replace perhaps with Guava
-  private val pathCache = {
-    val cacheManager = CacheManager.getInstance
-    cacheManager.addCache(new Cache("resolved_paths", 1000, false, false, 0, 60))
-    cacheManager.getEhcache("resolved_paths")
-  }
+  private val pathCache = new SimpleCache[String, String](100, 1, Some(10000L), Some(1 hour))
 
   /**
    * Interpolates strings to produce RegEx.
@@ -28,12 +24,7 @@ package object akka {
   /**
    * Retrieves the target link from the cache or does path resolution.
    */
-  def resolveLinkPath(path: String) = Option(pathCache.get(path)).map(_.getObjectValue.toString).getOrElse {
-    val resolvedPath = doResolveLinkPath(path)
-    val element = new Element(path, resolvedPath)
-    pathCache.put(element)
-    resolvedPath
-  }
+  def resolveLinkPath(path: String) = pathCache.getOrElseUpdate(path, doResolveLinkPath(path))
 
   /**
    * Resolves the target link path from the request path.
