@@ -10,6 +10,7 @@ import BenchmarkRequester.{ BenchmarkRequesterConfig, ReqStatsSample }
 import akka.actor.{ ActorRef, Cancellable, Props }
 import models.ResponseEnvelope
 import models.akka.{ CommProxy, DSLinkMode, IntCounter }
+import models.metrics.MetricDao.{ requestEventDao, responseEventDao }
 import models.rpc._
 
 /**
@@ -28,21 +29,23 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
   private val invokesSent = new AtomicInteger(0)
   private val updatesRcvd = new AtomicInteger(0)
 
+  private val linkAddress = "localhost"
+
   override def preStart() = {
     super.preStart
-    
+
     lastReportedAt = DateTime.now
 
     // subscribe to path events
     val subReq = SubscribeRequest(ridGen.inc, SubscriptionPath(config.path, 101))
-    proxy ! RequestMessage(localMsgId.inc, None, List(subReq))
+    sendToProxy(RequestMessage(localMsgId.inc, None, List(subReq)))
     log.info("[{}] subscribed to [{}]", linkName, config.path)
 
     // schedule action invocation
     val invPath = config.path + "/incCounter"
     invokeJob = context.system.scheduler.schedule(config.timeout, config.timeout) {
       val requests = (1 to config.batchSize) map (_ => InvokeRequest(ridGen.inc, invPath))
-      proxy ! RequestMessage(localMsgId.inc, None, requests.toList)
+      sendToProxy(RequestMessage(localMsgId.inc, None, requests.toList))
       invokesSent.addAndGet(config.batchSize)
       log.debug("[{}]: sent a batch of {} InvokeRequests to {}", linkName, config.batchSize, config.path)
     }
@@ -53,7 +56,7 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
 
     // unsubscribe from path
     val unsReq = UnsubscribeRequest(ridGen.inc, List(101))
-    proxy ! RequestMessage(localMsgId.inc, None, List(unsReq))
+    sendToProxy(RequestMessage(localMsgId.inc, None, List(unsReq)))
     log.info("Requester[{}] unsubscribed from [{}]", linkName, config.path)
 
     super.postStop
@@ -64,6 +67,8 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
       log.debug("[{}]: received {}", linkName, env)
       val updateCount = responses.map(_.updates.getOrElse(Nil).size).sum
       updatesRcvd.addAndGet(updateCount)
+      responseEventDao.saveResponseMessageEvent(DateTime.now, false, linkName, linkAddress,
+        localMsgId.inc, responses.size, updateCount, 0)
 
     case msg => log.warning("[{}]: received unknown message - {}", msg)
   }
@@ -75,6 +80,11 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
     log.debug("[{}]: collected {}", linkName, stats)
     config.statsCollector foreach (_ ! stats)
     lastReportedAt = now
+  }
+
+  protected def sendToProxy(msg: RequestMessage) = {
+    proxy ! msg
+    requestEventDao.saveRequestMessageEvent(DateTime.now, true, linkName, linkAddress, msg)
   }
 }
 
