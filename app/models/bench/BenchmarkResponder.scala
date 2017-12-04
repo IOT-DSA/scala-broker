@@ -9,6 +9,7 @@ import akka.actor.{ ActorRef, Props }
 import models.RequestEnvelope
 import models.akka.{ CommProxy, DSLinkMode, RegexContext }
 import models.rpc._
+import models.metrics.MetricDao.{ requestEventDao, responseEventDao }
 import net.sf.ehcache.{ Cache, CacheManager, Element }
 
 /**
@@ -29,6 +30,8 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
   private var invokesRcvd = 0
   private var updatesSent = 0
 
+  private val linkAddress = "localhost"
+
   // TODO cache startup takes a very long time. need to investigate, and replace perhaps with Guava
   private val cacheName = linkName + "_actions"
   private val actionCache = {
@@ -45,7 +48,7 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
 
   override def postStop() = {
     CacheManager.getInstance.removeCache(cacheName)
-    
+
     super.postStop
   }
 
@@ -53,7 +56,9 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
     case msg @ RequestEnvelope(requests) =>
       log.debug("[{}]: received {}", linkName, msg)
       val responses = requests flatMap processRequest
-      sender ! ResponseMessage(localMsgId.inc, None, responses.toList)
+      requestEventDao.saveRequestMessageEvent(DateTime.now, false, linkName, linkAddress,
+        localMsgId.inc, requests.size)
+      sendToProxy(ResponseMessage(localMsgId.inc, None, responses.toList))
 
     case msg => log.warning("[{}]: received unknown message - {}", linkName, msg)
   }
@@ -127,6 +132,11 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
     lastReportedAt = now
     invokesRcvd = 0
     updatesSent = 0
+  }
+
+  protected def sendToProxy(msg: ResponseMessage) = {
+    proxy ! msg
+    responseEventDao.saveResponseMessageEvent(DateTime.now, true, linkName, linkAddress, msg)
   }
 }
 
