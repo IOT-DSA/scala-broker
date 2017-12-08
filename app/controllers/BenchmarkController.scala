@@ -86,7 +86,7 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem) extends 
   /**
    * Starts benchmark.
    */
-  def start(reqCount: Int, rspCount: Int, rspNodeCount: Int, batchSize: Int, timeout: Long) = Action {
+  def start(reqCount: Int, rspCount: Int, rspNodeCount: Int, batchSize: Int, timeout: Long, parseJson: Boolean) = Action {
     if (isTestRunning) BadRequest("Test already running")
     else {
       aggregator ! ResetStats
@@ -101,7 +101,8 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem) extends 
         val rspIndex = Random.nextInt(rspCount) + 1
         val nodeIndex = Random.nextInt(rspNodeCount) + 1
         val path = s"/downstream/$rspNamePrefix$rspIndex/data$nodeIndex"
-        val req = createBenchRequester(reqNamePrefix + index, batchSize, timeout milliseconds, statsInterval, path)
+        val req = createBenchRequester(reqNamePrefix + index, batchSize, timeout milliseconds,
+          parseJson, statsInterval, path)
         Tuple2(req, (rspIndex, nodeIndex))
       }
 
@@ -173,9 +174,9 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem) extends 
    * Creates a benchmark requester.
    */
   private def createBenchRequester(name: String, batchSize: Int, timeout: FiniteDuration,
-                                   statsInterval: FiniteDuration, path: String) = {
+                                   parseJson: Boolean, statsInterval: FiniteDuration, path: String) = {
     val proxy = dslinkMgr.getCommProxy(name)
-    val config = BenchmarkRequester.BenchmarkRequesterConfig(path, batchSize, timeout,
+    val config = BenchmarkRequester.BenchmarkRequesterConfig(path, batchSize, timeout, parseJson,
       statsInterval, Some(aggregator))
     val props = BenchmarkRequester.props(name, proxy, config)
     actorSystem.actorOf(props)

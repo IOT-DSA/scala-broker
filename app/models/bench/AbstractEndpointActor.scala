@@ -2,12 +2,14 @@ package models.bench
 
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
+import org.joda.time.{ Duration => JodaDuration }
+
 import AbstractEndpointActor.{ EndpointConfig, StatsTick }
 import akka.actor.{ Actor, ActorLogging, ActorRef, Cancellable }
 import models.akka.{ CommProxy, ConnectionInfo, IntCounter }
 import models.akka.DSLinkMode.{ DSLinkMode, Dual, Requester, Responder }
 import models.akka.Messages.{ ConnectEndpoint, DisconnectEndpoint }
-import org.joda.time.{ Duration => JodaDuration }
+import play.api.libs.json.{ Json, Reads, Writes }
 
 /**
  * Base class for benchmark endpoint actors.
@@ -59,6 +61,14 @@ abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, proxy: 
    * Overridden by subsclasses to report stats data.
    */
   protected def reportStats(): Unit
+
+  /**
+   * Optionally converts the argument to JSON and back.
+   */
+  protected def viaJson[T, K >: T](obj: T)(implicit r: Reads[K], w: Writes[T]) = if (config.parseJson) {
+    val json = Json.toJson(obj)
+    json.as[K].asInstanceOf[T]
+  } else obj
 }
 
 /**
@@ -72,6 +82,7 @@ object AbstractEndpointActor {
   trait EndpointConfig {
     def statsInterval: FiniteDuration
     def statsCollector: Option[ActorRef]
+    def parseJson: Boolean
   }
 
   /**
