@@ -94,7 +94,7 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem) extends 
       expectedInvokeRate = (reqCount * batchSize * 1000L / timeout).toInt
 
       responders = (1 to rspCount) map { index =>
-        createBenchResponder(rspNamePrefix + index, rspNodeCount, statsInterval)
+        createBenchResponder(rspNamePrefix + index, rspNodeCount, statsInterval, parseJson)
       }
 
       val reqTargets = (1 to reqCount) map { index =>
@@ -163,9 +163,10 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem) extends 
   /**
    * Creates a benchmark responder.
    */
-  private def createBenchResponder(name: String, nodeCount: Int, statsInterval: FiniteDuration) = {
+  private def createBenchResponder(name: String, nodeCount: Int, statsInterval: FiniteDuration,
+                                   parseJson: Boolean) = {
     val proxy = dslinkMgr.getCommProxy(name)
-    val config = BenchmarkResponder.BenchmarkResponderConfig(nodeCount, statsInterval, Some(aggregator))
+    val config = BenchmarkResponder.BenchmarkResponderConfig(nodeCount, statsInterval, parseJson, Some(aggregator))
     val props = BenchmarkResponder.props(name, proxy, config)
     actorSystem.actorOf(props)
   }
