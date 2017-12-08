@@ -8,7 +8,7 @@ import org.joda.time.{ DateTime, Interval }
 
 import BenchmarkRequester.{ BenchmarkRequesterConfig, ReqStatsSample }
 import akka.actor.{ ActorRef, Cancellable, Props }
-import models.ResponseEnvelope
+import models.{ ResponseEnvelope, ResponseEnvelopeFormat }
 import models.akka.{ CommProxy, DSLinkMode, IntCounter }
 import models.metrics.MetricDao.{ requestEventDao, responseEventDao }
 import models.rpc._
@@ -63,7 +63,8 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
   }
 
   override def receive = super.receive orElse {
-    case env @ ResponseEnvelope(responses) =>
+    case env: ResponseEnvelope =>
+      val responses = viaJson(env).responses
       log.debug("[{}]: received {}", linkName, env)
       val updateCount = responses.map(_.updates.getOrElse(Nil).size).sum
       updatesRcvd.addAndGet(updateCount)
@@ -83,8 +84,9 @@ class BenchmarkRequester(linkName: String, proxy: CommProxy, config: BenchmarkRe
   }
 
   protected def sendToProxy(msg: RequestMessage) = {
-    proxy ! msg
-    requestEventDao.saveRequestMessageEvent(DateTime.now, true, linkName, linkAddress, msg)
+    val message = viaJson[RequestMessage, DSAMessage](msg)
+    proxy ! message
+    requestEventDao.saveRequestMessageEvent(DateTime.now, true, linkName, linkAddress, message)
   }
 }
 
@@ -98,6 +100,7 @@ object BenchmarkRequester {
    * BenchmarkRequester configuration.
    */
   case class BenchmarkRequesterConfig(path: String, batchSize: Int, timeout: FiniteDuration,
+                                      parseJson:      Boolean,
                                       statsInterval:  FiniteDuration   = 5 seconds,
                                       statsCollector: Option[ActorRef] = None) extends EndpointConfig
 

@@ -8,8 +8,8 @@ import BenchmarkResponder.{ BenchmarkResponderConfig, RspStatsSample }
 import akka.actor.{ ActorRef, Props }
 import models.RequestEnvelope
 import models.akka.{ CommProxy, DSLinkMode, RegexContext }
-import models.rpc._
 import models.metrics.MetricDao.{ requestEventDao, responseEventDao }
+import models.rpc._
 import models.util.SimpleCache
 
 /**
@@ -41,8 +41,9 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
   }
 
   override def receive = super.receive orElse {
-    case msg @ RequestEnvelope(requests) =>
-      log.debug("[{}]: received {}", linkName, msg)
+    case env: RequestEnvelope =>
+      val requests = viaJson(env).requests
+      log.debug("[{}]: received {}", linkName, env)
       val responses = requests flatMap processRequest
       requestEventDao.saveRequestMessageEvent(DateTime.now, false, linkName, linkAddress,
         localMsgId.inc, requests.size)
@@ -118,8 +119,9 @@ class BenchmarkResponder(linkName: String, proxy: CommProxy, config: BenchmarkRe
   }
 
   protected def sendToProxy(msg: ResponseMessage) = {
-    proxy ! msg
-    responseEventDao.saveResponseMessageEvent(DateTime.now, true, linkName, linkAddress, msg)
+    val message = viaJson[ResponseMessage, DSAMessage](msg)
+    proxy ! message
+    responseEventDao.saveResponseMessageEvent(DateTime.now, true, linkName, linkAddress, message)
   }
 }
 
@@ -133,6 +135,7 @@ object BenchmarkResponder {
    * BenchmarkResponder configuration.
    */
   case class BenchmarkResponderConfig(nodeCount: Int, statsInterval: FiniteDuration = 5 seconds,
+                                      parseJson:      Boolean,
                                       statsCollector: Option[ActorRef] = None) extends EndpointConfig
 
   /**

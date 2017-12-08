@@ -22,7 +22,7 @@ GET    /metrics/batches       controllers.MetricController.requestStatsByMethod(
 GET    /metrics/responses     controllers.MetricController.responseStatsByLink(from: Option[Long], to: Option[Long])
 
 GET    /bench/stats           controllers.BenchmarkController.viewStats
-PUT    /bench/start           controllers.BenchmarkController.start(reqCount: Int ?= 5, rspCount: Int ?= 2, rspNodeCount: Int ?= 10, batchSize: Int ?= 100, timeout: Long ?= 2000)
+PUT    /bench/start           controllers.BenchmarkController.start(reqCount: Int ?= 5, rspCount: Int ?= 2, rspNodeCount: Int ?= 10, batchSize: Int ?= 100, timeout: Long ?= 2000, parseJson: Boolean ?= true)
 PUT    /bench/stop            controllers.BenchmarkController.stop
 PUT    /bench/reset           controllers.BenchmarkController.reset
 
