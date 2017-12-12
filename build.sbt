@@ -12,6 +12,11 @@ scalaVersion := SCALA_VERSION
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
+// eclipse
+EclipseKeys.preTasks := Seq(compile in Compile, compile in Test)
+EclipseKeys.withSource := true
+EclipseKeys.withJavadoc := true
+
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
 scalacOptions ++= Seq(
@@ -27,7 +32,6 @@ scalacOptions ++= Seq(
 
 // packaging
 enablePlugins(DockerPlugin, JavaAppPackaging)
-//javaOptions in Universal ++= Seq(s"-Dpidfile.path=/var/run/${packageName.value}/play.pid")
 dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
