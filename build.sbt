@@ -53,6 +53,7 @@ libraryDependencies ++= Seq(
   ehcache,
   jdbc,
   "com.typesafe.play"       %% "play-json"               % JSON_VERSION,
+  "com.typesafe.play"       %% "play-json-joda"          % JSON_VERSION,
   "com.typesafe.akka"       %% "akka-cluster"            % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-metrics"    % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,

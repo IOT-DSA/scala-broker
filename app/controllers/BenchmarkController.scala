@@ -11,28 +11,29 @@ import org.joda.time.format.{ DateTimeFormat, PeriodFormat }
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill }
 import akka.cluster.Cluster
 import akka.pattern.ask
-import akka.stream.Materializer
 import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
-import models.bench.{ BenchmarkRequester, BenchmarkResponder }
+import models.bench.{ BenchmarkRequester, BenchmarkResponder, BenchmarkStatsAggregator }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
-import models.bench.BenchmarkStatsAggregator
 import play.api.libs.json.{ JsObject, JsValue, Json, Writes }
-import play.api.mvc.{ Action, Controller, Result }
+import play.api.mvc.{ AbstractController, ControllerComponents, Result }
 
 /**
  * Performs broker load test.
  */
 @Singleton
-class BenchmarkController @Inject() (implicit actorSystem: ActorSystem) extends Controller {
-  import actorSystem.dispatcher
-  import BenchmarkStatsAggregator._
+class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, cc: ControllerComponents)
+  extends AbstractController(cc) {
+
+  import models.bench.BenchmarkStatsAggregator._
 
   implicit val timeout = Timeout(5 seconds)
+
+  implicit val executionContext = cc.executionContext
 
   private val dateFmt = DateTimeFormat.mediumTime
   private val periodFmt = PeriodFormat.getDefault

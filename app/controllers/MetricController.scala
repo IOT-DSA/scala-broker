@@ -8,18 +8,19 @@ import akka.actor.ActorSystem
 import javax.inject.{ Inject, Singleton }
 import models.metrics._
 import models.metrics.MetricDao.{ dslinkEventDao, memberEventDao, requestEventDao, responseEventDao }
-import play.api.libs.json.{ JsValue, Json, Writes }
-import play.api.mvc.{ Action, Controller, Result }
+import play.api.libs.json.{ JodaWrites, JsValue, Json, Writes }
+import play.api.mvc.{ AbstractController, ControllerComponents, Result }
 
 /**
  * Handles statistics requests.
  */
 @Singleton
-class MetricController @Inject() (implicit actorSystem: ActorSystem) extends Controller {
+class MetricController @Inject() (implicit actorSystem: ActorSystem, cc: ControllerComponents)
+  extends AbstractController(cc) {
 
-  import actorSystem.dispatcher
+  implicit private val executionContext = cc.executionContext
 
-  implicit val dateWrites = Writes.jodaDateWrites("yyyy-MM-dd HH:mm:ss.SSS")
+  implicit val dateWrites = JodaWrites.jodaDateWrites("yyyy-MM-dd HH:mm:ss.SSS")
 
   implicit val memberEventWrites = Json.writes[MemberEvent]
 
