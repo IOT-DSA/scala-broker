@@ -1,10 +1,12 @@
 package models.akka.responder
 
-import akka.actor.{ ActorRef, actorRef2Scala }
+import scala.concurrent.duration.DurationInt
+
+import akka.actor.{ ActorRef, Inbox, actorRef2Scala }
 import akka.routing.{ Broadcast, ConsistentHashingPool }
 import models.{ Origin, Settings }
-import models.rpc.DSAResponse
 import models.akka.AbstractDSLinkActor
+import models.rpc.DSAResponse
 
 /**
  * Handles communication with a remote DSLink in Responder mode using a router and a pool of workers
@@ -13,7 +15,6 @@ import models.akka.AbstractDSLinkActor
 trait PooledResponderBehavior extends ResponderBehavior { me: AbstractDSLinkActor =>
   import context.system
   import ResponderWorker._
-  import akka.actor.ActorDSL._
   import akka.routing.ConsistentHashingRouter._
 
   // LIST and SUBSCRIBE workers
@@ -54,12 +55,12 @@ trait PooledResponderBehavior extends ResponderBehavior { me: AbstractDSLinkActo
    * removed (i.e. no listeners left), or None otherwise.
    */
   private def removeOrigin(origin: Origin, pool: ConsistentHashingPool, router: ActorRef) = {
-    val ibox = inbox()
+    val ibox = Inbox.create(system)
     router.tell(LookupTargetId(origin), ibox.getRef)
-    ibox.receive().asInstanceOf[Option[Int]] map { targetId =>
+    ibox.receive(10 seconds).asInstanceOf[Option[Int]] map { targetId =>
       router ! RemoveOrigin(origin)
       router.tell(Broadcast(GetOriginCount(targetId)), ibox.getRef)
-      val count = (1 to pool.nrOfInstances).map(_ => ibox.receive().asInstanceOf[Int]).sum
+      val count = (1 to pool.nrOfInstances).map(_ => ibox.receive(10 seconds).asInstanceOf[Int]).sum
       (targetId, count < 1)
     } collect {
       case (targetId, true) => targetId

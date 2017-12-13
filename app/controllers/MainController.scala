@@ -20,10 +20,9 @@ import models.akka.local.{ DownstreamActor, LocalDSLinkManager }
 import models.metrics.MetricDao.dslinkEventDao
 import models.rpc.{ DSAMessage, DSAMessageFormat }
 import play.api.Logger
-import play.api.cache.CacheApi
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import play.api.cache.SyncCacheApi
 import play.api.libs.json.{ JsError, Json, Reads }
-import play.api.mvc.{ Action, BodyParsers, Controller, Request, RequestHeader, WebSocket }
+import play.api.mvc.{ AbstractController, ControllerComponents, Request, RequestHeader, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 
 /**
@@ -31,12 +30,15 @@ import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
  */
 @Singleton
 class MainController @Inject() (implicit actorSystem: ActorSystem,
-                                materializer: Materializer, cache: CacheApi) extends Controller {
+                                materializer: Materializer, cache: SyncCacheApi,
+                                cc: ControllerComponents) extends AbstractController(cc) {
   import models.akka.Messages._
 
   private val log = Logger(getClass)
 
   implicit private val timeout = Timeout(Settings.QueryTimeout)
+
+  implicit private val executionContext = cc.executionContext
 
   implicit val ConnectionRequestReads = Json.reads[ConnectionRequest]
 
@@ -164,7 +166,7 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
   /**
    * Validates the JSON and extracts a request message.
    */
-  private def validateJson[A: Reads] = BodyParsers.parse.tolerantJson.validate { js =>
+  private def validateJson[A: Reads] = parse.tolerantJson.validate { js =>
     js.validate[A].asEither.left.map { e =>
       log.error(s"Cannot parse connection request JSON: $js. Error info: ${JsError.toJson(e)}")
       BadRequest(JsError.toJson(e))

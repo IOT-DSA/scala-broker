@@ -55,7 +55,7 @@ package object rpc {
     def reads(json: JsValue) = try {
       JsSuccess(json2dsa(json))
     } catch {
-      case e: RuntimeException => JsError(ValidationError(e.getMessage))
+      case e: RuntimeException => JsError(JsonValidationError(e.getMessage))
     }
 
     private def json2dsa: PartialFunction[JsValue, DSAVal] = {
@@ -193,14 +193,14 @@ package object rpc {
 
   def stringToBinary(str: String): Binary = Base64.getDecoder.decode(str.drop(BinaryPrefix.length))
 
-  def jsonMapToValues(fields: Map[String, JsValue]) = fields map { case (a, b) => a -> b.as[DSAVal] }
+  def jsonMapToValues(fields: Map[String, JsValue]) = fields.map { case (a, b) => a -> b.as[DSAVal] }.toMap[String, DSAVal]
 
   def jsonListToValues(items: Iterable[JsValue]) = items map (_.as[DSAVal]) toList
 
   def valueMapToJson(fields: Map[String, DSAVal]) = fields map { case (a, b) => (a -> Json.toJson(b)) }
 
   def valueListToJson(items: Iterable[DSAVal]) = items map (Json.toJson(_))
-  
+
   /**
    * Extracts SID from an update row.
    */

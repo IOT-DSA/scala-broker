@@ -49,7 +49,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
       responder.tell(RequestEnvelope(List(CloseRequest(201))), requesters(2).ref)
       responder.tell(RequestEnvelope(List(CloseRequest(101))), requesters(1).ref)
-      ws.expectNoMsg(1 second)
+      ws.expectNoMessage(1 second)
 
       responder.tell(RequestEnvelope(List(CloseRequest(301))), requesters(3).ref)
       ws.expectMsg(RequestEnvelope(List(CloseRequest(1))))
@@ -167,7 +167,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
         updates = Some(List(obj("sid" -> 2001, "data" -> 2222)))))))
 
       responder.tell(RequestEnvelope(List(UnsubscribeRequest(152, List(1001)))), requesters(1).ref)
-      ws.expectNoMsg()
+      ws.expectNoMessage(1 second)
       requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 152, stream = Some(Closed)))))
 
       responder.tell(RequestEnvelope(List(UnsubscribeRequest(352, List(3001)))), requesters(3).ref)
