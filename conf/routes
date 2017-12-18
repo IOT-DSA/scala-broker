@@ -11,8 +11,10 @@ POST   /disconnect            controllers.MainController.disconnectWS(link)
 POST   /remove                controllers.MainController.removeLink(link)
 GET    /upstream              controllers.MainController.upstream
 GET    /config                controllers.MainController.viewConfig
-POST   /conn                  controllers.MainController.conn
-GET    /ws                    controllers.MainController.ws
+
+# WebSocket facade
+POST   /conn                  modules.websocket.WebSocketController.conn
+GET    /ws                    modules.websocket.WebSocketController.ws
 
 GET    /metrics/cluster       controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
 GET    /metrics/connections   controllers.MetricController.connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])

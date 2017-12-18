@@ -9,31 +9,25 @@ import org.joda.time.DateTime
 import org.joda.time.format.{ DateTimeFormat, PeriodFormat }
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill }
-import akka.cluster.Cluster
 import akka.pattern.ask
-import akka.util.Timeout
 import javax.inject.{ Inject, Singleton }
-import models.akka.cluster.ClusteredDSLinkManager
-import models.akka.local.LocalDSLinkManager
+import models.akka.DSLinkManager
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
 import models.bench.{ BenchmarkRequester, BenchmarkResponder, BenchmarkStatsAggregator }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
-import play.api.libs.json.{ JsObject, JsValue, Json, Writes }
-import play.api.mvc.{ AbstractController, ControllerComponents, Result }
+import play.api.libs.json.{ JsObject, Json, Writes }
+import play.api.mvc.{ ControllerComponents, Result }
 
 /**
  * Performs broker load test.
  */
 @Singleton
-class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, cc: ControllerComponents)
-  extends AbstractController(cc) {
+class BenchmarkController @Inject() (actorSystem: ActorSystem,
+                                     dslinkMgr:   DSLinkManager,
+                                     cc:          ControllerComponents) extends BasicController(cc) {
 
   import models.bench.BenchmarkStatsAggregator._
-
-  implicit val timeout = Timeout(5 seconds)
-
-  implicit val executionContext = cc.executionContext
 
   private val dateFmt = DateTimeFormat.mediumTime
   private val periodFmt = PeriodFormat.getDefault
@@ -63,13 +57,6 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, cc: Cont
 
   implicit val allStatsWrites = Json.writes[AllStats]
   implicit val globalStatsWrites = Json.writes[GlobalStats]
-
-  val isClusterMode = actorSystem.hasExtension(Cluster)
-
-  val dslinkMgr = if (isClusterMode)
-    new ClusteredDSLinkManager(true)
-  else
-    new LocalDSLinkManager
 
   private val testRunning = new AtomicBoolean(false)
   def isTestRunning = testRunning.get
@@ -183,11 +170,6 @@ class BenchmarkController @Inject() (implicit actorSystem: ActorSystem, cc: Cont
     val props = BenchmarkRequester.props(name, proxy, config)
     actorSystem.actorOf(props)
   }
-
-  /**
-   * Converts a JSON value into a (pretty-printed) HTTP Result.
-   */
-  implicit protected def json2result(json: JsValue): Result = Ok(Json.prettyPrint(json)).as(JSON)
 
   /**
    * Converts REQ stats behavior to JSON.

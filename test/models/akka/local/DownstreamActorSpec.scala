@@ -22,7 +22,8 @@ class DownstreamActorSpec extends AbstractActorSpec {
   implicit val timeout = Timeout(5 seconds)
   val dsId = "link" + "?" * 44
 
-  val downstream = system.actorOf(props, Settings.Nodes.Downstream)
+  val dslinkMgr = new LocalDSLinkManager
+  val downstream = system.actorOf(props(dslinkMgr), Settings.Nodes.Downstream)
 
   "CreateDSLink" should {
     "create a new dslink" in {

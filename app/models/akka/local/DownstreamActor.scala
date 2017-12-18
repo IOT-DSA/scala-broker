@@ -4,7 +4,7 @@ import scala.util.control.NonFatal
 
 import akka.actor.{ Actor, ActorLogging, Props, Status, actorRef2Scala }
 import models.Settings
-import models.akka.DSLinkFactory
+import models.akka.{ DSLinkFactory, DSLinkManager }
 
 /**
  * Actor for DSA `/downstream` node.
@@ -14,7 +14,7 @@ import models.akka.DSLinkFactory
  * actorSystem.actorOf(DownstreamActor.props(...), "downstream")
  * </pre>
  */
-class DownstreamActor extends Actor with ActorLogging {
+class DownstreamActor(dslinkMgr: DSLinkManager) extends Actor with ActorLogging {
   import DownstreamActor._
 
   if (self.path != self.path.root / "user" / Settings.Nodes.Downstream) {
@@ -24,8 +24,6 @@ class DownstreamActor extends Actor with ActorLogging {
   }
 
   private val ownId = "[" + Settings.Paths.Downstream + "]"
-
-  private val dslinkMgr = new LocalDSLinkManager()(context.system)
 
   override def preStart = log.debug(s"$ownId actor created")
 
@@ -67,5 +65,5 @@ object DownstreamActor {
   /**
    * Creates a new instance of [[DownstreamActor]] props.
    */
-  def props = Props(new DownstreamActor)
+  def props(dslinkMgr: DSLinkManager) = Props(new DownstreamActor(dslinkMgr))
 }

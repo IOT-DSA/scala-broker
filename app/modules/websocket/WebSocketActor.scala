@@ -1,10 +1,11 @@
-package models.akka
+package modules.websocket
 
 import org.joda.time.DateTime
 
-import Messages.ConnectEndpoint
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{ RequestEnvelope, ResponseEnvelope, formatMessage }
+import models.akka.{ CommProxy, ConnectionInfo, IntCounter }
+import models.akka.Messages.ConnectEndpoint
 import models.metrics.MetricDao.{ dslinkEventDao, requestEventDao, responseEventDao }
 import models.rpc._
 

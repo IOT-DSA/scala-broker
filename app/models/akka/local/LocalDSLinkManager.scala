@@ -17,6 +17,8 @@ class LocalDSLinkManager(implicit val system: ActorSystem) extends DSLinkManager
   import Messages._
 
   implicit val timeout = Timeout(QueryTimeout)
+  
+  log.info("Local DSLink Manager created")
 
   /**
    * Sends a message to the DSLink using ActorSelection.

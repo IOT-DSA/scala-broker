@@ -5,6 +5,7 @@ import scala.reflect.ClassTag
 
 import akka.actor.{ Actor, ActorRef, ActorSystem }
 import models.akka.Messages.LinkInfo
+import play.api.Logger
 
 /**
  * Manages interaction with DSLinks
@@ -13,6 +14,8 @@ trait DSLinkManager {
   import models.Settings.Paths._
 
   def system: ActorSystem
+
+  protected val log = Logger(getClass)
 
   /**
    * Sends a fire-and-forget message to the DSLink.

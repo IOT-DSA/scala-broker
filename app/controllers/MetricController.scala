@@ -15,7 +15,7 @@ import play.api.mvc.{ AbstractController, ControllerComponents, Result }
  * Handles statistics requests.
  */
 @Singleton
-class MetricController @Inject() (implicit actorSystem: ActorSystem, cc: ControllerComponents)
+class MetricController @Inject() (actorSystem: ActorSystem, cc: ControllerComponents)
   extends AbstractController(cc) {
 
   implicit private val executionContext = cc.executionContext

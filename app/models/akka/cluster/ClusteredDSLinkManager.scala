@@ -19,6 +19,8 @@ class ClusteredDSLinkManager(frontendMode: Boolean)(implicit val system: ActorSy
   implicit val timeout = Timeout(QueryTimeout)
 
   private val cluster = Cluster(system)
+  
+  log.info("Clustered DSLink Manager created")
 
   /**
    * Extracts DSLink name and payload from the message.

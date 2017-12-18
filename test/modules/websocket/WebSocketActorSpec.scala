@@ -1,9 +1,10 @@
-package models.akka
+package modules.websocket
 
 import akka.actor.actorRef2Scala
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
+import models.akka._
 
 /**
  * WebSocketActor test suite.

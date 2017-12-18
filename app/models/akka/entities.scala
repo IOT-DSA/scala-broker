@@ -1,7 +1,5 @@
 package models.akka
 
-import controllers.ConnectionRequest
-
 /**
  * Encapsulates DSLink information for WebSocket connection.
  */
@@ -15,19 +13,6 @@ case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, 
     case (false, true) => DSLinkMode.Responder
     case _             => throw new IllegalArgumentException("DSLink must be Requester, Responder or Dual")
   }
-}
-
-/**
- * Factory for [[ConnectionInfo]] instances.
- */
-object ConnectionInfo {
-  /**
-   * Creates a new [[ConnectionInfo]] instance by extracting information from a connection request.
-   */
-  def apply(dsId: String, cr: ConnectionRequest, linkAddress: String, brokerAddress: String): ConnectionInfo =
-    new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
-      cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
-      linkAddress, brokerAddress)
 }
 
 /**
