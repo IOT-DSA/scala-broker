@@ -9,12 +9,13 @@ import org.joda.time.DateTime
 
 import anorm.{ Macro, SQL, SqlStringInterpolation, sqlToSimple }
 import anorm.JodaParameterMetaData.JodaDateTimeMetaData
+import javax.inject.Inject
 import models.metrics.{ ListResult, ResponseEventDao, ResponseMessageEvent, ResponseStatsByLink }
 
 /**
  * JDBC-based implementation of [[ResponseEventDao]].
  */
-class JdbcResponseEventDao(conn: Connection) extends JdbcGenericDao(conn) with ResponseEventDao {
+class JdbcResponseEventDao @Inject() (conn: Connection) extends JdbcGenericDao(conn) with ResponseEventDao {
 
   private val rspStatsByLinkParser = Macro.indexedParser[ResponseStatsByLink]
 

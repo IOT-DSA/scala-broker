@@ -67,7 +67,7 @@ class DSLinkManagerSpec extends AbstractActorSpec with Inside {
   }
 
   "ClusteredDSLinkManager" should {
-    val clusterMgr: DSLinkManager = new ClusteredDSLinkManager(false)(backendSystem)
+    val clusterMgr: DSLinkManager = new ClusteredDSLinkManager(false, nullDaos)(backendSystem)
     val backendProbe = TestProbe()(backendSystem)
     val backend = backendSystem.actorOf(TestActors.forwardActorProps(backendProbe.ref), "backend")
 

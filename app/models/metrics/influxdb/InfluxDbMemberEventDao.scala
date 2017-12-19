@@ -5,15 +5,16 @@ import scala.concurrent.Future
 
 import org.joda.time.DateTime
 
-import com.paulgoldbaum.influxdbclient._
+import com.paulgoldbaum.influxdbclient.{ Database, Point, Record }
 import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
+import javax.inject.Inject
 import models.metrics.{ MemberEvent, MemberEventDao }
 
 /**
  * InfluxDB-based implementation of [[MemberEventDao]].
  */
-class InfluxDbMemberEventDao(db: Database) extends InfluxDbGenericDao(db) with MemberEventDao {
+class InfluxDbMemberEventDao @Inject() (db: Database) extends InfluxDbGenericDao(db) with MemberEventDao {
 
   /**
    * Saves a member event as a point in 'cluster' measurement.

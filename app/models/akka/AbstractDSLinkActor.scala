@@ -4,6 +4,7 @@ import org.joda.time.DateTime
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
 import models.Settings
+import models.metrics.EventDaos
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -13,7 +14,7 @@ import models.Settings
  * The facade initiates a session by sending `ConnectEndpoint` message to the actor. The session
  * ends either when `DisconnectEndpoint` message is sent to an actor, or the endpoint actor terminates.
  */
-abstract class AbstractDSLinkActor extends Actor with Stash with ActorLogging {
+abstract class AbstractDSLinkActor(val eventDaos: EventDaos) extends Actor with Stash with ActorLogging {
   import Messages._
 
   protected val linkName = self.path.name

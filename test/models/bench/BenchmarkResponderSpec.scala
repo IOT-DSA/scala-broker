@@ -22,7 +22,7 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
   val proxy = new ActorRefProxy(probe.ref)
   val stats = TestProbe()
   val config = BenchmarkResponderConfig(2, 100 milliseconds, true, Some(stats.ref))
-  val responder = system.actorOf(BenchmarkResponder.props(linkName, proxy, config))
+  val responder = system.actorOf(BenchmarkResponder.props(linkName, proxy, nullDaos, config))
 
   "BenchmarkResponder" should {
     "register with proxy" in {

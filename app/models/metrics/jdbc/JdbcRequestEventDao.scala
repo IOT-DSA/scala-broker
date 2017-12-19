@@ -7,15 +7,16 @@ import scala.concurrent.Future
 
 import org.joda.time.DateTime
 
-import anorm._
+import anorm.{ Macro, SQL, SqlStringInterpolation, sqlToSimple }
 import anorm.JodaParameterMetaData.JodaDateTimeMetaData
 import anorm.SqlParser.{ flatten, int, str }
+import javax.inject.Inject
 import models.metrics._
 
 /**
  * JDBC-based implementation of [[RequestEventDao]].
  */
-class JdbcRequestEventDao(conn: Connection) extends JdbcGenericDao(conn) with RequestEventDao {
+class JdbcRequestEventDao @Inject() (conn: Connection) extends JdbcGenericDao(conn) with RequestEventDao {
 
   private val reqStatsByLinkParser = Macro.indexedParser[RequestStatsByLink]
 

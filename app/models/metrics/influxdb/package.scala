@@ -6,8 +6,6 @@ import org.slf4j.LoggerFactory
 
 import com.paulgoldbaum.influxdbclient._
 
-import models.Settings.InfluxDb.{ Host, Port }
-
 /**
  * InfluxDB helper methods.
  */
@@ -18,9 +16,9 @@ package object influxdb {
   /**
    * Opens a connection to InfluxDB database.
    */
-  def connectToInfluxDB: InfluxDB = {
-    log.info(s"Connecting to InfluxDB at $Host:$Port")
-    val dbConn = InfluxDB.connect(Host, Port)
+  def connectToInfluxDB(host: String, port: Int): InfluxDB = {
+    log.info(s"Connecting to InfluxDB at $host:$port")
+    val dbConn = InfluxDB.connect(host, port)
     log.info("InfluxDB connection established")
     dbConn
   }

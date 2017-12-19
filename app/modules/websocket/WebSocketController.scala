@@ -12,7 +12,7 @@ import controllers.BasicController
 import javax.inject.{ Inject, Singleton }
 import models.Settings
 import models.akka.{ ConnectionInfo, DSLinkManager }
-import models.metrics.DSLinkEventDao
+import models.metrics.EventDaos
 import models.rpc.DSAMessage
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
@@ -23,12 +23,14 @@ import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
  * Establishes WebSocket DSLink connections
  */
 @Singleton
-class WebSocketController @Inject() (actorSystem:    ActorSystem,
-                                     materializer:   Materializer,
-                                     cache:          SyncCacheApi,
-                                     dslinkMgr:      DSLinkManager,
-                                     dslinkEventDao: DSLinkEventDao,
-                                     cc:             ControllerComponents) extends BasicController(cc) {
+class WebSocketController @Inject() (actorSystem:  ActorSystem,
+                                     materializer: Materializer,
+                                     cache:        SyncCacheApi,
+                                     dslinkMgr:    DSLinkManager,
+                                     eventDaos:    EventDaos,
+                                     cc:           ControllerComponents) extends BasicController(cc) {
+
+  import eventDaos._
 
   implicit private val ConnectionRequestReads = Json.reads[ConnectionRequest]
 
@@ -79,7 +81,7 @@ class WebSocketController @Inject() (actorSystem:    ActorSystem,
       .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
 
     val proxy = dslinkMgr.getCommProxy(sessionInfo.ci.linkName)
-    val wsProps = WebSocketActor.props(toSocket, proxy,
+    val wsProps = WebSocketActor.props(toSocket, proxy, eventDaos,
       WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
     val fromSocket = actorSystem.actorOf(Props(new Actor {

@@ -23,7 +23,7 @@ class DownstreamActorSpec extends AbstractActorSpec {
   val dsId = "link" + "?" * 44
 
   val dslinkMgr = new LocalDSLinkManager
-  val downstream = system.actorOf(props(dslinkMgr), Settings.Nodes.Downstream)
+  val downstream = system.actorOf(props(dslinkMgr, nullDaos), Settings.Nodes.Downstream)
 
   "CreateDSLink" should {
     "create a new dslink" in {

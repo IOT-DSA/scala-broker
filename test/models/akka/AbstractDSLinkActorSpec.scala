@@ -6,27 +6,27 @@ import org.scalatest.Inside
 
 import akka.actor.{ PoisonPill, Props }
 import akka.pattern.ask
-import akka.testkit.{ TestActorRef, TestProbe }
+import akka.testkit.{ TestActorRef, TestActors, TestProbe }
 import akka.util.Timeout
-import akka.testkit.TestActors
+import models.metrics.EventDaos
 
 /**
  * AbstractDSLinkActor test suite.
  */
 class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
   import AbstractDSLinkActorSpec._
-  import Messages._
   import BackendActor._
+  import Messages._
 
   implicit val timeout = Timeout(5 seconds)
   val dsId = "link" + "?" * 44
 
-  val dslink = TestActorRef[LinkActor](Props(new LinkActor), "abc")
+  val dslink = TestActorRef[LinkActor](Props(new LinkActor(nullDaos)), "abc")
 
   val Seq(endpoint1, endpoint2, endpoint3) = (1 to 3) map (_ => watch(TestProbe().ref))
 
   val ci = ConnectionInfo(dsId, "abc", true, false)
-  
+
   val backendProbe = TestProbe()
   val backend = system.actorOf(TestActors.forwardActorProps(backendProbe.ref), "backend")
 
@@ -86,11 +86,10 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
  * Common definitions for [[AbstractDSLinkActorSpec]].
  */
 object AbstractDSLinkActorSpec {
-
   /**
    * Test actor.
    */
-  class LinkActor extends AbstractDSLinkActor {
+  class LinkActor(eventDaos: EventDaos) extends AbstractDSLinkActor(eventDaos) {
     def dsaSend(to: String, msg: Any): Unit = {}
   }
 }

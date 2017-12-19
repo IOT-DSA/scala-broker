@@ -3,6 +3,7 @@ package models.akka
 import akka.actor.{ Actor, Props, actorRef2Scala }
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.metrics.EventDaos
 import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
 
 /**
@@ -29,7 +30,7 @@ class RequesterBehaviorSpec extends AbstractActorSpec {
   }), "broker")
 
   val ci = ConnectionInfo("", "", true, false)
-  val requester = system.actorOf(Props(new Requester), "requester")
+  val requester = system.actorOf(Props(new Requester(nullDaos)), "requester")
   val ws = TestProbe()
   requester.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
 
@@ -64,10 +65,10 @@ object RequesterBehaviorSpec {
   /**
    * Test actor.
    */
-  class Requester extends AbstractDSLinkActor with RequesterBehavior {
-    
+  class Requester(eventDaos: EventDaos) extends AbstractDSLinkActor(eventDaos) with RequesterBehavior {
+
     override def connected = super.connected orElse requesterBehavior
-    
+
     def dsaSend(to: String, msg: Any) = context.actorSelection("/user/" + Settings.Nodes.Root + to) ! msg
   }
 }

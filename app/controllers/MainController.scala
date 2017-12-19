@@ -10,6 +10,7 @@ import javax.inject.{ Inject, Singleton }
 import models.Settings
 import models.akka.{ BackendActor, DSLinkManager, FrontendActor, RootNodeActor }
 import models.akka.local.DownstreamActor
+import models.metrics.EventDaos
 import play.api.mvc.ControllerComponents
 
 /**
@@ -18,17 +19,18 @@ import play.api.mvc.ControllerComponents
 @Singleton
 class MainController @Inject() (actorSystem: ActorSystem,
                                 dslinkMgr:   DSLinkManager,
+                                eventDaos:   EventDaos,
                                 cc:          ControllerComponents) extends BasicController(cc) {
 
   import models.akka.Messages._
 
   val isClusterMode = actorSystem.hasExtension(Cluster)
 
-  private val frontend = actorSystem.actorOf(FrontendActor.props, "frontend")
+  private val frontend = actorSystem.actorOf(FrontendActor.props(eventDaos), "frontend")
 
   if (!isClusterMode) {
     actorSystem.actorOf(BackendActor.props(dslinkMgr), "backend")
-    actorSystem.actorOf(DownstreamActor.props(dslinkMgr), "downstream")
+    actorSystem.actorOf(DownstreamActor.props(dslinkMgr, eventDaos), "downstream")
     actorSystem.actorOf(RootNodeActor.props, Settings.Nodes.Root)
   }
 

@@ -1,7 +1,5 @@
 package models.akka
 
-import java.net.InetAddress
-
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 
@@ -10,18 +8,19 @@ import org.joda.time.DateTime
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, Status, Terminated, actorRef2Scala }
 import akka.pattern.{ ask, pipe }
 import akka.cluster.Cluster
-import akka.pattern.ask
 import akka.util.Timeout
 import models.{ RequestEnvelope, RichBoolean, Settings }
-import models.metrics.MetricDao.memberEventDao
+import models.metrics.EventDaos
 
 /**
  * This actor is responsible for communicating with the facade. It can be deployed both in local
  * and cluster environments.
  */
-class FrontendActor extends Actor with ActorLogging {
+class FrontendActor(eventDaos: EventDaos) extends Actor with ActorLogging {
+
   import BackendActor._
   import context.dispatcher
+  import eventDaos._
   import Messages._
 
   if (self.path != self.path.root / "user" / "frontend") {
@@ -151,5 +150,5 @@ object FrontendActor {
   /**
    * Creates a new instance of [[FrontendActor]] props.
    */
-  def props = Props(new FrontendActor)
+  def props(eventDaos: EventDaos) = Props(new FrontendActor(eventDaos))
 }

@@ -2,6 +2,7 @@ package models.metrics
 
 import org.joda.time.DateTime
 
+import javax.inject.Inject
 import models.akka.DSLinkMode.DSLinkMode
 import models.rpc.DSAMethod.DSAMethod
 
@@ -73,3 +74,9 @@ case class RequestStatsByMethod(srcLinkName: String, tgtLinkName: String, counts
  */
 case class ResponseStatsByLink(linkName: String, inbound: Boolean, msgCount: Int, rspCount: Int,
                                updateCount: Int, errorCount: Int)
+
+/**
+ * Event DAOs combined into a single container class.
+ */
+case class EventDaos @Inject() (memberEventDao: MemberEventDao, dslinkEventDao: DSLinkEventDao,
+                                requestEventDao: RequestEventDao, responseEventDao: ResponseEventDao)

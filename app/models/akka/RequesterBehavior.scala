@@ -5,7 +5,6 @@ import scala.util.control.NonFatal
 import org.joda.time.DateTime
 
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.metrics.MetricDao._
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
@@ -13,6 +12,8 @@ import models.rpc.DSAValue.DSAVal
  * Handles communication with a remote DSLink in Requester mode.
  */
 trait RequesterBehavior { me: AbstractDSLinkActor =>
+
+  import eventDaos._
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]

@@ -9,12 +9,13 @@ import org.joda.time.DateTime
 
 import anorm.{ Macro, SQL, SqlStringInterpolation, sqlToSimple }
 import anorm.JodaParameterMetaData.JodaDateTimeMetaData
+import javax.inject.Inject
 import models.metrics.{ ListResult, MemberEvent, MemberEventDao }
 
 /**
  * JDBC-based implementation of [[MemberEventDao]].
  */
-class JdbcMemberEventDao(conn: Connection) extends JdbcGenericDao(conn) with MemberEventDao {
+class JdbcMemberEventDao @Inject() (conn: Connection) extends JdbcGenericDao(conn) with MemberEventDao {
 
   private val memberEventParser = Macro.namedParser[MemberEvent]
 

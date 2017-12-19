@@ -16,6 +16,7 @@ import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
 import models.bench.{ BenchmarkRequester, BenchmarkResponder, BenchmarkStatsAggregator }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
+import models.metrics.EventDaos
 import play.api.libs.json.{ JsObject, Json, Writes }
 import play.api.mvc.{ ControllerComponents, Result }
 
@@ -25,6 +26,7 @@ import play.api.mvc.{ ControllerComponents, Result }
 @Singleton
 class BenchmarkController @Inject() (actorSystem: ActorSystem,
                                      dslinkMgr:   DSLinkManager,
+                                     eventDaos:   EventDaos,
                                      cc:          ControllerComponents) extends BasicController(cc) {
 
   import models.bench.BenchmarkStatsAggregator._
@@ -155,7 +157,7 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
                                    parseJson: Boolean) = {
     val proxy = dslinkMgr.getCommProxy(name)
     val config = BenchmarkResponder.BenchmarkResponderConfig(nodeCount, statsInterval, parseJson, Some(aggregator))
-    val props = BenchmarkResponder.props(name, proxy, config)
+    val props = BenchmarkResponder.props(name, proxy, eventDaos, config)
     actorSystem.actorOf(props)
   }
 
@@ -167,7 +169,7 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
     val proxy = dslinkMgr.getCommProxy(name)
     val config = BenchmarkRequester.BenchmarkRequesterConfig(path, batchSize, timeout, parseJson,
       statsInterval, Some(aggregator))
-    val props = BenchmarkRequester.props(name, proxy, config)
+    val props = BenchmarkRequester.props(name, proxy, eventDaos, config)
     actorSystem.actorOf(props)
   }
 

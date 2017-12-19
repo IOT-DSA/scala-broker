@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 
 import akka.actor.ActorSystem
 import models.akka.{ BackendActor, RootNodeActor }
+import models.metrics.{ EventDaos, NullDaos }
 
 /**
  * Broker backend application. Joins Akka cluster with "backend" role using
@@ -21,11 +22,15 @@ object BrokerBackend extends App {
   val systemName = config.getString("play.akka.actor-system")
   implicit val system = ActorSystem(systemName, config.resolve)
 
+  // TODO this class will go away once the refactoring is complete, so don't worry about Null DAOs
+  val eventDaos = EventDaos(new NullDaos.NullMemberEventDao, new NullDaos.NullDSLinkEventDao,
+    new NullDaos.NullRequestEventDao, new NullDaos.NullResponseEventDao)
+  val dslinkMgr = new ClusteredDSLinkManager(false, eventDaos)
+
   // start Backend
-  val dslinkMgr = new ClusteredDSLinkManager(false)
   system.actorOf(BackendActor.props(dslinkMgr), "backend")
 
-  // start Root node 
+  // start Root node
   RootNodeActor.singletonStart
 
   sys.addShutdownHook {

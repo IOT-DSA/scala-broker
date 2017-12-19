@@ -6,7 +6,7 @@ import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
 import models.{ RequestEnvelope, ResponseEnvelope, formatMessage }
 import models.akka.{ CommProxy, ConnectionInfo, IntCounter }
 import models.akka.Messages.ConnectEndpoint
-import models.metrics.MetricDao.{ dslinkEventDao, requestEventDao, responseEventDao }
+import models.metrics.EventDaos
 import models.rpc._
 
 /**
@@ -17,7 +17,9 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, sal
 /**
  * Represents a WebSocket connection and communicates to the DSLink actor.
  */
-class WebSocketActor(out: ActorRef, proxy: CommProxy, config: WebSocketActorConfig) extends Actor with ActorLogging {
+class WebSocketActor(out: ActorRef, proxy: CommProxy, eventDaos: EventDaos, config: WebSocketActorConfig) extends Actor with ActorLogging {
+
+  import eventDaos._
 
   protected val ci = config.connInfo
   protected val linkName = ci.linkName
@@ -121,6 +123,6 @@ object WebSocketActor {
   /**
    * Creates a new [[WebSocketActor]] props.
    */
-  def props(out: ActorRef, proxy: CommProxy, config: WebSocketActorConfig) =
-    Props(new WebSocketActor(out, proxy, config))
+  def props(out: ActorRef, proxy: CommProxy, eventDaos: EventDaos, config: WebSocketActorConfig) =
+    Props(new WebSocketActor(out, proxy, eventDaos, config))
 }

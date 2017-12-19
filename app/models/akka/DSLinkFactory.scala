@@ -3,13 +3,14 @@ package models.akka
 import akka.actor.Props
 import models.Settings
 import models.akka.responder.{ PooledResponderBehavior, ResponderBehavior, SimpleResponderBehavior }
+import models.metrics.EventDaos
 
 /**
  * Combines [[AbstractDSLinkActor] with Requester behavior and abstract Responder behavior
  * (to be provided by the subclasses).
  */
-abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager) extends AbstractDSLinkActor
-    with RequesterBehavior with ResponderBehavior {
+abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, eventDaos: EventDaos)
+  extends AbstractDSLinkActor(eventDaos) with RequesterBehavior with ResponderBehavior {
 
   /**
    * Performs post-stop actions on the requester.
@@ -34,16 +35,16 @@ abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager) extends AbstractDSLinkA
  * DSLink with a simple responder implementation, which uses local registries for LIST and
  * SUBSCRIBE calls.
  */
-class SimpleDSLinkActor(dslinkMgr: DSLinkManager)
-  extends BaseDSLinkActor(dslinkMgr)
+class SimpleDSLinkActor(dslinkMgr: DSLinkManager, eventDaos: EventDaos)
+  extends BaseDSLinkActor(dslinkMgr, eventDaos)
   with SimpleResponderBehavior
 
 /**
  * DSLink with a Router/Worker responder implementation, which uses two pools of workers
  * for managing LIST and SUBSCRIBE bindings.
  */
-class PooledDSLinkActor(dslinkMgr: DSLinkManager)
-  extends BaseDSLinkActor(dslinkMgr)
+class PooledDSLinkActor(dslinkMgr: DSLinkManager, eventDaos: EventDaos)
+  extends BaseDSLinkActor(dslinkMgr, eventDaos)
   with PooledResponderBehavior
 
 /**
@@ -69,11 +70,13 @@ object DSLinkFactory {
     case "dpubsub" => createDPubSubProps _
   }
 
-  private def createSimpleProps(dslinkMgr: DSLinkManager) = Props(new SimpleDSLinkActor(dslinkMgr))
+  private def createSimpleProps(dslinkMgr: DSLinkManager, eventDaos: EventDaos) =
+    Props(new SimpleDSLinkActor(dslinkMgr, eventDaos))
 
-  private def createPooledProps(dslinkMgr: DSLinkManager) = Props(new PooledDSLinkActor(dslinkMgr))
+  private def createPooledProps(dslinkMgr: DSLinkManager, eventDaos: EventDaos) =
+    Props(new PooledDSLinkActor(dslinkMgr, eventDaos))
 
-  private def createPubSubProps(dslinkMgr: DSLinkManager) = ???
+  private def createPubSubProps(dslinkMgr: DSLinkManager, eventDaos: EventDaos) = ???
 
-  private def createDPubSubProps(dslinkMgr: DSLinkManager) = ???
+  private def createDPubSubProps(dslinkMgr: DSLinkManager, eventDaos: EventDaos) = ???
 }

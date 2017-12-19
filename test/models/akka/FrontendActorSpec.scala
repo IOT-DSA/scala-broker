@@ -44,7 +44,7 @@ class FrontendActorSpec extends AbstractActorSpec {
 
   "Local FrontendActor" should {
     val backend = TestProbe("backend")(system)
-    val frontend = system.actorOf(FrontendActor.props, "frontend")
+    val frontend = system.actorOf(FrontendActor.props(nullDaos), "frontend")
     "fail when no backend is present" in {
       val future = frontend ? GetDSLinkStats
       future.failed.futureValue mustBe an[IllegalStateException]
@@ -78,7 +78,7 @@ class FrontendActorSpec extends AbstractActorSpec {
   "Cluster FrontendActor" should {
     val backend1 = TestProbe("backend")(backendSystem1)
     val backend2 = TestProbe("backend")(backendSystem2)
-    val frontend = frontendSystem.actorOf(FrontendActor.props, "frontend")
+    val frontend = frontendSystem.actorOf(FrontendActor.props(nullDaos), "frontend")
     "fail when no backend is present" in {
       val future = frontend ? GetDSLinkStats
       future.failed.futureValue mustBe an[IllegalStateException]
