@@ -162,26 +162,6 @@ object BackendActor {
   case object RegisterBackend
 
   /**
-   * Sent by a dslink to the backend to registers itself.
-   */
-  case class RegisterDSLink(name: String, mode: DSLinkMode, connected: Boolean)
-
-  /**
-   * Encapsulates DSLink state as seen by the backend.
-   */
-  private case class LinkState(mode: DSLinkMode, connected: Boolean)
-
-  /**
-   * Sent by a dslink to the backend when its status changes.
-   */
-  case class DSLinkStateChanged(name: String, mode: DSLinkMode, connected: Boolean)
-
-  /**
-   * Sent by a dslink to the backend to unregister itself.
-   */
-  case class UnregisterDSLink(name: String)
-
-  /**
    * Creates a new instance of [[BackendActor]] props.
    */
   def props(linkMgr: DSLinkManager) = Props(new BackendActor(linkMgr))

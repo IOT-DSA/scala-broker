@@ -3,8 +3,15 @@ package models
 import scala.concurrent.duration.DurationInt
 import scala.util.matching.Regex
 
+import _root_.akka.actor.{ Actor, ActorRef }
+import _root_.akka.pattern.{ ask => query }
+import _root_.akka.routing._
+import _root_.akka.util.Timeout
 import models.rpc.DSAValue.{ DSAVal, StringValue, array }
 import models.util.SimpleCache
+import scala.reflect.ClassTag
+import scala.concurrent.Future
+import models.akka.cluster.ShardedRoutee
 
 /**
  * Types and utility functions for DSA actors.
@@ -12,6 +19,32 @@ import models.util.SimpleCache
 package object akka {
 
   private val pathCache = new SimpleCache[String, String](100, 1, Some(10000L), Some(1 hour))
+
+  /**
+   * Adds convenience methods to akka Routee.
+   */
+  implicit class RichRoutee(val routee: Routee) extends AnyVal {
+    /**
+     * An alias for `send`.
+     */
+    def !(msg: Any)(implicit sender: ActorRef = Actor.noSender): Unit = routee.send(msg, sender)
+
+    /**
+     * Sends a message and returns a future response casting it to the specified type `T`.
+     */
+    def ask[T: ClassTag](msg: Any)(implicit timeout: Timeout,
+                                   sender: ActorRef = Actor.noSender): Future[T] = routee match {
+      case ActorRefRoutee(ref)             => query(ref, msg, sender)(timeout).mapTo[T]
+      case ActorSelectionRoutee(selection) => selection.ask(msg)(timeout, sender).mapTo[T]
+      case r @ ShardedRoutee(region, _)    => query(region, r.wrap(msg), sender)(timeout).mapTo[T]
+    }
+
+    /**
+     * An alias for `ask`.
+     */
+    def ?[T: ClassTag](msg: Any)(implicit timeout: Timeout,
+                                 sender: ActorRef = Actor.noSender) = ask[T](msg)
+  }
 
   /**
    * Interpolates strings to produce RegEx.

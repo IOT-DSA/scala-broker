@@ -5,6 +5,7 @@ import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
 import models.akka._
+import akka.routing.ActorRefRoutee
 
 /**
  * WebSocketActor test suite.
@@ -16,7 +17,7 @@ class WebSocketActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "ws", true, false)
   val config = WebSocketActorConfig(ci, "session", salt)
   val link = TestProbe()
-  val wsActor = system.actorOf(WebSocketActor.props(testActor, new ActorRefProxy(link.ref), nullDaos, config))
+  val wsActor = system.actorOf(WebSocketActor.props(testActor, new ActorRefRoutee(link.ref), nullDaos, config))
 
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {

@@ -37,7 +37,7 @@ class LocalDSLinkManager(implicit val system: ActorSystem) extends DSLinkManager
    */
   def tellNode(path: String, message: Any)(implicit sender: ActorRef = Actor.noSender) =
     if (path == Settings.Paths.Downstream)
-      system.actorSelection("/user/backend") ! message
+      system.actorSelection("/user/downstream") ! message
     else
       system.actorSelection("/user/" + Settings.Nodes.Root + path) ! message
 
@@ -55,7 +55,7 @@ class LocalDSLinkManager(implicit val system: ActorSystem) extends DSLinkManager
    */
   def getCommProxy(linkName: String) = {
     val downstream = system.actorSelection("/user/downstream")
-    val ref = akka.pattern.ask(downstream, DownstreamActor.GetOrCreateDSLink(linkName)).mapTo[ActorRef]
+    val ref = akka.pattern.ask(downstream, GetOrCreateDSLink(linkName)).mapTo[ActorRef]
     new ActorRefProxy(Await.result(ref, Duration.Inf))
   }
 

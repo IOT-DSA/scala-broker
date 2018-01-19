@@ -3,14 +3,14 @@ package controllers
 import scala.concurrent.Future
 
 import akka.actor.{ ActorSystem, PoisonPill }
+import akka.pattern.{ ask, pipe }
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.CurrentClusterState
-import akka.pattern.ask
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ BackendActor, DSLinkManager, FrontendActor, RootNodeActor }
-import models.akka.local.DownstreamActor
+import models.akka.DSLinkManager
 import models.metrics.EventDaos
+import modules.BrokerActors
 import play.api.mvc.ControllerComponents
 
 /**
@@ -19,6 +19,7 @@ import play.api.mvc.ControllerComponents
 @Singleton
 class MainController @Inject() (actorSystem: ActorSystem,
                                 dslinkMgr:   DSLinkManager,
+                                actors:      BrokerActors,
                                 eventDaos:   EventDaos,
                                 cc:          ControllerComponents) extends BasicController(cc) {
 
@@ -26,13 +27,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
 
   val isClusterMode = actorSystem.hasExtension(Cluster)
 
-  private val frontend = actorSystem.actorOf(FrontendActor.props(eventDaos), "frontend")
-
-  if (!isClusterMode) {
-    actorSystem.actorOf(BackendActor.props(dslinkMgr), "backend")
-    actorSystem.actorOf(DownstreamActor.props(dslinkMgr, eventDaos), "downstream")
-    actorSystem.actorOf(RootNodeActor.props, Settings.Nodes.Root)
-  }
+  val downstream = actors.downstream
 
   /**
    * Displays the main app page.
@@ -109,14 +104,14 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Returns a future with the cluster information.
    */
   //TODO temporary, the view needs to be reworked
-  private def getClusterInfo = (frontend ? GetBrokerInfo).mapTo[BrokerInfo].map {
+  private def getClusterInfo = (downstream ? GetBrokerInfo).mapTo[BrokerInfo].map {
     _.clusterInfo.getOrElse(CurrentClusterState())
   }
 
   /**
    * Returns a future with the number of registered dslinks by backend.
    */
-  private def getDSLinkCounts = (frontend ? GetDSLinkStats).mapTo[DSLinkStats]
+  private def getDSLinkCounts = (downstream ? GetDSLinkStats).mapTo[DSLinkStats]
 
   /**
    * Returns a future with the total number of registered dslinks.
@@ -141,5 +136,5 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Returns a future with the list of dslink names matching the criteria.
    */
   private def getDSLinkNames(regex: String, limit: Int, offset: Int) =
-    (frontend ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+    (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
 }

@@ -88,7 +88,7 @@ class InfluxDatabaseProvider extends Provider[Database] {
 class JdbcConnectionProvider extends Provider[Connection] {
   Class.forName(JDBC.Driver)
   private val conn = DriverManager.getConnection(JDBC.Url)
-  jdbc.createDatabaseSchema(conn)
+  createDatabaseSchema(conn)
   sys.addShutdownHook(conn.close)
 
   def get = conn

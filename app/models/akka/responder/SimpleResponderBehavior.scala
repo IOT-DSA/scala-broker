@@ -1,5 +1,7 @@
 package models.akka.responder
 
+import akka.actor._
+
 import models.Origin
 import models.rpc.DSAResponse
 import models.akka.AbstractDSLinkActor
@@ -8,7 +10,7 @@ import models.akka.AbstractDSLinkActor
  * Handles communication with a remote DSLink in Responder mode using local maps
  * for implementing multi-recipient responce delivery (LIST, SUBSCRIBE).
  */
-trait SimpleResponderBehavior extends ResponderBehavior { me: AbstractDSLinkActor =>
+trait SimpleResponderBehavior extends ResponderBehavior { me: Actor with ActorLogging =>
 
   private val listRegistry = new ListCallRegistry(log, ownId + "-LIST")
   private val subsRegistry = new SubscribeCallRegistry(log, ownId + "-SUBS")

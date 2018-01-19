@@ -6,17 +6,21 @@ import scala.util.Random
 import org.joda.time.DateTime
 
 import akka.actor._
+import akka.pattern.ask
+import akka.routing.Routee
 import akka.stream.{ Materializer, OverflowStrategy }
 import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import controllers.BasicController
 import javax.inject.{ Inject, Singleton }
 import models.Settings
 import models.akka.{ ConnectionInfo, DSLinkManager }
+import models.akka.Messages.GetOrCreateDSLink
 import models.metrics.EventDaos
 import models.rpc.DSAMessage
+import modules.BrokerActors
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
-import play.api.mvc.{ ControllerComponents, Request, RequestHeader, WebSocket }
+import play.api.mvc.{ ControllerComponents, Request, RequestHeader, Result, WebSocket }
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 
 /**
@@ -27,8 +31,11 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                                      materializer: Materializer,
                                      cache:        SyncCacheApi,
                                      dslinkMgr:    DSLinkManager,
+                                     actors:       BrokerActors,
                                      eventDaos:    EventDaos,
                                      cc:           ControllerComponents) extends BasicController(cc) {
+
+  type DSAFlow = Flow[DSAMessage, DSAMessage, _]
 
   import eventDaos._
 
@@ -66,7 +73,11 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
     log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
-    Future.successful(sessionInfo.map(createWSFlow(_)).toRight(Forbidden))
+    sessionInfo map {
+      createWSFlow(_) map Right[Result, DSAFlow]
+    } getOrElse
+      Future.successful(Left[Result, DSAFlow](Forbidden))
+
   }(transformer)
 
   /**
@@ -80,27 +91,30 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
 
-    val proxy = dslinkMgr.getCommProxy(sessionInfo.ci.linkName)
-    val wsProps = WebSocketActor.props(toSocket, proxy, eventDaos,
-      WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
+    val fRoutee = (actors.downstream ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
-    val fromSocket = actorSystem.actorOf(Props(new Actor {
-      val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+    fRoutee map { routee =>
+      val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
+        WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
-      def receive = {
-        case Success(_) | Failure(_) => wsActor ! PoisonPill
-        case Terminated(_)           => context.stop(self)
-        case other                   => wsActor ! other
-      }
+      val fromSocket = actorSystem.actorOf(Props(new Actor {
+        val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
 
-      override def supervisorStrategy = OneForOneStrategy() {
-        case _ => SupervisorStrategy.Stop
-      }
-    }))
+        def receive = {
+          case Success(_) | Failure(_) => wsActor ! PoisonPill
+          case Terminated(_)           => context.stop(self)
+          case other                   => wsActor ! other
+        }
 
-    Flow.fromSinkAndSource[DSAMessage, DSAMessage](
-      Sink.actorRef(fromSocket, Success(())),
-      Source.fromPublisher(publisher))
+        override def supervisorStrategy = OneForOneStrategy() {
+          case _ => SupervisorStrategy.Stop
+        }
+      }))
+
+      Flow.fromSinkAndSource[DSAMessage, DSAMessage](
+        Sink.actorRef(fromSocket, Success(())),
+        Source.fromPublisher(publisher))
+    }
   }
 
   /**

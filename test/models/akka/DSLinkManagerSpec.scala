@@ -10,7 +10,6 @@ import akka.util.Timeout
 import models.Settings
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
-import models.akka.local.DownstreamActor.GetOrCreateDSLink
 
 /**
  * DSLinkManager test suite.
@@ -68,27 +67,30 @@ class DSLinkManagerSpec extends AbstractActorSpec with Inside {
 
   "ClusteredDSLinkManager" should {
     val clusterMgr: DSLinkManager = new ClusteredDSLinkManager(false, nullDaos)(backendSystem)
-    val backendProbe = TestProbe()(backendSystem)
-    val backend = backendSystem.actorOf(TestActors.forwardActorProps(backendProbe.ref), "backend")
+    val downProbe = TestProbe()(backendSystem)
+    val downstream = backendSystem.actorOf(TestActors.forwardActorProps(downProbe.ref), "downstream")
 
     "send a message to a dslink" in {
       clusterMgr.tellDSLink("abc", ConnectEndpoint(testActor, ConnectionInfo("", "abc", true, false)))
-      backendProbe.expectMsg(RegisterDSLink("abc", DSLinkMode.Requester, true))
+      downProbe.expectMsg(RegisterDSLink("abc", DSLinkMode.Requester, false))
+      downProbe.expectMsg(DSLinkStateChanged("abc", DSLinkMode.Requester, true))
       clusterMgr.tellDSLink("abc", PoisonPill)
-      backendProbe.expectMsg(UnregisterDSLink("abc"))
+      downProbe.expectMsg(UnregisterDSLink("abc"))
     }
     "send request-reply to a dslink" in {
       val ci = ConnectionInfo("", "xyz", true, false)
       whenReady(clusterMgr.askDSLink[LinkInfo]("xyz", GetLinkInfo)) { _ mustBe LinkInfo(ci, false, None, None) }
+      downProbe.expectMsg(RegisterDSLink("xyz", DSLinkMode.Requester, false))
     }
     "connect dslink to endpoint" in {
       val ci = ConnectionInfo("", "abc", true, false)
       clusterMgr.connectEndpoint("abc", testActor, ci)
-      backendProbe.expectMsg(RegisterDSLink("abc", DSLinkMode.Requester, true))
+      downProbe.expectMsg(RegisterDSLink("abc", DSLinkMode.Requester, false))
+      downProbe.expectMsg(DSLinkStateChanged("abc", DSLinkMode.Requester, true))
     }
     "disconnect dslink to endpoint" in {
       clusterMgr.disconnectEndpoint("abc", false)
-      backendProbe.expectMsg(DSLinkStateChanged("abc", DSLinkMode.Requester, false))
+      downProbe.expectMsg(DSLinkStateChanged("abc", DSLinkMode.Requester, false))
     }
     "get dslink info" in {
       val ci = ConnectionInfo("", "abc", true, false)

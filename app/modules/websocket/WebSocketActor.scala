@@ -3,9 +3,11 @@ package modules.websocket
 import org.joda.time.DateTime
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
-import models.{ RequestEnvelope, ResponseEnvelope, formatMessage }
-import models.akka.{ CommProxy, ConnectionInfo, IntCounter }
+import akka.routing.Routee
+import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.{ ConnectionInfo, IntCounter, RichRoutee }
 import models.akka.Messages.ConnectEndpoint
+import models.formatMessage
 import models.metrics.EventDaos
 import models.rpc._
 
@@ -17,7 +19,7 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, sal
 /**
  * Represents a WebSocket connection and communicates to the DSLink actor.
  */
-class WebSocketActor(out: ActorRef, proxy: CommProxy, eventDaos: EventDaos, config: WebSocketActorConfig) extends Actor with ActorLogging {
+class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config: WebSocketActorConfig) extends Actor with ActorLogging {
 
   import eventDaos._
 
@@ -35,7 +37,7 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, eventDaos: EventDaos, conf
   override def preStart() = {
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
-    proxy tell ConnectEndpoint(self, ci)
+    routee ! ConnectEndpoint(self, ci)
     dslinkEventDao.saveConnectionEvent(startTime, "connect", config.sessionId, ci.dsId, linkName,
       ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
   }
@@ -64,12 +66,12 @@ class WebSocketActor(out: ActorRef, proxy: CommProxy, eventDaos: EventDaos, conf
     case m @ RequestMessage(msg, _, _) =>
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
-      proxy tell m
+      routee ! m
       requestEventDao.saveRequestMessageEvent(DateTime.now, true, linkName, ci.linkAddress, m)
     case m @ ResponseMessage(msg, _, _) =>
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
-      proxy tell m
+      routee ! m
       responseEventDao.saveResponseMessageEvent(DateTime.now, true, linkName, ci.linkAddress, m)
     case e @ RequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
@@ -123,6 +125,6 @@ object WebSocketActor {
   /**
    * Creates a new [[WebSocketActor]] props.
    */
-  def props(out: ActorRef, proxy: CommProxy, eventDaos: EventDaos, config: WebSocketActorConfig) =
-    Props(new WebSocketActor(out, proxy, eventDaos, config))
+  def props(out: ActorRef, routee: Routee, eventDaos: EventDaos, config: WebSocketActorConfig) =
+    Props(new WebSocketActor(out, routee, eventDaos, config))
 }

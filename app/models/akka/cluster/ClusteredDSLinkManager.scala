@@ -39,7 +39,7 @@ class ClusteredDSLinkManager(frontendMode: Boolean, eventDaos: EventDaos)(implic
   /**
    * Create shard region.
    */
-  private val region = {
+  val region = {
     val sharding = ClusterSharding(system)
     if (frontendMode)
       sharding.startProxy(Nodes.Downstream, Some("backend"), extractEntityId, extractShardId)
