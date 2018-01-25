@@ -15,7 +15,6 @@ import models.metrics.EventDaos
  */
 class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
   import AbstractDSLinkActorSpec._
-  import BackendActor._
   import Messages._
 
   implicit val timeout = Timeout(5 seconds)

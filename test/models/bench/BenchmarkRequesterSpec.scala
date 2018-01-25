@@ -5,8 +5,9 @@ import scala.concurrent.duration.DurationInt
 import org.scalatest.Inside
 
 import akka.actor.PoisonPill
+import akka.routing.ActorRefRoutee
 import akka.testkit.TestProbe
-import models.akka.{ AbstractActorSpec, ActorRefProxy, ConnectionInfo }
+import models.akka.{ AbstractActorSpec, ConnectionInfo }
 import models.akka.Messages.ConnectEndpoint
 import models.rpc._
 
@@ -22,10 +23,10 @@ class BenchmarkRequesterSpec extends AbstractActorSpec with Inside {
 
   val reqName = "BenchRQ"
   val probe = TestProbe()
-  val proxy = new ActorRefProxy(probe.ref)
+  val routee = new ActorRefRoutee(probe.ref)
   val stats = TestProbe()
   val config = BenchmarkRequesterConfig(nodePath, 5, 200 milliseconds, true, 100 milliseconds, Some(stats.ref))
-  val requester = system.actorOf(BenchmarkRequester.props(reqName, proxy, nullDaos, config))
+  val requester = system.actorOf(BenchmarkRequester.props(reqName, routee, nullDaos, config))
 
   "BenchmarkRequester" should {
     "register with proxy" in {

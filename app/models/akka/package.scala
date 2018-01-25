@@ -1,5 +1,6 @@
 package models
 
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.matching.Regex
 
@@ -7,11 +8,9 @@ import _root_.akka.actor.{ Actor, ActorRef }
 import _root_.akka.pattern.{ ask => query }
 import _root_.akka.routing._
 import _root_.akka.util.Timeout
+import models.akka.cluster.ShardedRoutee
 import models.rpc.DSAValue.{ DSAVal, StringValue, array }
 import models.util.SimpleCache
-import scala.reflect.ClassTag
-import scala.concurrent.Future
-import models.akka.cluster.ShardedRoutee
 
 /**
  * Types and utility functions for DSA actors.
@@ -32,18 +31,17 @@ package object akka {
     /**
      * Sends a message and returns a future response casting it to the specified type `T`.
      */
-    def ask[T: ClassTag](msg: Any)(implicit timeout: Timeout,
-                                   sender: ActorRef = Actor.noSender): Future[T] = routee match {
-      case ActorRefRoutee(ref)             => query(ref, msg, sender)(timeout).mapTo[T]
-      case ActorSelectionRoutee(selection) => selection.ask(msg)(timeout, sender).mapTo[T]
-      case r @ ShardedRoutee(region, _)    => query(region, r.wrap(msg), sender)(timeout).mapTo[T]
+    def ask(msg: Any)(implicit timeout: Timeout,
+                      sender: ActorRef = Actor.noSender): Future[Any] = routee match {
+      case ActorRefRoutee(ref)             => query(ref, msg, sender)(timeout).mapTo[Any]
+      case ActorSelectionRoutee(selection) => selection.ask(msg)(timeout, sender).mapTo[Any]
+      case r: ShardedRoutee                => r.ask(msg)
     }
 
     /**
      * An alias for `ask`.
      */
-    def ?[T: ClassTag](msg: Any)(implicit timeout: Timeout,
-                                 sender: ActorRef = Actor.noSender) = ask[T](msg)
+    def ?(msg: Any)(implicit timeout: Timeout, sender: ActorRef = Actor.noSender) = ask(msg)
   }
 
   /**

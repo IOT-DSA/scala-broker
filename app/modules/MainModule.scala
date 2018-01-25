@@ -24,7 +24,9 @@ import play.api.inject.Module
 class MainModule extends Module {
 
   def bindings(environment: Environment, configuration: Configuration) = {
-    Seq(bind[DSLinkManager].toProvider[DSLinkManagerProvider]) ++ createEventDaoBindings
+    Seq(
+      bind[DSLinkManager].toProvider[DSLinkManagerProvider],
+      bind[BrokerActors].toSelf.eagerly) ++ createEventDaoBindings
   }
 
   private def createEventDaoBindings = Metrics.Collector match {

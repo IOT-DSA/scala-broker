@@ -12,6 +12,7 @@ import models.rpc.DSAValue.DSAVal
  * Handles communication with a remote DSLink in Requester mode.
  */
 trait RequesterBehavior { me: AbstractDSLinkActor =>
+  import models.Settings._
 
   import eventDaos._
 
@@ -162,6 +163,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
    * Sends a message to a DSA node. The implementations of this method may use direct Actor->Actor
    * delivery, or sharded region delivery, etc - depending on the destination and deployment type
    * (local vs clustered).
+   *
+   * TODO for clustered, a custom router needed for that
    */
-  def dsaSend(to: String, msg: Any): Unit
+  def dsaSend(to: String, msg: Any): Unit = to match {
+    case Paths.Downstream                          => context.actorSelection("/user" + Paths.Downstream) ! msg
+    case path if path.startsWith(Paths.Downstream) => context.actorSelection("/user" + path) ! msg
+    case path                                      => context.actorSelection("/user/" + Nodes.Root + path) ! msg
+  }
 }

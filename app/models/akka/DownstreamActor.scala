@@ -32,9 +32,9 @@ abstract class DownstreamActor extends Actor with ActorLogging with SimpleRespon
 
   protected var listRid: Option[Int] = None
 
-  override def preStart = log.debug(s"$ownId actor created")
+  override def preStart = log.info(s"$ownId actor created")
 
-  override def postStop = log.debug(s"$ownId actor stopped")
+  override def postStop = log.info(s"$ownId actor stopped")
 
   /**
    * Terminates the actor system if the actor's path does not match `/user/<path>`.
@@ -58,6 +58,7 @@ abstract class DownstreamActor extends Actor with ActorLogging with SimpleRespon
    * Searches DSLinks by name pattern.
    */
   protected def findDSLinks(regex: String, limit: Int, offset: Int) = {
+    log.debug("{}: searching for dslinks: pattern={}, limit={}, offset={}", ownId, regex, limit, offset)
     val pattern = Pattern.compile(regex)
     val filtered = links.keys.filter(pattern.matcher(_).matches).toList.sorted
     filtered.drop(offset).take(limit)

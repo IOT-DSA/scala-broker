@@ -2,13 +2,14 @@ package controllers
 
 import scala.concurrent.Future
 
-import akka.actor.{ ActorSystem, PoisonPill }
-import akka.pattern.{ ask, pipe }
+import akka.actor.ActorSystem
+import akka.pattern.ask
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.CurrentClusterState
+import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.DSLinkManager
+import models.akka.{ DSLinkManager, RichRoutee }
 import models.metrics.EventDaos
 import modules.BrokerActors
 import play.api.mvc.ControllerComponents
@@ -66,23 +67,26 @@ class MainController @Inject() (actorSystem: ActorSystem,
     for {
       names <- fLinkNames
       (down, up) <- fDownUpCount
-      infos <- Future.sequence(names map dslinkMgr.getDSLinkInfo)
+      links <- Future.sequence(names map (name => (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]))
+      infos <- Future.sequence(links map (link => (link ? GetLinkInfo).mapTo[LinkInfo]))
     } yield Ok(views.html.links(regex, limit, offset, infos, down, Some(down), Some(up)))
   }
 
   /**
-   * Disconnects the dslink from Web Socket.
+   * Disconnects the dslink from endpoint.
    */
-  def disconnectWS(name: String) = Action {
-    dslinkMgr.disconnectEndpoint(name, true)
-    Ok(s"Endpoint '$name' disconnected")
+  def disconnectEndpoint(name: String) = Action.async {
+    (downstream ? GetOrCreateDSLink(name)).mapTo[Routee] map { routee =>
+      routee ! DisconnectEndpoint(true)
+      Ok(s"Endpoint '$name' disconnected")
+    }
   }
 
   /**
    * Removes the DSLink.
    */
   def removeLink(name: String) = Action {
-    dslinkMgr.tellDSLink(name, PoisonPill)
+    downstream ! RemoveDSLink(name)
     Ok(s"DSLink '$name' removed")
   }
 

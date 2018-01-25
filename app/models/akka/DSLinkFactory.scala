@@ -24,11 +24,6 @@ abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, eventDaos: EventDaos)
    * Handles messages in CONNECTED state.
    */
   override def connected = super.connected orElse requesterBehavior orElse responderBehavior
-
-  /**
-   * Sends a message to an actor using its DSA link path.
-   */
-  def dsaSend(to: String, msg: Any) = dslinkMgr.dsaSend(to, msg)
 }
 
 /**

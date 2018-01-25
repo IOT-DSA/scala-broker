@@ -2,7 +2,8 @@ package controllers
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import scala.concurrent.duration.{ DurationInt, DurationLong, FiniteDuration }
+import scala.concurrent.Await
+import scala.concurrent.duration.{ Duration, DurationInt, DurationLong, FiniteDuration }
 import scala.util.Random
 
 import org.joda.time.DateTime
@@ -10,13 +11,16 @@ import org.joda.time.format.{ DateTimeFormat, PeriodFormat }
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill }
 import akka.pattern.ask
+import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
 import models.akka.DSLinkManager
+import models.akka.Messages.GetOrCreateDSLink
+import models.bench._
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
-import models.bench.{ BenchmarkRequester, BenchmarkResponder, BenchmarkStatsAggregator }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
 import models.metrics.EventDaos
+import modules.BrokerActors
 import play.api.libs.json.{ JsObject, Json, Writes }
 import play.api.mvc.{ ControllerComponents, Result }
 
@@ -26,6 +30,7 @@ import play.api.mvc.{ ControllerComponents, Result }
 @Singleton
 class BenchmarkController @Inject() (actorSystem: ActorSystem,
                                      dslinkMgr:   DSLinkManager,
+                                     actors:      BrokerActors,
                                      eventDaos:   EventDaos,
                                      cc:          ControllerComponents) extends BasicController(cc) {
 
@@ -72,6 +77,8 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
   private var requesters: Iterable[ActorRef] = Nil
   private var expectedInvokeRate: Int = _
   private var expectedUpdateToInvokeRatio: Double = _
+
+  private val downstream = actors.downstream
 
   /**
    * Starts benchmark.
@@ -152,25 +159,26 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
 
   /**
    * Creates a benchmark responder.
+   * TODO refactor to remove blocking
    */
   private def createBenchResponder(name: String, nodeCount: Int, statsInterval: FiniteDuration,
                                    parseJson: Boolean) = {
-    val proxy = dslinkMgr.getCommProxy(name)
     val config = BenchmarkResponder.BenchmarkResponderConfig(nodeCount, statsInterval, parseJson, Some(aggregator))
-    val props = BenchmarkResponder.props(name, proxy, eventDaos, config)
-    actorSystem.actorOf(props)
+    val routee = (downstream ? GetOrCreateDSLink).mapTo[Routee]
+    val ref = routee map (r => actorSystem.actorOf(BenchmarkResponder.props(name, r, eventDaos, config)))
+    Await.result(ref, Duration.Inf)
   }
 
   /**
    * Creates a benchmark requester.
+   * TODO refactor to remove blocking
    */
-  private def createBenchRequester(name: String, batchSize: Int, timeout: FiniteDuration,
+  private def createBenchRequester(name: String, batchSize: Int, tout: FiniteDuration,
                                    parseJson: Boolean, statsInterval: FiniteDuration, path: String) = {
-    val proxy = dslinkMgr.getCommProxy(name)
-    val config = BenchmarkRequester.BenchmarkRequesterConfig(path, batchSize, timeout, parseJson,
-      statsInterval, Some(aggregator))
-    val props = BenchmarkRequester.props(name, proxy, eventDaos, config)
-    actorSystem.actorOf(props)
+    val config = BenchmarkRequester.BenchmarkRequesterConfig(path, batchSize, tout, parseJson, statsInterval, Some(aggregator))
+    val routee = (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]
+    val ref = routee map (r => actorSystem.actorOf(BenchmarkRequester.props(name, r, eventDaos, config)))
+    Await.result(ref, Duration.Inf)
   }
 
   /**
