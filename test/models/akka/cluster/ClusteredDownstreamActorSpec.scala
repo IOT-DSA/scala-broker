@@ -30,15 +30,15 @@ class ClusteredDownstreamActorSpec extends AbstractActorSpec with Inside {
 
   val system1 = createActorSystem(2551)
   val mgr1 = new ClusteredDSLinkManager(false, nullDaos)(system1)
-  val downstream1 = system1.actorOf(ClusteredDownstreamActor.props(mgr1, nullDaos), Downstream)
+  val downstream1 = system1.actorOf(ClusteredDownstreamActor.props(mgr1), Downstream)
 
   val system2 = createActorSystem(0)
   val mgr2 = new ClusteredDSLinkManager(false, nullDaos)(system2)
-  val downstream2 = system2.actorOf(ClusteredDownstreamActor.props(mgr2, nullDaos), Downstream)
+  val downstream2 = system2.actorOf(ClusteredDownstreamActor.props(mgr2), Downstream)
 
   val system3 = createActorSystem(0)
   val mgr3 = new ClusteredDSLinkManager(false, nullDaos)(system3)
-  val downstream3 = system3.actorOf(ClusteredDownstreamActor.props(mgr3, nullDaos), Downstream)
+  val downstream3 = system3.actorOf(ClusteredDownstreamActor.props(mgr3), Downstream)
 
   override def afterAll = {
     super.afterAll

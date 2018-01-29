@@ -2,12 +2,10 @@ package models.akka.cluster
 
 import scala.concurrent.Await
 
-import akka.actor.{ Identify, PoisonPill, actorRef2Scala }
+import akka.actor.{ Identify, PoisonPill, Props, actorRef2Scala }
 import akka.pattern.{ ask, pipe }
 import akka.routing.Routee
-import models.akka.{ DownstreamActor, IsNode, rows }
-import models.metrics.EventDaos
-import akka.actor.Props
+import models.akka.{ DSLinkManager, DownstreamActor, IsNode, RichRoutee, rows }
 
 /**
  * Actor for DSA `/downstream` node.
@@ -17,14 +15,11 @@ import akka.actor.Props
  * actorSystem.actorOf(ClusteredDownstreamActor.props(...), "downstream")
  * </pre>
  */
-class ClusteredDownstreamActor(dslinkMgr: ClusteredDSLinkManager, eventDaos: EventDaos)
-  extends DownstreamActor with ClusteredActor {
+class ClusteredDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor with ClusteredActor {
 
   import context.dispatcher
   import models.akka.Messages._
   import models.rpc.DSAValue._
-
-  val region = dslinkMgr.region
 
   /**
    * Handles incoming messages.
@@ -85,7 +80,7 @@ class ClusteredDownstreamActor(dslinkMgr: ClusteredDSLinkManager, eventDaos: Eve
       tellPeers(PeerMessage(evt))
 
     case GetDSLinkStats =>
-      val nodeStats = askPeers[DSLinkNodeStats](PeerMessage(GetDSLinkStats)) 
+      val nodeStats = askPeers[DSLinkNodeStats](PeerMessage(GetDSLinkStats))
       nodeStats map DSLinkStats pipeTo sender
 
     case FindDSLinks(regex, limit, offset) =>
@@ -105,17 +100,15 @@ class ClusteredDownstreamActor(dslinkMgr: ClusteredDSLinkManager, eventDaos: Eve
    * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
    */
   protected def getOrCreateDSLink(name: String): Routee = {
-    val routee = ShardedRoutee(region, name)
-    routee.send(Identify, self)
+    val routee = dslinkMgr.getDSLinkRoutee(name) //ShardedRoutee(region, name)
+    routee ! Identify
     routee
   }
 
   /**
    * Terminates the specified DSLink actors.
    */
-  protected def removeDSLinks(names: String*) = {
-    names foreach (ShardedRoutee(region, _).send(PoisonPill, self))
-  }
+  protected def removeDSLinks(names: String*) = names map dslinkMgr.getDSLinkRoutee foreach (_ ! PoisonPill)
 
   /**
    * Creates a list of values in response to LIST request by querying peer nodes
@@ -143,6 +136,5 @@ object ClusteredDownstreamActor {
   /**
    * Creates a new props for [[ClusteredDownstreamActor]].
    */
-  def props(dslinkMgr: ClusteredDSLinkManager, eventDaos: EventDaos) =
-    Props(new ClusteredDownstreamActor(dslinkMgr, eventDaos))
+  def props(dslinkMgr: DSLinkManager) = Props(new ClusteredDownstreamActor(dslinkMgr))
 }

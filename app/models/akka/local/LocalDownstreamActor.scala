@@ -2,8 +2,7 @@ package models.akka.local
 
 import akka.actor.{ PoisonPill, Props, actorRef2Scala }
 import akka.routing.{ ActorRefRoutee, Routee }
-import models.akka.{ DSLinkFactory, DSLinkManager, DownstreamActor, IsNode, rows }
-import models.metrics.EventDaos
+import models.akka.{ DSLinkManager, DownstreamActor, IsNode, rows }
 
 /**
  * Actor for DSA `/downstream` node.
@@ -13,7 +12,7 @@ import models.metrics.EventDaos
  * actorSystem.actorOf(LocalDownstreamActor.props(...), "downstream")
  * </pre>
  */
-class LocalDownstreamActor(dslinkMgr: DSLinkManager, eventDaos: EventDaos) extends DownstreamActor {
+class LocalDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor {
   import models.akka.Messages._
   import models.rpc.DSAValue._
 
@@ -64,7 +63,7 @@ class LocalDownstreamActor(dslinkMgr: DSLinkManager, eventDaos: EventDaos) exten
   protected def getOrCreateDSLink(name: String): Routee = {
     val child = context.child(name) getOrElse {
       log.info("{}: creating a new dslink '{}'", ownId, name)
-      context.actorOf(DSLinkFactory.props(dslinkMgr, eventDaos), name)
+      context.actorOf(dslinkMgr.props, name)
     }
     ActorRefRoutee(child)
   }
@@ -96,5 +95,5 @@ object LocalDownstreamActor {
   /**
    * Creates a new props for [[LocalDownstreamActor]].
    */
-  def props(dslinkMgr: DSLinkManager, eventDaos: EventDaos) = Props(new LocalDownstreamActor(dslinkMgr, eventDaos))
+  def props(dslinkMgr: DSLinkManager) = Props(new LocalDownstreamActor(dslinkMgr))
 }

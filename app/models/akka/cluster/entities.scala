@@ -11,6 +11,11 @@ import akka.util.Timeout
 import models.Settings
 
 /**
+ * An envelope for message routing, that provides the entityId for the shard coordinator.
+ */
+final case class EntityEnvelope(entityId: String, msg: Any)
+
+/**
  * A wrapper for messages passed between peer actors in the cluster.
  */
 final case class PeerMessage(payload: Any)

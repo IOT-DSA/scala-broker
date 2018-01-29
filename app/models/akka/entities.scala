@@ -31,11 +31,6 @@ class IntCounter(init: Int = 0) {
 }
 
 /**
- * An envelope for message routing, that provides the entityId for the shard coordinator.
- */
-final case class EntityEnvelope(entityId: String, msg: Any)
-
-/**
  * DSA Link mode.
  */
 object DSLinkMode extends Enumeration {

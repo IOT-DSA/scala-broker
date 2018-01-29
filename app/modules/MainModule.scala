@@ -66,7 +66,7 @@ class DSLinkManagerProvider @Inject() (actorSystem: ActorSystem, eventDaos: Even
   private val mgr = if (actorSystem.hasExtension(Cluster))
     new ClusteredDSLinkManager(false, eventDaos)(actorSystem)
   else
-    new LocalDSLinkManager()(actorSystem)
+    new LocalDSLinkManager(eventDaos)(actorSystem)
 
   def get = mgr
 }

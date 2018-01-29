@@ -15,6 +15,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   import models.Settings._
 
   import eventDaos._
+  
+  protected def dslinkMgr: DSLinkManager
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
@@ -97,7 +99,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       case (to, reqs) =>
         val envelope = RequestEnvelope(reqs.toSeq)
         log.debug("{}: sending {} to [{}]", ownId, envelope, to)
-        dsaSend(to, envelope)
+        dslinkMgr.dsaSend(to, envelope)
         logRequestBatch(to, envelope.requests)
     }
   }
@@ -157,18 +159,5 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     }
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)
-  }
-
-  /**
-   * Sends a message to a DSA node. The implementations of this method may use direct Actor->Actor
-   * delivery, or sharded region delivery, etc - depending on the destination and deployment type
-   * (local vs clustered).
-   *
-   * TODO for clustered, a custom router needed for that
-   */
-  def dsaSend(to: String, msg: Any): Unit = to match {
-    case Paths.Downstream                          => context.actorSelection("/user" + Paths.Downstream) ! msg
-    case path if path.startsWith(Paths.Downstream) => context.actorSelection("/user" + path) ! msg
-    case path                                      => context.actorSelection("/user/" + Nodes.Root + path) ! msg
   }
 }

@@ -4,6 +4,7 @@ import akka.actor.{ Actor, Props, actorRef2Scala }
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.Messages.{ DSLinkStateChanged, RegisterDSLink }
+import models.akka.local.LocalDSLinkManager
 import models.metrics.EventDaos
 import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
 
@@ -12,6 +13,8 @@ import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
  */
 class RequesterBehaviorSpec extends AbstractActorSpec {
   import RequesterBehaviorSpec._
+
+  val dslinkMgr = new LocalDSLinkManager(nullDaos)
 
   val abcProbe = TestProbe()
   class AbcActor extends Actor {
@@ -31,7 +34,7 @@ class RequesterBehaviorSpec extends AbstractActorSpec {
   }
   val brokerActor = system.actorOf(Props(new BrokerActor), "broker")
 
-  val requester = system.actorOf(Props(new Requester(nullDaos)), "requester")
+  val requester = system.actorOf(Props(new Requester(dslinkMgr, nullDaos)), "requester")
   val ws = TestProbe()
 
   "RequesterActor" should {
@@ -73,7 +76,8 @@ object RequesterBehaviorSpec {
   /**
    * Test actor.
    */
-  class Requester(eventDaos: EventDaos) extends AbstractDSLinkActor(eventDaos) with RequesterBehavior {
+  class Requester(val dslinkMgr: DSLinkManager, eventDaos: EventDaos)
+    extends AbstractDSLinkActor(eventDaos) with RequesterBehavior {
     override def connected = super.connected orElse requesterBehavior
   }
 }

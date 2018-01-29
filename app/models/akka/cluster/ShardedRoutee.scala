@@ -5,7 +5,6 @@ import scala.concurrent.Future
 import akka.actor.{ Actor, ActorRef }
 import akka.routing.Routee
 import akka.util.Timeout
-import models.akka.EntityEnvelope
 
 /**
  * Sends messages using ShardRegion containing entities.
