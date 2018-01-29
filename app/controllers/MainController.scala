@@ -1,63 +1,34 @@
 package controllers
 
 import scala.concurrent.Future
-import scala.util.Random
 
-import org.joda.time.DateTime
-
-import akka.actor._
+import akka.actor.ActorSystem
+import akka.pattern.ask
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.CurrentClusterState
-import akka.pattern.ask
-import akka.stream.{ Materializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
-import akka.util.Timeout
+import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka._
-import models.akka.cluster.ClusteredDSLinkManager
-import models.akka.local.{ DownstreamActor, LocalDSLinkManager }
-import models.metrics.MetricDao.dslinkEventDao
-import models.rpc.{ DSAMessage, DSAMessageFormat }
-import play.api.Logger
-import play.api.cache.SyncCacheApi
-import play.api.libs.json.{ JsError, Json, Reads }
-import play.api.mvc.{ AbstractController, ControllerComponents, Request, RequestHeader, WebSocket }
-import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
+import models.akka.{ DSLinkManager, RichRoutee }
+import models.metrics.EventDaos
+import modules.BrokerActors
+import play.api.mvc.ControllerComponents
 
 /**
  * Handles main web requests.
  */
 @Singleton
-class MainController @Inject() (implicit actorSystem: ActorSystem,
-                                materializer: Materializer, cache: SyncCacheApi,
-                                cc: ControllerComponents) extends AbstractController(cc) {
+class MainController @Inject() (actorSystem: ActorSystem,
+                                dslinkMgr:   DSLinkManager,
+                                actors:      BrokerActors,
+                                eventDaos:   EventDaos,
+                                cc:          ControllerComponents) extends BasicController(cc) {
+
   import models.akka.Messages._
-
-  private val log = Logger(getClass)
-
-  implicit private val timeout = Timeout(Settings.QueryTimeout)
-
-  implicit private val executionContext = cc.executionContext
-
-  implicit val ConnectionRequestReads = Json.reads[ConnectionRequest]
-
-  private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
 
   val isClusterMode = actorSystem.hasExtension(Cluster)
 
-  private val frontend = actorSystem.actorOf(FrontendActor.props, "frontend")
-
-  val dslinkMgr = if (isClusterMode)
-    new ClusteredDSLinkManager(true)
-  else
-    new LocalDSLinkManager
-
-  if (!isClusterMode) {
-    actorSystem.actorOf(BackendActor.props(dslinkMgr), "backend")
-    actorSystem.actorOf(DownstreamActor.props, "downstream")
-    actorSystem.actorOf(RootNodeActor.props, Settings.Nodes.Root)
-  }
+  val downstream = actors.downstream
 
   /**
    * Displays the main app page.
@@ -96,23 +67,26 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
     for {
       names <- fLinkNames
       (down, up) <- fDownUpCount
-      infos <- Future.sequence(names map dslinkMgr.getDSLinkInfo)
+      links <- Future.sequence(names map (name => (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]))
+      infos <- Future.sequence(links map (link => (link ? GetLinkInfo).mapTo[LinkInfo]))
     } yield Ok(views.html.links(regex, limit, offset, infos, down, Some(down), Some(up)))
   }
 
   /**
-   * Disconnects the dslink from Web Socket.
+   * Disconnects the dslink from endpoint.
    */
-  def disconnectWS(name: String) = Action {
-    dslinkMgr.disconnectEndpoint(name, true)
-    Ok(s"Endpoint '$name' disconnected")
+  def disconnectEndpoint(name: String) = Action.async {
+    (downstream ? GetOrCreateDSLink(name)).mapTo[Routee] map { routee =>
+      routee ! DisconnectEndpoint(true)
+      Ok(s"Endpoint '$name' disconnected")
+    }
   }
 
   /**
    * Removes the DSLink.
    */
   def removeLink(name: String) = Action {
-    dslinkMgr.tellDSLink(name, PoisonPill)
+    downstream ! RemoveDSLink(name)
     Ok(s"DSLink '$name' removed")
   }
 
@@ -131,105 +105,17 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
   }
 
   /**
-   * Accepts a connection request and sends back the server config JSON.
-   */
-  def conn = Action(validateJson[ConnectionRequest]) { implicit request =>
-    log.debug(s"Conn request received at $request : ${request.body}")
-
-    val ci = buildConnectionInfo(request)
-    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
-    val json = Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
-
-    val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
-
-    cache.set(ci.dsId, DSLinkSessionInfo(ci, sessionId))
-
-    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", sessionId,
-      ci.dsId, ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
-
-    log.debug(s"Conn response sent: ${json.toString}")
-    Ok(json)
-  }
-
-  /**
-   * Establishes a WebSocket connection.
-   */
-  def ws = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
-    log.debug(s"WS request received: $request")
-    val dsId = getDsId(request)
-    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
-    log.debug(s"Session info retrieved for $dsId: $sessionInfo")
-
-    Future.successful(sessionInfo.map(createWSFlow(_)).toRight(Forbidden))
-  }(transformer)
-
-  /**
-   * Validates the JSON and extracts a request message.
-   */
-  private def validateJson[A: Reads] = parse.tolerantJson.validate { js =>
-    js.validate[A].asEither.left.map { e =>
-      log.error(s"Cannot parse connection request JSON: $js. Error info: ${JsError.toJson(e)}")
-      BadRequest(JsError.toJson(e))
-    }
-  }
-
-  /**
-   * Creates a new WebSocket flow bound to a newly created WSActor.
-   */
-  private def createWSFlow(
-    sessionInfo: DSLinkSessionInfo,
-    bufferSize:  Int               = 16, overflow: OverflowStrategy = OverflowStrategy.dropNew) = {
-    import akka.actor.Status._
-
-    val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
-      .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
-
-    val proxy = dslinkMgr.getCommProxy(sessionInfo.ci.linkName)
-    val wsProps = WebSocketActor.props(toSocket, proxy,
-      WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
-
-    val fromSocket = actorSystem.actorOf(Props(new Actor {
-      val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
-
-      def receive = {
-        case Success(_) | Failure(_) => wsActor ! PoisonPill
-        case Terminated(_)           => context.stop(self)
-        case other                   => wsActor ! other
-      }
-
-      override def supervisorStrategy = OneForOneStrategy() {
-        case _ => SupervisorStrategy.Stop
-      }
-    }))
-
-    Flow.fromSinkAndSource[DSAMessage, DSAMessage](
-      Sink.actorRef(fromSocket, Success(())),
-      Source.fromPublisher(publisher))
-  }
-
-  /**
-   * Extracts `dsId` from the request's query string.
-   */
-  private def getDsId(request: RequestHeader) = request.queryString("dsId").head
-
-  /**
-   * Constructs a connection info instance from the incoming request.
-   */
-  private def buildConnectionInfo(request: Request[ConnectionRequest]) =
-    ConnectionInfo(getDsId(request), request.body, request.remoteAddress, request.host)
-
-  /**
    * Returns a future with the cluster information.
    */
   //TODO temporary, the view needs to be reworked
-  private def getClusterInfo = (frontend ? GetBrokerInfo).mapTo[BrokerInfo].map {
+  private def getClusterInfo = (downstream ? GetBrokerInfo).mapTo[BrokerInfo].map {
     _.clusterInfo.getOrElse(CurrentClusterState())
   }
 
   /**
    * Returns a future with the number of registered dslinks by backend.
    */
-  private def getDSLinkCounts = (frontend ? GetDSLinkStats).mapTo[DSLinkStats]
+  private def getDSLinkCounts = (downstream ? GetDSLinkStats).mapTo[DSLinkStats]
 
   /**
    * Returns a future with the total number of registered dslinks.
@@ -254,5 +140,5 @@ class MainController @Inject() (implicit actorSystem: ActorSystem,
    * Returns a future with the list of dslink names matching the criteria.
    */
   private def getDSLinkNames(regex: String, limit: Int, offset: Int) =
-    (frontend ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+    (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
 }

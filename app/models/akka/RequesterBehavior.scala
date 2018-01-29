@@ -5,7 +5,6 @@ import scala.util.control.NonFatal
 import org.joda.time.DateTime
 
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.metrics.MetricDao._
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
@@ -13,6 +12,11 @@ import models.rpc.DSAValue.DSAVal
  * Handles communication with a remote DSLink in Requester mode.
  */
 trait RequesterBehavior { me: AbstractDSLinkActor =>
+  import models.Settings._
+
+  import eventDaos._
+  
+  protected def dslinkMgr: DSLinkManager
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
@@ -95,7 +99,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       case (to, reqs) =>
         val envelope = RequestEnvelope(reqs.toSeq)
         log.debug("{}: sending {} to [{}]", ownId, envelope, to)
-        dsaSend(to, envelope)
+        dslinkMgr.dsaSend(to, envelope)
         logRequestBatch(to, envelope.requests)
     }
   }
@@ -156,11 +160,4 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)
   }
-
-  /**
-   * Sends a message to a DSA node. The implementations of this method may use direct Actor->Actor
-   * delivery, or sharded region delivery, etc - depending on the destination and deployment type
-   * (local vs clustered).
-   */
-  def dsaSend(to: String, msg: Any): Unit
 }

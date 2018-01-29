@@ -1,4 +1,4 @@
-package controllers
+package modules.websocket
 
 import org.scalatestplus.play.PlaySpec
 import play.api.libs.json._

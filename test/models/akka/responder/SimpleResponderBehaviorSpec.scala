@@ -6,6 +6,7 @@ import akka.actor.Props
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages }
+import models.metrics.EventDaos
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
 
@@ -18,7 +19,7 @@ class SimpleResponderBehaviorSpec extends AbstractActorSpec {
 
   val ci = ConnectionInfo("", "", false, true)
 
-  val responder = system.actorOf(Props(new Responder), "R")
+  val responder = system.actorOf(Props(new Responder(nullDaos)), "R")
 
   val ws = TestProbe()
 
@@ -142,7 +143,8 @@ class SimpleResponderBehaviorSpec extends AbstractActorSpec {
       ws.reply(ResponseMessage(1, None, List(rsp1)))
 
       requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 151, stream = Some(Closed)))))
-      requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 0,
+      requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(
+        rid = 0,
         updates = Some(List(obj("sid" -> 1001, "data" -> 111)))))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 12, stream = Some(Closed)))))
@@ -150,7 +152,8 @@ class SimpleResponderBehaviorSpec extends AbstractActorSpec {
       ws.reply(ResponseMessage(1, None, List(rsp2)))
 
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 251, stream = Some(Closed)))))
-      requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 0,
+      requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(
+        rid = 0,
         updates = Some(List(obj("sid" -> 2001, "data" -> 222)))))))
 
       responder.tell(RequestEnvelope(List(SubscribeRequest(351, List(
@@ -163,7 +166,8 @@ class SimpleResponderBehaviorSpec extends AbstractActorSpec {
       val rsp2a = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> 2, "data" -> 2222))))
       ws.reply(ResponseMessage(1, None, List(rsp2a)))
 
-      requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 0,
+      requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(
+        rid = 0,
         updates = Some(List(obj("sid" -> 2001, "data" -> 2222)))))))
 
       responder.tell(RequestEnvelope(List(UnsubscribeRequest(152, List(1001)))), requesters(1).ref)
@@ -190,7 +194,7 @@ object SimpleResponderBehaviorSpec {
   /**
    * Test actor.
    */
-  class Responder extends AbstractDSLinkActor with SimpleResponderBehavior {
+  class Responder(eventDaos: EventDaos) extends AbstractDSLinkActor(eventDaos) with SimpleResponderBehavior {
     override def connected = super.connected orElse responderBehavior
   }
 }

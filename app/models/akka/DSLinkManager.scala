@@ -1,61 +1,47 @@
 package models.akka
 
-import scala.concurrent.Future
-import scala.reflect.ClassTag
-
-import akka.actor.{ Actor, ActorRef, ActorSystem }
-import models.akka.Messages.LinkInfo
+import akka.actor.ActorRef
+import akka.routing.Routee
+import models.Settings
+import models.metrics.EventDaos
+import play.api.Logger
 
 /**
- * Manages interaction with DSLinks
+ * Manages DSA communications and dslink operations.
  */
 trait DSLinkManager {
-  import models.Settings.Paths._
-
-  def system: ActorSystem
 
   /**
-   * Sends a fire-and-forget message to the DSLink.
+   * Event DAOs.
    */
-  def tellDSLink(linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender): Unit
+  def eventDaos: EventDaos
+
+  protected val log = Logger(getClass)
 
   /**
-   * Sends a message and returns a future response.
+   * Returns a [[Routee]] that can be used for sending messages to a specific dslink.
    */
-  def askDSLink[T: ClassTag](linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender): Future[T]
+  def getDSLinkRoutee(name: String): Routee
 
   /**
-   * Sends a message to a non-DSLink node, like `/`, `/data/...` etc.
-   * The `path` should start with `/` character.
+   * Sends a message to its DSA destination using actor selection.
    */
-  def tellNode(path: String, message: Any)(implicit sender: ActorRef = Actor.noSender): Unit
+  def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit
 
   /**
-   * Sends a message to an arbitrary DSA path.
+   * Creates a new instance of DSLink actor props, according to the
+   * `broker.responder.group.call.engine` config settings:
+   * <ul>
+   * 	<li>`simple`</li> - Basic DSLink implementation, uses local registry.
+   * 	<li>`pooled`</li> - Router/Worker implementation, uses worker actor pools.
+   *  <li>`pubsub`</li> - EventBus implementation, uses local subscriptions.
+   *  <li>`dpubsub`</li> - Distributed PubSub implementation, uses cluster-wide subscriptions.
+   * </ul>
    */
-  def dsaSend(to: String, msg: Any)(implicit sender: ActorRef = Actor.noSender) =
-    if (to.startsWith(Downstream) && to != Downstream)
-      tellDSLink(to drop Downstream.size + 1, msg)
-    else
-      tellNode(to, msg)
-
-  /**
-   * Connects DSLink to an endpoint.
-   */
-  def connectEndpoint(linkName: String, ep: ActorRef, ci: ConnectionInfo): Unit
-
-  /**
-   * Disconnects DSLink from the associated endpoint.
-   */
-  def disconnectEndpoint(linkName: String, killEndpoint: Boolean = true): Unit
-
-  /**
-   * Returns a future with the information on the particular DSLink.
-   */
-  def getDSLinkInfo(linkName: String): Future[LinkInfo]
-
-  /**
-   * Returns a communication proxy for this DSLink. This call may block as it ensures the link exists.
-   */
-  def getCommProxy(linkName: String): CommProxy
+  val props = Settings.Responder.GroupCallEngine match {
+    case "simple"  => DSLinkFactory.createSimpleProps(this, eventDaos)
+    case "pooled"  => DSLinkFactory.createPooledProps(this, eventDaos)
+    case "pubsub"  => DSLinkFactory.createPubSubProps(this, eventDaos)
+    case "dpubsub" => DSLinkFactory.createDPubSubProps(this, eventDaos)
+  }
 }

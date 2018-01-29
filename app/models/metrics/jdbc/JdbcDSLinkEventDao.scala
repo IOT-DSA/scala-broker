@@ -9,13 +9,14 @@ import org.joda.time.DateTime
 
 import anorm.{ Macro, SQL, SqlStringInterpolation, sqlToSimple }
 import anorm.JodaParameterMetaData.JodaDateTimeMetaData
+import javax.inject.Inject
 import models.akka.DSLinkMode
 import models.metrics.{ ConnectionEvent, DSLinkEventDao, LinkSessionEvent, ListResult }
 
 /**
  * JDBC-based implementation of [[DSLinkEventDao]].
  */
-class JdbcDSLinkEventDao(conn: Connection) extends JdbcGenericDao(conn) with DSLinkEventDao {
+class JdbcDSLinkEventDao @Inject() (conn: Connection) extends JdbcGenericDao(conn) with DSLinkEventDao {
 
   implicit val dslinkModeExtractor = EnumColumn.forEnum(DSLinkMode)
 

@@ -2,7 +2,7 @@ package models.akka.responder
 
 import scala.util.control.NonFatal
 
-import akka.actor.{ ActorRef, actorRef2Scala }
+import akka.actor._
 import models._
 import models.akka.AbstractDSLinkActor
 import models.rpc._
@@ -12,8 +12,12 @@ import models.rpc.DSAValue.{ ArrayValue, DSAVal, MapValue, StringValue, array }
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: AbstractDSLinkActor =>
+trait ResponderBehavior { me: Actor with ActorLogging =>
   import RidRegistry._
+  
+  protected def linkPath: String
+  
+  protected def ownId: String
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
   type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]
@@ -60,8 +64,8 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
       case NonFatal(e) => log.error(s"$ownId: error handling request $request - {}", e); HandlerResult.Empty
     })
 
-    log.debug(s"$ownId: RID after Req: " + ridRegistry.info)
-    log.debug(s"$ownId: SID after Req: " + sidRegistry.info)
+    log.debug("{}: RID after Req: {}", ownId, ridRegistry.info)
+    log.debug("{}: SID after Req: {}", ownId, sidRegistry.info)
 
     HandlerResult.flatten(results)
   }
@@ -74,8 +78,8 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
 
     val results = responses flatMap handler
 
-    log.debug(s"$ownId: RID after Rsp: " + ridRegistry.info)
-    log.debug(s"$ownId: SID after Rsp: " + sidRegistry.info)
+    log.debug("{}: RID after Rsp: {}", ownId, ridRegistry.info)
+    log.debug("{}: SID after Rsp: {}", ownId, sidRegistry.info)
 
     results groupBy (_._1) mapValues (_.map(_._2))
   }
@@ -275,4 +279,9 @@ trait ResponderBehavior { me: AbstractDSLinkActor =>
    * Delivers a SUBSCRIBE response to its recipients.
    */
   protected def deliverSubscribeResponse(rsp: DSAResponse): Unit
+  
+  /**
+   * Sends a message to the endpoint, if connected.
+   */
+  protected def sendToEndpoint(msg: Any): Unit
 }

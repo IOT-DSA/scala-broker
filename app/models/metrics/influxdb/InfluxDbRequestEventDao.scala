@@ -7,12 +7,13 @@ import org.joda.time.DateTime
 import com.paulgoldbaum.influxdbclient.{ Database, Point }
 import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
+import javax.inject.Inject
 import models.metrics._
 
 /**
  * InfluxDB-based implementation of [[RequestEventDao]].
  */
-class InfluxDbRequestEventDao(db: Database) extends InfluxDbGenericDao(db) with RequestEventDao {
+class InfluxDbRequestEventDao @Inject() (db: Database) extends InfluxDbGenericDao(db) with RequestEventDao {
 
   /**
    * Saves a request message event as a point in 'req_message' measurement.

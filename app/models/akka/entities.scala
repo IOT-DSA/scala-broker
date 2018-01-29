@@ -1,7 +1,5 @@
 package models.akka
 
-import controllers.ConnectionRequest
-
 /**
  * Encapsulates DSLink information for WebSocket connection.
  */
@@ -18,19 +16,6 @@ case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, 
 }
 
 /**
- * Factory for [[ConnectionInfo]] instances.
- */
-object ConnectionInfo {
-  /**
-   * Creates a new [[ConnectionInfo]] instance by extracting information from a connection request.
-   */
-  def apply(dsId: String, cr: ConnectionRequest, linkAddress: String, brokerAddress: String): ConnectionInfo =
-    new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
-      cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
-      linkAddress, brokerAddress)
-}
-
-/**
  * Similar to java AtomicInteger, but not thread safe,
  * optimized for single threaded execution by an actor.
  */
@@ -44,11 +29,6 @@ class IntCounter(init: Int = 0) {
     result
   }
 }
-
-/**
- * An envelope for message routing, that provides the entityId for the shard coordinator.
- */
-final case class EntityEnvelope(entityId: String, msg: Any)
 
 /**
  * DSA Link mode.

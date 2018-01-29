@@ -4,16 +4,17 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import org.joda.time.{ DateTime, Interval }
 
-import com.paulgoldbaum.influxdbclient._
+import com.paulgoldbaum.influxdbclient.{ Database, Point, Record }
 import com.paulgoldbaum.influxdbclient.Parameter.Precision.MILLISECONDS
 
+import javax.inject.Inject
 import models.akka.DSLinkMode
 import models.metrics.{ ConnectionEvent, DSLinkEventDao, LinkSessionEvent, ListResult }
 
 /**
  * InfluxDB-based implementation of [[DSLinkEventDao]].
  */
-class InfluxDbDSLinkEventDao(db: Database) extends InfluxDbGenericDao(db) with DSLinkEventDao {
+class InfluxDbDSLinkEventDao @Inject() (db: Database) extends InfluxDbGenericDao(db) with DSLinkEventDao {
 
   /**
    * Saves a connection event as a point in 'connection' measurement.

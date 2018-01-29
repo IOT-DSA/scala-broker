@@ -1,24 +1,38 @@
 package models.akka.cluster
 
-import akka.actor.{ ActorSystem, Actor, ActorRef }
-import models.akka._
-import akka.util.Timeout
-import akka.cluster.sharding.{ ShardRegion, ClusterSharding, ClusterShardingSettings }
-import scala.reflect.ClassTag
+import akka.actor.{ ActorRef, ActorSystem }
 import akka.cluster.Cluster
-import akka.cluster.MemberStatus
-import akka.actor.RootActorPath
+import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
+import akka.routing.Routee
+import akka.util.Timeout
+import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
+import models.metrics.EventDaos
 
 /**
  * Uses Akka Cluster Sharding to communicate with DSLinks.
  */
-class ClusteredDSLinkManager(frontendMode: Boolean)(implicit val system: ActorSystem) extends DSLinkManager {
+class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(implicit val system: ActorSystem) extends DSLinkManager {
   import models.Settings._
-  import models.akka.Messages._
 
   implicit val timeout = Timeout(QueryTimeout)
 
   private val cluster = Cluster(system)
+
+  log.info("Clustered DSLink Manager created")
+
+  /**
+   * Returns a [[ShardedRoutee]] instance for the specified dslink.
+   */
+  def getDSLinkRoutee(name: String): Routee = ShardedRoutee(region, name)
+
+  /**
+   * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.
+   */
+  def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = path match {
+    case Paths.Downstream                          => system.actorSelection("/user" + Paths.Downstream) ! message
+    case path if path.startsWith(Paths.Downstream) => getDSLinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
+    case path                                      => RootNodeActor.childProxy(path)(system) ! message
+  }
 
   /**
    * Extracts DSLink name and payload from the message.
@@ -37,59 +51,16 @@ class ClusteredDSLinkManager(frontendMode: Boolean)(implicit val system: ActorSy
   /**
    * Create shard region.
    */
-  private val region = {
+  val region = {
     val sharding = ClusterSharding(system)
-    if (frontendMode)
+    if (proxyMode)
       sharding.startProxy(Nodes.Downstream, Some("backend"), extractEntityId, extractShardId)
     else
       sharding.start(
         Nodes.Downstream,
-        DSLinkFactory.props(this),
+        props,
         ClusterShardingSettings(system),
         extractEntityId,
         extractShardId)
   }
-
-  /**
-   * Sends a message to the DSLink using the shard region.
-   */
-  def tellDSLink(linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender) =
-    region.tell(wrap(linkName, msg), sender)
-
-  /**
-   * Sends a request-response message to the DSLink using the shard region.
-   */
-  def askDSLink[T: ClassTag](linkName: String, msg: Any)(implicit sender: ActorRef = Actor.noSender) =
-    akka.pattern.ask(region, wrap(linkName, msg), sender).mapTo[T]
-
-  /**
-   * Sends a message to a root node's child using singleton proxy.
-   */
-  def tellNode(path: String, message: Any)(implicit sender: ActorRef = Actor.noSender) =
-    if (path == Paths.Downstream)
-      cluster.state.members.filter(_.status == MemberStatus.Up) foreach { member =>
-        val backend = system.actorSelection(RootActorPath(member.address) / "user" / "backend")
-        backend ! message
-      }
-    else
-      RootNodeActor.childProxy(path)(system) ! message
-
-  def connectEndpoint(linkName: String, ep: ActorRef, ci: ConnectionInfo) =
-    tellDSLink(linkName, ConnectEndpoint(ep, ci))
-
-  def disconnectEndpoint(linkName: String, killEndpoint: Boolean = true) =
-    tellDSLink(linkName, DisconnectEndpoint(killEndpoint))
-
-  def getDSLinkInfo(linkName: String) = askDSLink[LinkInfo](linkName, GetLinkInfo)
-
-  /**
-   * Creates an instance of [[ShardedActorProxy]].
-   */
-  def getCommProxy(linkName: String) = new ShardedActorProxy(region, linkName)
-
-  /**
-   * Wraps the message into the entity envelope, which is used by the shard coordinator to route
-   * it to the entity actor.
-   */
-  private def wrap(linkName: String, msg: Any) = EntityEnvelope(linkName, msg)
 }

@@ -6,7 +6,8 @@ import org.joda.time.{ Duration => JodaDuration }
 
 import AbstractEndpointActor.{ EndpointConfig, StatsTick }
 import akka.actor.{ Actor, ActorLogging, ActorRef, Cancellable }
-import models.akka.{ CommProxy, ConnectionInfo, IntCounter }
+import akka.routing.Routee
+import models.akka.{ ConnectionInfo, IntCounter, RichRoutee }
 import models.akka.DSLinkMode.{ DSLinkMode, Dual, Requester, Responder }
 import models.akka.Messages.{ ConnectEndpoint, DisconnectEndpoint }
 import play.api.libs.json.{ Json, Reads, Writes }
@@ -14,7 +15,7 @@ import play.api.libs.json.{ Json, Reads, Writes }
 /**
  * Base class for benchmark endpoint actors.
  */
-abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, proxy: CommProxy,
+abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, routee: Routee,
                                      config: EndpointConfig) extends Actor with ActorLogging {
 
   import context.dispatcher
@@ -32,7 +33,7 @@ abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, proxy: 
    * Registers endpoint and start stats collection loop.
    */
   override def preStart() = {
-    proxy tell ConnectEndpoint(self, connInfo)
+    routee ! ConnectEndpoint(self, connInfo)
 
     if (config.statsInterval > Duration.Zero)
       statsJob = Some(context.system.scheduler.schedule(config.statsInterval, config.statsInterval, self, StatsTick))
@@ -46,7 +47,7 @@ abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, proxy: 
   override def postStop() = {
     statsJob.foreach(_.cancel)
 
-    proxy tell DisconnectEndpoint
+    routee ! DisconnectEndpoint
     log.info("[{}] stopped", linkName)
   }
 

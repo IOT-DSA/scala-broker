@@ -1,4 +1,5 @@
 import play.api.libs.json.Json
+import models.rpc.DSAMessage
 
 package object models {
 
@@ -66,4 +67,13 @@ package object models {
   implicit class RichBoolean(val b: Boolean) extends AnyVal {
     final def option[A](a: => A): Option[A] = if (b) Some(a) else None
   }
+
+  /**
+   * Outputs the message either as raw JSON or as Scala object, according to
+   * `broker.logging.show.ws.payload` config.
+   */
+  def formatMessage(msg: DSAMessage) = if (Settings.Logging.ShowWebSocketPayload)
+    play.api.libs.json.Json.toJson(msg).toString
+  else
+    msg.toString  
 }

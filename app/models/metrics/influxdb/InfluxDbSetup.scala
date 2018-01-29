@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory
 
 import com.paulgoldbaum.influxdbclient.{ Database, InfluxDB }
 
-import models.Settings.InfluxDb.DbName
+import models.Settings.InfluxDb._
 
 /**
  * Creates and initializes InfluxDB database.
@@ -16,7 +16,7 @@ object InfluxDbSetup extends App {
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  val dbConn = connectToInfluxDB
+  val dbConn = connectToInfluxDB(Host, Port)
 
   val fdb = createDatabase(dbConn, DbName)
 

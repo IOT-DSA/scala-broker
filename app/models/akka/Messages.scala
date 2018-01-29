@@ -4,11 +4,49 @@ import org.joda.time.DateTime
 
 import akka.actor.{ ActorPath, ActorRef, Address }
 import akka.cluster.ClusterEvent
+import models.akka.DSLinkMode.DSLinkMode
 
 /**
  * Common messages passed between the broker actors.
  */
 object Messages {
+
+  /**
+   * Sent to Downstream actor to create or access a dslink. The Downstream actor will respond
+   * with a [[Routee]] for that dslink.
+   */
+  case class GetOrCreateDSLink(name: String)
+
+  /**
+   * Sent to Downstream actor to remove a dslink.
+   */
+  case class RemoveDSLink(name: String)
+
+  /**
+   * Sent to Downstream actor to retrieve the list of dslink names. The Downstream actor will
+   * respond with an `Iterable[String]` of names.
+   */
+  case object GetDSLinkNames
+
+  /**
+   * Sent by a dslink to the Downstream actor to register itself.
+   */
+  case class RegisterDSLink(name: String, mode: DSLinkMode, connected: Boolean)
+
+  /**
+   * Encapsulates DSLink state as seen by the Downstream actor.
+   */
+  case class LinkState(mode: DSLinkMode, connected: Boolean)
+
+  /**
+   * Sent by a dslink to the Downstream actor when its status changes.
+   */
+  case class DSLinkStateChanged(name: String, mode: DSLinkMode, connected: Boolean)
+
+  /**
+   * Sent by a dslink to the Downstream actor to unregister itself.
+   */
+  case class UnregisterDSLink(name: String)
 
   /**
    * Sent by facade to a DSLinkActor to connect it to the specified Endpoint actor (the
@@ -31,30 +69,31 @@ object Messages {
    * Sent by DSLinkActor back to the caller in response to [[GetLinkInfo]] message.
    */
   case class LinkInfo(ci: ConnectionInfo, connected: Boolean,
-                      lastConnected: Option[DateTime],
+                      lastConnected:    Option[DateTime],
                       lastDisconnected: Option[DateTime])
 
   /**
    * Sent to FrontendActor to request the broker information.
+   * TODO
    */
   case object GetBrokerInfo
 
   /**
    * Broker information, sent back by FrontendActor in response to [[GetBrokerInfo]] message.
+   * TODO
    */
   case class BrokerInfo(backends: Seq[ActorPath], clusterInfo: Option[ClusterEvent.CurrentClusterState])
 
   /**
-   * Sent to FrontendActor to request the aggregated [[DSLinkStats]] or sent to BackendActor
-   * to request [[DSLinkNodeStats]].
+   * Sent to Downstream actor to request the aggregated [[DSLinkStats]].
    */
   case object GetDSLinkStats
 
   /**
-   * DSLinks basic statistics for one node. Sent back by BackendActor in response to [[GetDSLinkStats]]
-   * or as part of FrontendActor's response [[DSLinkStats]].
+   * DSLinks basic statistics for one node. Sent back by Downstream actor as part of
+   * [[DSLinkStats]] response.
    */
-  case class DSLinkNodeStats(address: Address,
+  case class DSLinkNodeStats(address:      Address,
                              requestersOn: Int, requestersOff: Int,
                              respondersOn: Int, respondersOff: Int,
                              dualsOn: Int, dualsOff: Int) {
@@ -67,7 +106,7 @@ object Messages {
   }
 
   /**
-   * DSLink statistics for all nodes, sent back by FrontendActor in response to [[GetDSLinkStats]].
+   * DSLink statistics for all nodes, sent back by Downstream actor in response to [[GetDSLinkStats]].
    */
   case class DSLinkStats(nodeStats: Map[Address, DSLinkNodeStats]) {
 
@@ -80,7 +119,8 @@ object Messages {
     val dualsOn = sumUp(_.dualsOn)
     val dualsOff = sumUp(_.dualsOff)
 
-    private val stats = DSLinkNodeStats(null,
+    private val stats = DSLinkNodeStats(
+      null,
       requestersOn, requestersOff, respondersOn, respondersOff, dualsOn, dualsOff)
 
     val requesters = stats.requesters
@@ -92,12 +132,12 @@ object Messages {
   }
 
   /**
-   * Sent to FrontendActor or BackendActor to search DSLink names matching the pattern.
+   * Sent to Downstream actor to search DSLink names matching the pattern.
    */
   case class FindDSLinks(regex: String, limit: Int, offset: Int = 0)
 
   /**
-   * Sent to FrontendActor or BackendActor to remove disconnected DSLinks.
+   * Sent to Downstream actor to remove disconnected DSLinks.
    */
   case object RemoveDisconnectedDSLinks
 }
