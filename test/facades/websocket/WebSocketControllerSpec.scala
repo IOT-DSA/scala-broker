@@ -1,11 +1,8 @@
-package modules.websocket
+package facades.websocket
 
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 
-import javax.inject.Singleton
-import play.api.Application
-import play.api.cache.SyncCacheApi
 import play.api.libs.json.JsValue.jsValueToJsLookup
 import play.api.libs.json.Json
 import play.api.test.FakeRequest
@@ -15,7 +12,7 @@ import play.api.test.Helpers._
  * Tests WebSocket connection controller.
  */
 class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
-  
+
   "WebSocketController /conn" should {
 
     val connReq = ConnectionRequest("", true, true, None, "", None, true)
@@ -33,5 +30,5 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       (json \ "wsUri").toOption.value mustBe Json.toJson("/ws")
       (json \ "path").toOption.value mustBe Json.toJson("/downstream/Shell")
     }
-  }  
+  }
 }

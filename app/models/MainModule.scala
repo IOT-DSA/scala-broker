@@ -1,14 +1,16 @@
-package modules
+package models
 
 import java.sql.{ Connection, DriverManager }
 
+import scala.collection.Seq
+
 import com.paulgoldbaum.influxdbclient.Database
 
-import akka.actor.ActorSystem
-import akka.cluster.Cluster
+import _root_.akka.actor.ActorSystem
+import _root_.akka.cluster.Cluster
 import javax.inject.{ Inject, Provider, Singleton }
 import models.Settings.{ InfluxDb, JDBC, Metrics }
-import models.akka.DSLinkManager
+import models.akka.{ BrokerActors, DSLinkManager }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
 import models.metrics._

@@ -1,4 +1,4 @@
-package modules.websocket
+package facades.websocket
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -13,11 +13,10 @@ import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import controllers.BasicController
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ ConnectionInfo, DSLinkManager }
+import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager }
 import models.akka.Messages.GetOrCreateDSLink
 import models.metrics.EventDaos
 import models.rpc.DSAMessage
-import modules.BrokerActors
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.mvc.{ ControllerComponents, Request, RequestHeader, Result, WebSocket }

@@ -1,7 +1,6 @@
-package modules.websocket
+package facades.websocket
 
 import org.joda.time.DateTime
-
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
 import akka.routing.Routee
 import models.{ RequestEnvelope, ResponseEnvelope }

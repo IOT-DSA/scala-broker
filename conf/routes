@@ -13,8 +13,8 @@ GET    /upstream              controllers.MainController.upstream
 GET    /config                controllers.MainController.viewConfig
 
 # WebSocket facade
-POST   /conn                  modules.websocket.WebSocketController.conn
-GET    /ws                    modules.websocket.WebSocketController.ws
+POST   /conn                  facades.websocket.WebSocketController.conn
+GET    /ws                    facades.websocket.WebSocketController.ws
 
 GET    /metrics/cluster       controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
 GET    /metrics/connections   controllers.MetricController.connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
