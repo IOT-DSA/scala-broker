@@ -11,6 +11,8 @@ import play.api.Logger
  */
 trait DSLinkManager {
 
+  protected val log = Logger(getClass)
+
   /**
    * Actor system.
    */
@@ -21,23 +23,26 @@ trait DSLinkManager {
    */
   def eventDaos: EventDaos
 
-  protected val log = Logger(getClass)
-
   /**
    * Downstream node routee.
    */
-  protected def downstream = ActorSelectionRoutee(system.actorSelection("/user" + Paths.Downstream))
+  val downstream = ActorSelectionRoutee(system.actorSelection("/user" + Paths.Downstream))
 
   /**
    * Upstream node routee.
    */
-  protected def upstream = ActorSelectionRoutee(system.actorSelection("/user/" + Nodes.Root + Paths.Upstream))
+  val upstream = ActorSelectionRoutee(system.actorSelection("/user" + Paths.Upstream))
 
   /**
-   * Returns a [[Routee]] that can be used for sending messages to a specific dslink.
+   * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
    */
-  def getDSLinkRoutee(name: String): Routee
+  def getDownlinkRoutee(name: String): Routee
 
+  /**
+   * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
+   */
+  def getUplinkRoutee(name: String): Routee
+  
   /**
    * Sends a message to its DSA destination using actor selection.
    */
@@ -53,7 +58,7 @@ trait DSLinkManager {
    *  <li>`dpubsub`</li> - Distributed PubSub implementation, uses cluster-wide subscriptions.
    * </ul>
    */
-  val downlinkProps = Responder.GroupCallEngine match {
+  val dnlinkProps = Responder.GroupCallEngine match {
     case "simple"  => DSLinkFactory.createSimpleProps(this, Paths.Downstream, downstream, eventDaos)
     case "pooled"  => DSLinkFactory.createPooledProps(this, Paths.Downstream, downstream, eventDaos)
     case "pubsub"  => DSLinkFactory.createPubSubProps(this, Paths.Downstream, downstream, eventDaos)

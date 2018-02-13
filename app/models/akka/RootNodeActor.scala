@@ -20,7 +20,6 @@ class RootNodeActor extends Actor with ActorLogging {
   private val defsNode = createDefsNode
   private val usersNode = createUsersNode
   private val sysNode = createSysNode
-  private val upstreamNode = createUpstreamNode
 
   override def preStart() = log.info("[RootNode] actor initialized")
 
@@ -113,15 +112,6 @@ class RootNodeActor extends Actor with ActorLogging {
     val sysNode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
     sysNode.profile = "node"
     sysNode
-  }
-
-  /**
-   * Creates a /upstream node.
-   */
-  private def createUpstreamNode = {
-    val upstreamNode = TypedActor(context).typedActorOf(DSANode.props(None), Upstream)
-    upstreamNode.profile = "node"
-    upstreamNode
   }
 }
 

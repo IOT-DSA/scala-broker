@@ -17,16 +17,23 @@ class LocalDSLinkManager(val eventDaos: EventDaos)(implicit val system: ActorSys
   log.info("Local DSLink Manager created")
 
   /**
-   * Returns a [[ActorSelectionRoutee]] instance for the specified dslink.
+   * Returns a [[ActorSelectionRoutee]] instance for the specified downlink.
    */
-  def getDSLinkRoutee(name: String): Routee =
+  def getDownlinkRoutee(name: String): Routee =
     ActorSelectionRoutee(system.actorSelection("/user/" + Nodes.Downstream + "/" + name))
+
+  /**
+   * Returns a [[ActorSelectionRoutee]] instance for the specified uplink.
+   */
+  def getUplinkRoutee(name: String): Routee =
+    ActorSelectionRoutee(system.actorSelection("/user/" + Nodes.Upstream + "/" + name))
 
   /**
    * Sends a message to its DSA destination using actor selection.
    */
   def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = path match {
     case path if path.startsWith(Paths.Downstream) => system.actorSelection("/user" + path) ! message
+    case path if path.startsWith(Paths.Upstream)   => system.actorSelection("/user" + path) ! message
     case path                                      => system.actorSelection("/user/" + Nodes.Root + path) ! message
   }
 }

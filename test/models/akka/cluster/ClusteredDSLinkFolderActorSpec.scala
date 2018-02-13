@@ -11,34 +11,36 @@ import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
 import models.{ RequestEnvelope, ResponseEnvelope }
-import models.Settings.Nodes.Downstream
 import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
 import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
 
 /**
- * ClusteredDownstreamActor test suite.
+ * ClusteredDSLinkFolderActor test suite.
  */
-class ClusteredDownstreamActorSpec extends AbstractActorSpec with Inside {
+class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   import akka.cluster.sharding.ShardRegion._
   import models.akka.Messages._
   import models.rpc.DSAValue._
+  import models.Settings._
 
   import system.dispatcher
 
   implicit val timeout = Timeout(3 seconds)
   val dsId = "link" + "?" * 44
+  val dsaPath = Paths.Downstream
+  val extra: (String, DSAVal) = "downstream" -> true
 
   val system1 = createActorSystem(2551)
   val mgr1 = new ClusteredDSLinkManager(false, nullDaos)(system1)
-  val downstream1 = system1.actorOf(ClusteredDownstreamActor.props(mgr1), Downstream)
+  val downstream1 = system1.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr1.getDownlinkRoutee, extra), Nodes.Downstream)
 
   val system2 = createActorSystem(0)
   val mgr2 = new ClusteredDSLinkManager(false, nullDaos)(system2)
-  val downstream2 = system2.actorOf(ClusteredDownstreamActor.props(mgr2), Downstream)
+  val downstream2 = system2.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr2.getDownlinkRoutee, extra), Nodes.Downstream)
 
   val system3 = createActorSystem(0)
   val mgr3 = new ClusteredDSLinkManager(false, nullDaos)(system3)
-  val downstream3 = system3.actorOf(ClusteredDownstreamActor.props(mgr3), Downstream)
+  val downstream3 = system3.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr3.getDownlinkRoutee, extra), Nodes.Downstream)
 
   override def afterAll = {
     super.afterAll
@@ -52,31 +54,31 @@ class ClusteredDownstreamActorSpec extends AbstractActorSpec with Inside {
       whenReady(downstream1 ? GetOrCreateDSLink("aaa")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
-        link.region mustBe mgr1.region
+        link.region mustBe mgr1.dnlinkRegion
         link.entityId mustBe "aaa"
       }
       whenReady(downstream2 ? GetOrCreateDSLink("bbb")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
-        link.region mustBe mgr2.region
+        link.region mustBe mgr2.dnlinkRegion
         link.entityId mustBe "bbb"
       }
       whenReady(downstream3 ? GetOrCreateDSLink("ccc")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
-        link.region mustBe mgr3.region
+        link.region mustBe mgr3.dnlinkRegion
         link.entityId mustBe "ccc"
       }
       whenReady(downstream2 ? GetOrCreateDSLink("ddd")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
-        link.region mustBe mgr2.region
+        link.region mustBe mgr2.dnlinkRegion
         link.entityId mustBe "ddd"
       }
       whenReady(downstream1 ? GetOrCreateDSLink("eee")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
-        link.region mustBe mgr1.region
+        link.region mustBe mgr1.dnlinkRegion
         link.entityId mustBe "eee"
       }
       Thread.sleep(3000)
@@ -89,13 +91,13 @@ class ClusteredDownstreamActorSpec extends AbstractActorSpec with Inside {
       whenReady(downstream2 ? GetOrCreateDSLink("aaa")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
-        link.region mustBe mgr2.region
+        link.region mustBe mgr2.dnlinkRegion
         link.entityId mustBe "aaa"
       }
       whenReady(downstream3 ? GetOrCreateDSLink("eee")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
-        link.region mustBe mgr3.region
+        link.region mustBe mgr3.dnlinkRegion
         link.entityId mustBe "eee"
       }
       whenReady(getClusterShardingStats) { css =>
@@ -117,9 +119,9 @@ class ClusteredDownstreamActorSpec extends AbstractActorSpec with Inside {
       }
     }
     "match sharded entities" in {
-      val f1 = (mgr1.region ? GetShardRegionState).mapTo[CurrentShardRegionState]
-      val f2 = (mgr2.region ? GetShardRegionState).mapTo[CurrentShardRegionState]
-      val f3 = (mgr3.region ? GetShardRegionState).mapTo[CurrentShardRegionState]
+      val f1 = (mgr1.dnlinkRegion ? GetShardRegionState).mapTo[CurrentShardRegionState]
+      val f2 = (mgr2.dnlinkRegion ? GetShardRegionState).mapTo[CurrentShardRegionState]
+      val f3 = (mgr3.dnlinkRegion ? GetShardRegionState).mapTo[CurrentShardRegionState]
       whenReady(for (s1 <- f1; s2 <- f2; s3 <- f3) yield (s1, s2, s3)) { states =>
         val shards = states._1.shards ++ states._2.shards ++ states._3.shards
         shards.flatMap(_.entityIds).toSet mustBe Set("aaa", "bbb", "ccc", "ddd", "eee")
@@ -226,5 +228,5 @@ class ClusteredDownstreamActorSpec extends AbstractActorSpec with Inside {
   }
 
   private def getClusterShardingStats =
-    (mgr1.region ? GetClusterShardingStats(timeout.duration)).mapTo[ClusterShardingStats]
+    (mgr1.dnlinkRegion ? GetClusterShardingStats(timeout.duration)).mapTo[ClusterShardingStats]
 }

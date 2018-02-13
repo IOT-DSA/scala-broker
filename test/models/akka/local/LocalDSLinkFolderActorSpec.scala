@@ -13,9 +13,10 @@ import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
 import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
 
 /**
- * LocalDownstreamActor test suite.
+ * LocalDSLinkFolderActor test suite.
  */
-class LocalDownstreamActorSpec extends AbstractActorSpec with Inside {
+class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
+  import models.Settings._
   import models.akka.Messages._
   import models.rpc.DSAValue._
 
@@ -23,7 +24,8 @@ class LocalDownstreamActorSpec extends AbstractActorSpec with Inside {
   val dsId = "link" + "?" * 44
 
   val dslinkMgr = new LocalDSLinkManager(nullDaos)
-  val downstream = system.actorOf(LocalDownstreamActor.props(dslinkMgr), Settings.Nodes.Downstream)
+  val downstream = system.actorOf(LocalDSLinkFolderActor.props(
+    Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
 
   "GetOrCreateDSLink" should {
     "create a new dslink" in {

@@ -11,20 +11,16 @@ import models.akka.responder.SimpleResponderBehavior
 import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
 
 /**
- * Base actor for DSA `/downstream` node.
- * To ensure the correct routing, it needs to be created by the actor system under `downstream`
- * name, so its full path is `/user/downstream`:
- * <pre>
- * actorSystem.actorOf(..., "downstream")
- * </pre>
+ * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.
+ *
+ * When started, it verifies its own location against the `linkPath` parameter. For example,
+ * if linkPath is set to "/downstream", the actor path needs to be "/user/downstream".
  */
-abstract class DownstreamActor extends Actor with ActorLogging with SimpleResponderBehavior {
+abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorLogging with SimpleResponderBehavior {
   import models.rpc.DSAValue._
   import models.rpc.StreamState._
-
-  checkPath(Settings.Nodes.Downstream)
-
-  protected val linkPath: String = Settings.Paths.Downstream
+  
+  checkPath(linkPath)
 
   protected val ownId: String = "[" + linkPath + "]"
 
@@ -39,7 +35,7 @@ abstract class DownstreamActor extends Actor with ActorLogging with SimpleRespon
   /**
    * Terminates the actor system if the actor's path does not match `/user/<path>`.
    */
-  protected def checkPath(path: String) = if (self.path != self.path.root / "user" / path) {
+  protected def checkPath(path: String) = if (self.path != self.path.root / "user" / path.split("/")) {
     val msg = s"${getClass.getSimpleName} should be created under [$path]"
     log.error(new IllegalStateException(msg), msg + ", not [" + self.path + "]")
     context.system.terminate
