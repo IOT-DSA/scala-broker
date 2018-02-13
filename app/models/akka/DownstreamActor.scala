@@ -85,10 +85,8 @@ abstract class DownstreamActor extends Actor with ActorLogging with SimpleRespon
    * Processes a DSA payload and forwards the results to [[ResponderBehavior]].
    */
   protected def sendToEndpoint(msg: Any): Unit = msg match {
-    case RequestEnvelope(requests) =>
-      val envelopes = requests flatMap processRequest
-      envelopes foreach responderBehavior
-    case _ => log.warning("Unknown message received: {}", msg)
+    case RequestEnvelope(requests) => requests flatMap processRequest foreach responderBehavior
+    case _                         => log.warning("Unknown message received: {}", msg)
   }
 
   /**
@@ -127,21 +125,17 @@ abstract class DownstreamActor extends Actor with ActorLogging with SimpleRespon
   /**
    * Generates and sends response messages to notify the listeners about the registered dslink.
    */
-  protected def notifyOnRegister(name: String): Unit = {
-    listRid foreach { rid =>
-      val updates = rows(name -> obj(IsNode))
-      self ! ResponseMessage(-1, None, DSAResponse(rid, Some(Open), Some(updates)) :: Nil)
-    }
+  protected def notifyOnRegister(name: String): Unit = listRid foreach { rid =>
+    val updates = rows(name -> obj(IsNode))
+    self ! ResponseMessage(-1, None, DSAResponse(rid, Some(Open), Some(updates)) :: Nil)
   }
 
   /**
    * Generates and sends response messages to notify the listeners about the removed dslinks.
    */
-  protected def notifyOnRemove(names: String*) = {
-    listRid foreach { rid =>
-      val updates = names map (name => obj("name" -> name, "change" -> "remove"))
-      self ! ResponseMessage(-1, None, DSAResponse(rid, Some(Open), Some(updates.toList)) :: Nil)
-    }
+  protected def notifyOnRemove(names: String*) = listRid foreach { rid =>
+    val updates = names map (name => obj("name" -> name, "change" -> "remove"))
+    self ! ResponseMessage(-1, None, DSAResponse(rid, Some(Open), Some(updates.toList)) :: Nil)
   }
 
   /**

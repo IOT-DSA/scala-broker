@@ -63,7 +63,7 @@ class LocalDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor {
   protected def getOrCreateDSLink(name: String): Routee = {
     val child = context.child(name) getOrElse {
       log.info("{}: creating a new dslink '{}'", ownId, name)
-      context.actorOf(dslinkMgr.props, name)
+      context.actorOf(dslinkMgr.downlinkProps, name)
     }
     ActorRefRoutee(child)
   }

@@ -100,7 +100,7 @@ class ClusteredDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor
    * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
    */
   protected def getOrCreateDSLink(name: String): Routee = {
-    val routee = dslinkMgr.getDSLinkRoutee(name) //ShardedRoutee(region, name)
+    val routee = dslinkMgr.getDSLinkRoutee(name)
     routee ! Identify
     routee
   }

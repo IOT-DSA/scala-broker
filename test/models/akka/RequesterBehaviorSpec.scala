@@ -1,6 +1,7 @@
 package models.akka
 
 import akka.actor.{ Actor, Props, actorRef2Scala }
+import akka.routing.{ ActorRefRoutee, Routee }
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.Messages.{ DSLinkStateChanged, RegisterDSLink }
@@ -34,7 +35,7 @@ class RequesterBehaviorSpec extends AbstractActorSpec {
   }
   val brokerActor = system.actorOf(Props(new BrokerActor), "broker")
 
-  val requester = system.actorOf(Props(new Requester(dslinkMgr, nullDaos)), "requester")
+  val requester = system.actorOf(Props(new Requester(dslinkMgr, ActorRefRoutee(downstreamActor), nullDaos)), "requester")
   val ws = TestProbe()
 
   "RequesterActor" should {
@@ -76,8 +77,8 @@ object RequesterBehaviorSpec {
   /**
    * Test actor.
    */
-  class Requester(val dslinkMgr: DSLinkManager, eventDaos: EventDaos)
-    extends AbstractDSLinkActor(eventDaos) with RequesterBehavior {
+  class Requester(val dslinkMgr: DSLinkManager, registry: Routee, val eventDaos: EventDaos)
+    extends AbstractDSLinkActor(registry) with RequesterBehavior {
     override def connected = super.connected orElse requesterBehavior
   }
 }

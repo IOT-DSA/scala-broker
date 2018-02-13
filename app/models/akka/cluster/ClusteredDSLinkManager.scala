@@ -58,7 +58,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(impli
     else
       sharding.start(
         Nodes.Downstream,
-        props,
+        downlinkProps,
         ClusterShardingSettings(system),
         extractEntityId,
         extractShardId)
