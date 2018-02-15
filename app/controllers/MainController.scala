@@ -9,9 +9,8 @@ import akka.cluster.ClusterEvent.CurrentClusterState
 import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ DSLinkManager, RichRoutee }
+import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
 import models.metrics.EventDaos
-import modules.BrokerActors
 import play.api.mvc.ControllerComponents
 
 /**

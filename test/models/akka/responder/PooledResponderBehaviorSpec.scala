@@ -3,6 +3,7 @@ package models.akka.responder
 import scala.concurrent.duration.DurationInt
 
 import akka.actor.Props
+import akka.routing.NoRoutee
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages }
@@ -194,7 +195,8 @@ object PooledResponderBehaviorSpec {
   /**
    * Test actor.
    */
-  class Responder(eventDaos: EventDaos) extends AbstractDSLinkActor(eventDaos) with PooledResponderBehavior {
+  class Responder(eventDaos: EventDaos) extends AbstractDSLinkActor(NoRoutee) with PooledResponderBehavior {
+    val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def connected = super.connected orElse responderBehavior
   }
 }

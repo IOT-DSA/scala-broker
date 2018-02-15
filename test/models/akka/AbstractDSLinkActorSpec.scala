@@ -6,9 +6,9 @@ import org.scalatest.Inside
 
 import akka.actor.{ PoisonPill, Props }
 import akka.pattern.ask
-import akka.testkit.{ TestActorRef, TestActors, TestProbe }
+import akka.routing.{ ActorRefRoutee, Routee }
+import akka.testkit.{ TestActorRef, TestProbe }
 import akka.util.Timeout
-import models.metrics.EventDaos
 
 /**
  * AbstractDSLinkActor test suite.
@@ -23,9 +23,8 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
   val ci = ConnectionInfo(dsId, "abc", true, false)
 
   val downProbe = TestProbe()
-  val downstream = system.actorOf(TestActors.forwardActorProps(downProbe.ref), "downstream")
 
-  val dslink = TestActorRef[LinkActor](Props(new LinkActor(nullDaos)), "abc")
+  val dslink = TestActorRef[LinkActor](Props(new LinkActor(ActorRefRoutee(downProbe.ref))), "abc")
 
   val Seq(endpoint1, endpoint2, endpoint3) = (1 to 3) map (_ => watch(TestProbe().ref))
 
@@ -91,7 +90,5 @@ object AbstractDSLinkActorSpec {
   /**
    * Test actor.
    */
-  class LinkActor(eventDaos: EventDaos) extends AbstractDSLinkActor(eventDaos) {
-    def dsaSend(to: String, msg: Any): Unit = {}
-  }
+  class LinkActor(registry: Routee) extends AbstractDSLinkActor(registry)
 }

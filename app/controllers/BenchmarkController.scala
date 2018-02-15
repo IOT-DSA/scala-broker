@@ -13,14 +13,13 @@ import akka.actor.{ ActorRef, ActorSystem, PoisonPill }
 import akka.pattern.ask
 import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
-import models.akka.DSLinkManager
+import models.akka.{ BrokerActors, DSLinkManager }
 import models.akka.Messages.GetOrCreateDSLink
 import models.bench._
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
 import models.metrics.EventDaos
-import modules.BrokerActors
 import play.api.libs.json.{ JsObject, Json, Writes }
 import play.api.mvc.{ ControllerComponents, Result }
 
@@ -164,7 +163,7 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
   private def createBenchResponder(name: String, nodeCount: Int, statsInterval: FiniteDuration,
                                    parseJson: Boolean) = {
     val config = BenchmarkResponder.BenchmarkResponderConfig(nodeCount, statsInterval, parseJson, Some(aggregator))
-    val routee = (downstream ? GetOrCreateDSLink).mapTo[Routee]
+    val routee = (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]
     val ref = routee map (r => actorSystem.actorOf(BenchmarkResponder.props(name, r, eventDaos, config)))
     Await.result(ref, Duration.Inf)
   }

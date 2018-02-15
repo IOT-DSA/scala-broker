@@ -3,22 +3,27 @@ package models.akka
 import org.joda.time.DateTime
 
 import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
-import models.Settings
-import models.metrics.EventDaos
+import akka.routing.Routee
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
  * The Endpoint actor is supplied by the facade and can represent a WebSocket or TCP connection,
  * HTTP response stream, a test actor etc.
  *
- * The facade initiates a session by sending `ConnectEndpoint` message to the actor. The session
- * ends either when `DisconnectEndpoint` message is sent to an actor, or the endpoint actor terminates.
+ * This actor can represent either a downlink (a dslink connection) or uplink (upstream broker connection).
+ * The `registry` passed in the constructor is used to send notifications about the actor's state changes.
+ *
+ * Initially the actor is in `disconnected` state. The facade initiates a session by sending `ConnectEndpoint`
+ * message to the actor. The session ends either when `DisconnectEndpoint` message is sent to an actor,
+ * or the endpoint actor terminates.
+ * 
+ * When the actor is disconnected, it stashes incoming messages and releases them to the endpoint, once it
+ * becomes connected again.
  */
-abstract class AbstractDSLinkActor(val eventDaos: EventDaos) extends Actor with Stash with ActorLogging {
+abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash with ActorLogging {
   import Messages._
 
   protected val linkName = self.path.name
-  protected val linkPath = Settings.Paths.Downstream + "/" + linkName
   protected val ownId = s"DSLink[$linkName]"
 
   // initially None, then set by ConnectEndpoint, unset by DisconnectEndpoint
@@ -31,18 +36,18 @@ abstract class AbstractDSLinkActor(val eventDaos: EventDaos) extends Actor with 
   private var lastDisconnected: Option[DateTime] = None
 
   /**
-   * Called on link start up, logs the dslink status.
+   * Called on link start up: notifies the registry and logs the dslink status.
    */
   override def preStart() = {
-    sendToDownstream(RegisterDSLink(linkName, connInfo.mode, false))
+    sendToRegistry(RegisterDSLink(linkName, connInfo.mode, false))
     log.info(s"$ownId: initialized, not connected to Endpoint")
   }
 
   /**
-   * Called on link shut down, unregisters from Backend and logs the dslink status.
+   * Called on link shut down, notifies the registry and logs the dslink status.
    */
   override def postStop() = {
-    sendToDownstream(UnregisterDSLink(self.path.name))
+    sendToRegistry(UnregisterDSLink(self.path.name))
     log.info(s"$ownId: stopped")
   }
 
@@ -97,7 +102,7 @@ abstract class AbstractDSLinkActor(val eventDaos: EventDaos) extends Actor with 
     connInfo = ci
     lastConnected = Some(DateTime.now)
 
-    sendToDownstream(DSLinkStateChanged(linkName, ci.mode, true))
+    sendToRegistry(DSLinkStateChanged(linkName, ci.mode, true))
 
     log.debug(s"$ownId: unstashing all stored messages")
     unstashAll()
@@ -115,7 +120,7 @@ abstract class AbstractDSLinkActor(val eventDaos: EventDaos) extends Actor with 
     endpoint = None
     lastDisconnected = Some(DateTime.now)
 
-    sendToDownstream(DSLinkStateChanged(linkName, connInfo.mode, false))
+    sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
 
     context.become(disconnected)
   }
@@ -126,7 +131,7 @@ abstract class AbstractDSLinkActor(val eventDaos: EventDaos) extends Actor with 
   protected def sendToEndpoint(msg: Any): Unit = endpoint foreach (_ ! msg)
 
   /**
-   * Sends a message to the backend actor.
+   * Sends a message to the registry.
    */
-  protected def sendToDownstream(msg: Any): Unit = context.actorSelection("/user/downstream") ! msg
+  protected def sendToRegistry(msg: Any): Unit = registry ! msg
 }

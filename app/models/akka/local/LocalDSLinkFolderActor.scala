@@ -2,19 +2,15 @@ package models.akka.local
 
 import akka.actor.{ PoisonPill, Props, actorRef2Scala }
 import akka.routing.{ ActorRefRoutee, Routee }
-import models.akka.{ DSLinkManager, DownstreamActor, IsNode, rows }
+import models.akka.{ DSLinkManager, DSLinkFolderActor, IsNode, rows }
+import models.akka.Messages._
+import models.rpc.DSAValue._
 
 /**
- * Actor for DSA `/downstream` node.
- * To ensure the correct routing, it needs to be created by the actor system under `downstream`
- * name, so its full path is `/user/downstream`:
- * <pre>
- * actorSystem.actorOf(LocalDownstreamActor.props(...), "downstream")
- * </pre>
+ * Actor for local DSA link folder node, such as `/upstream` or `/downstream`.
  */
-class LocalDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor {
-  import models.akka.Messages._
-  import models.rpc.DSAValue._
+class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (String, DSAVal)*)
+  extends DSLinkFolderActor(linkPath) {
 
   /**
    * Handles incoming messages.
@@ -63,7 +59,7 @@ class LocalDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor {
   protected def getOrCreateDSLink(name: String): Routee = {
     val child = context.child(name) getOrElse {
       log.info("{}: creating a new dslink '{}'", ownId, name)
-      context.actorOf(dslinkMgr.props, name)
+      context.actorOf(linkProps, name)
     }
     ActorRefRoutee(child)
   }
@@ -79,7 +75,7 @@ class LocalDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor {
    * Generates a list of values in response to LIST request.
    */
   protected def listNodes: Iterable[ArrayValue] = {
-    val configs = rows(IsNode, "downstream" -> true).toIterable
+    val configs = rows(IsNode) ++ rows(extraConfigs: _*)
 
     val children = links.keys map (name => array(name, obj(IsNode)))
 
@@ -88,12 +84,13 @@ class LocalDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor {
 }
 
 /**
- * Factory for [[LocalDownstreamActor]] instances.
+ * Factory for [[LocalDSLinkFolderActor]] instances.
  */
-object LocalDownstreamActor {
+object LocalDSLinkFolderActor {
 
   /**
-   * Creates a new props for [[LocalDownstreamActor]].
+   * Creates a new props for [[LocalDSLinkFolderActor]].
    */
-  def props(dslinkMgr: DSLinkManager) = Props(new LocalDownstreamActor(dslinkMgr))
+  def props(linkPath: String, linkProps: Props, extraConfigs: (String, DSAVal)*) =
+    Props(new LocalDSLinkFolderActor(linkPath, linkProps, extraConfigs: _*))
 }

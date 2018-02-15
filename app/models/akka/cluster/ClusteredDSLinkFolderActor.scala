@@ -5,21 +5,17 @@ import scala.concurrent.Await
 import akka.actor.{ Identify, PoisonPill, Props, actorRef2Scala }
 import akka.pattern.{ ask, pipe }
 import akka.routing.Routee
-import models.akka.{ DSLinkManager, DownstreamActor, IsNode, RichRoutee, rows }
+import models.akka.{ DSLinkFolderActor, IsNode, RichRoutee, rows }
+import models.akka.Messages._
+import models.rpc.DSAValue.{ ArrayValue, DSAVal, StringValue, array, obj }
 
 /**
- * Actor for DSA `/downstream` node.
- * To ensure the correct routing, it needs to be created by the actor system under `downstream`
- * name, so its full path is `/user/downstream`:
- * <pre>
- * actorSystem.actorOf(ClusteredDownstreamActor.props(...), "downstream")
- * </pre>
+ * Actor for clustered DSA link folder node, such as `/upstream` or `/downstream`.
  */
-class ClusteredDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor with ClusteredActor {
+class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee, extraConfigs: (String, DSAVal)*)
+  extends DSLinkFolderActor(linkPath) with ClusteredActor {
 
   import context.dispatcher
-  import models.akka.Messages._
-  import models.rpc.DSAValue._
 
   /**
    * Handles incoming messages.
@@ -27,7 +23,7 @@ class ClusteredDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor
   def receive = responderBehavior orElse mgmtHandler
 
   /**
-   * Handler for messages coming from peer downstream nodes.
+   * Handler for messages coming from peer nodes.
    */
   private val peerMsgHandler: Receive = {
 
@@ -100,7 +96,7 @@ class ClusteredDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor
    * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
    */
   protected def getOrCreateDSLink(name: String): Routee = {
-    val routee = dslinkMgr.getDSLinkRoutee(name) //ShardedRoutee(region, name)
+    val routee = linkProxy(name)
     routee ! Identify
     routee
   }
@@ -108,14 +104,14 @@ class ClusteredDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor
   /**
    * Terminates the specified DSLink actors.
    */
-  protected def removeDSLinks(names: String*) = names map dslinkMgr.getDSLinkRoutee foreach (_ ! PoisonPill)
+  protected def removeDSLinks(names: String*) = names map linkProxy foreach (_ ! PoisonPill)
 
   /**
    * Creates a list of values in response to LIST request by querying peer nodes
    * and contatenating their list with its own.
    */
   protected def listNodes: Iterable[ArrayValue] = {
-    val configs = rows(IsNode, "downstream" -> true).toIterable
+    val configs = rows(IsNode) ++ rows(extraConfigs: _*)
 
     val otherLinks = askPeers[Iterable[String]](PeerMessage(GetDSLinkNames), false)
     val children = otherLinks map (_.flatMap(_._2)) map { names =>
@@ -129,12 +125,13 @@ class ClusteredDownstreamActor(dslinkMgr: DSLinkManager) extends DownstreamActor
 }
 
 /**
- * Factory for [[ClusteredDownstreamActor]] instances.
+ * Factory for [[ClusteredDSLinkFolderActor]] instances.
  */
-object ClusteredDownstreamActor {
+object ClusteredDSLinkFolderActor {
 
   /**
-   * Creates a new props for [[ClusteredDownstreamActor]].
+   * Creates a new props for [[ClusteredDSLinkFolderActor]].
    */
-  def props(dslinkMgr: DSLinkManager) = Props(new ClusteredDownstreamActor(dslinkMgr))
+  def props(linkPath: String, linkProxy: (String) => Routee, extraConfigs: (String, DSAVal)*) =
+    Props(new ClusteredDSLinkFolderActor(linkPath, linkProxy, extraConfigs: _*))
 }

@@ -1,4 +1,4 @@
-package modules.websocket
+package facades.websocket
 
 import models.akka.ConnectionInfo
 import play.api.libs.json.JsValue

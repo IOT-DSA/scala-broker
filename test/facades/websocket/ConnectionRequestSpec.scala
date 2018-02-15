@@ -1,4 +1,4 @@
-package modules.websocket
+package facades.websocket
 
 import org.scalatestplus.play.PlaySpec
 import play.api.libs.json._

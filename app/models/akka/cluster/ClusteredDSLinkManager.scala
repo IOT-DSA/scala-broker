@@ -7,6 +7,7 @@ import akka.routing.Routee
 import akka.util.Timeout
 import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
 import models.metrics.EventDaos
+import akka.actor.Props
 
 /**
  * Uses Akka Cluster Sharding to communicate with DSLinks.
@@ -21,16 +22,23 @@ class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(impli
   log.info("Clustered DSLink Manager created")
 
   /**
-   * Returns a [[ShardedRoutee]] instance for the specified dslink.
+   * Returns a [[ShardedRoutee]] instance for the specified downlink.
    */
-  def getDSLinkRoutee(name: String): Routee = ShardedRoutee(region, name)
+  def getDownlinkRoutee(name: String): Routee = ShardedRoutee(dnlinkRegion, name)
+
+  /**
+   * Returns a [[ShardedRoutee]] instance for the specified uplink.
+   */
+  def getUplinkRoutee(name: String): Routee = ShardedRoutee(uplinkRegion, name)
 
   /**
    * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.
    */
   def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = path match {
     case Paths.Downstream                          => system.actorSelection("/user" + Paths.Downstream) ! message
-    case path if path.startsWith(Paths.Downstream) => getDSLinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
+    case path if path.startsWith(Paths.Downstream) => getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
+    case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ! message
+    case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
     case path                                      => RootNodeActor.childProxy(path)(system) ! message
   }
 
@@ -49,18 +57,23 @@ class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(impli
   }
 
   /**
-   * Create shard region.
+   * Shard region for downstream links.
    */
-  val region = {
+  val dnlinkRegion = createRegion(Nodes.Downstream, dnlinkProps)
+  
+  /**
+   * Shard region for upstream links.
+   */
+  val uplinkRegion = createRegion(Nodes.Upstream, uplinkProps)
+
+  /**
+   * Creates a sharding region or connects to the sharding system in proxy mode.
+   */
+  private def createRegion(typeName: String, linkProps: Props) = {
     val sharding = ClusterSharding(system)
     if (proxyMode)
-      sharding.startProxy(Nodes.Downstream, Some("backend"), extractEntityId, extractShardId)
+      sharding.startProxy(typeName, Some("backend"), extractEntityId, extractShardId)
     else
-      sharding.start(
-        Nodes.Downstream,
-        props,
-        ClusterShardingSettings(system),
-        extractEntityId,
-        extractShardId)
+      sharding.start(typeName, linkProps, ClusterShardingSettings(system), extractEntityId, extractShardId)
   }
 }

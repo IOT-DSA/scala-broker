@@ -7,6 +7,7 @@ import org.joda.time.DateTime
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
+import models.metrics.EventDaos
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
@@ -14,10 +15,10 @@ import models.rpc.DSAValue.DSAVal
 trait RequesterBehavior { me: AbstractDSLinkActor =>
   import models.Settings._
 
-  import eventDaos._
+  protected def eventDaos: EventDaos
   
   protected def dslinkMgr: DSLinkManager
-
+  
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
   private val targetsBySid = collection.mutable.Map.empty[Int, String]
@@ -115,7 +116,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     else
       "broker"
 
-    requestEventDao.saveRequestBatchEvents(DateTime.now, linkName, connInfo.linkAddress,
+    eventDaos.requestEventDao.saveRequestBatchEvents(DateTime.now, linkName, connInfo.linkAddress,
       tgtLinkName, requests: _*)
   }
 

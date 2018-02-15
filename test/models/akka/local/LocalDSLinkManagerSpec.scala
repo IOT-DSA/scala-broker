@@ -4,13 +4,12 @@ import scala.concurrent.duration.DurationInt
 
 import org.scalatest.Inside
 
-import akka.routing.ActorSelectionRoutee
 import akka.pattern.ask
+import akka.routing.ActorSelectionRoutee
 import akka.util.Timeout
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
-import models.akka.AbstractActorSpec
+import models.akka.{ AbstractActorSpec, RootNodeActor }
 import models.akka.Messages.{ GetDSLinkNames, GetLinkInfo, GetOrCreateDSLink, LinkInfo }
-import models.akka.RootNodeActor
 import models.rpc.{ DSAResponse, ListRequest }
 
 /**
@@ -21,15 +20,25 @@ class LocalDSLinkManagerSpec extends AbstractActorSpec with Inside {
   implicit val timeout = Timeout(3 seconds)
 
   val mgr = new LocalDSLinkManager(nullDaos)
-  val downstream = system.actorOf(LocalDownstreamActor.props(mgr), Settings.Nodes.Downstream)
+  val downstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Downstream, mgr.dnlinkProps), Settings.Nodes.Downstream)
+  val upstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Upstream, mgr.uplinkProps), Settings.Nodes.Upstream)
   system.actorOf(RootNodeActor.props, Settings.Nodes.Root)
 
-  "getDSLinkRoutee" should {
+  "getDownlinkRoutee" should {
     "return a actor selection routee" in {
-      val routee = mgr.getDSLinkRoutee("aaa")
+      val routee = mgr.getDownlinkRoutee("aaa")
       routee mustBe a[ActorSelectionRoutee]
       val link = routee.asInstanceOf[ActorSelectionRoutee]
       link.selection mustBe system.actorSelection("/user/downstream/aaa")
+    }
+  }
+
+  "getUplinkRoutee" should {
+    "return a actor selection routee" in {
+      val routee = mgr.getUplinkRoutee("aaa")
+      routee mustBe a[ActorSelectionRoutee]
+      val link = routee.asInstanceOf[ActorSelectionRoutee]
+      link.selection mustBe system.actorSelection("/user/upstream/aaa")
     }
   }
 
@@ -38,12 +47,23 @@ class LocalDSLinkManagerSpec extends AbstractActorSpec with Inside {
       mgr.dsaSend("/downstream", GetDSLinkNames)
       expectMsg(Set.empty)
     }
-    "send a message to a dslink" in {
+    "send a message to a downlink" in {
       whenReady(downstream ? GetOrCreateDSLink("abc")) { _ =>
         mgr.dsaSend(s"/downstream/abc", GetLinkInfo)
         expectMsgType[LinkInfo]
       }
     }
+    "send a message to /upstream node" in {
+      mgr.dsaSend("/upstream", GetDSLinkNames)
+      expectMsg(Set.empty)
+    }
+    "send a message to an uplink" in {
+      whenReady(upstream ? GetOrCreateDSLink("abc")) { _ =>
+        mgr.dsaSend(s"/upstream/abc", GetLinkInfo)
+        expectMsgType[LinkInfo]
+      }
+    }
+
     "send a message to the top node" in {
       mgr.dsaSend("/", RequestEnvelope(ListRequest(1, "/") :: Nil))
       inside(receiveOne(timeout.duration)) {

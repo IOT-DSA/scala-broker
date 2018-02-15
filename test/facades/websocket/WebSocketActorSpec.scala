@@ -1,17 +1,16 @@
-package modules.websocket
+package facades.websocket
 
-import akka.actor.actorRef2Scala
+import akka.routing.ActorRefRoutee
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
+import models.akka.{ AbstractActorSpec, ConnectionInfo }
 import models.rpc._
-import models.akka._
-import akka.routing.ActorRefRoutee
 
 /**
  * WebSocketActor test suite.
  */
 class WebSocketActorSpec extends AbstractActorSpec {
-  import Messages._
+  import models.akka.Messages._
 
   val salt = 1234
   val ci = ConnectionInfo("", "ws", true, false)

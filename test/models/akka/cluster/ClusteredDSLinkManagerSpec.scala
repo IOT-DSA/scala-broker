@@ -24,6 +24,9 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
   // global downstream sink
   val downstreamProbe = TestProbe()(system)
 
+  // global upstream sink
+  val upstreamProbe = TestProbe()(system)
+
   val (system1, mgr1, probe1) = createClusterArtifacts(2551, false)
   val (system2, mgr2, probe2) = createClusterArtifacts(0, false)
   val (system3, mgr3, probe3) = createClusterArtifacts(0, false)
@@ -38,12 +41,22 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
     TestKit.shutdownActorSystem(system1)
   }
 
-  "getDSLinkRoutee" should {
+  "getDownlinkRoutee" should {
     "return a sharded routee" in {
-      val routee = mgr1.getDSLinkRoutee("aaa")
+      val routee = mgr1.getDownlinkRoutee("aaa")
       routee mustBe a[ShardedRoutee]
       val link = routee.asInstanceOf[ShardedRoutee]
-      link.region mustBe mgr1.region
+      link.region mustBe mgr1.dnlinkRegion
+      link.entityId mustBe "aaa"
+    }
+  }
+
+  "getUplinkRoutee" should {
+    "return a sharded routee" in {
+      val routee = mgr1.getUplinkRoutee("aaa")
+      routee mustBe a[ShardedRoutee]
+      val link = routee.asInstanceOf[ShardedRoutee]
+      link.region mustBe mgr1.uplinkRegion
       link.entityId mustBe "aaa"
     }
   }
@@ -53,12 +66,24 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
       mgr1.dsaSend("/downstream", "hello")
       downstreamProbe.expectMsg("hello")
     }
-    "send a message to a dslink" in {
+    "send a message to a downlink" in {
       managers.zipWithIndex foreach {
         case (mgr, index) =>
           val name = "aaa" + index
           mgr.dsaSend(s"/downstream/$name", s"hello_$name")
           downstreamProbe.expectMsg(RegisterDSLink(name, DSLinkMode.Requester, false))
+      }
+    }
+    "send a message to /upstream node" in {
+      mgr1.dsaSend("/upstream", "hello")
+      upstreamProbe.expectMsg("hello")
+    }
+    "send a message to an uplink" in {
+      managers.zipWithIndex foreach {
+        case (mgr, index) =>
+          val name = "aaa" + index
+          mgr.dsaSend(s"/upstream/$name", s"hello_$name")
+          upstreamProbe.expectMsg(RegisterDSLink(name, DSLinkMode.Requester, false))
       }
     }
     "send a message to the top node" in {
@@ -97,6 +122,7 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
     val system = createActorSystem(port)
     val mgr = new ClusteredDSLinkManager(proxyMode, nullDaos)(system)
     system.actorOf(TestActors.forwardActorProps(downstreamProbe.ref), Settings.Nodes.Downstream)
+    system.actorOf(TestActors.forwardActorProps(upstreamProbe.ref), Settings.Nodes.Upstream)
     if (proxyMode)
       RootNodeActor.singletonProxy(system)
     else

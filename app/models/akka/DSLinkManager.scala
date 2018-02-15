@@ -1,8 +1,8 @@
 package models.akka
 
-import akka.actor.ActorRef
-import akka.routing.Routee
-import models.Settings
+import akka.actor.{ ActorRef, ActorSystem }
+import akka.routing.{ ActorSelectionRoutee, Routee }
+import models.Settings.{ Nodes, Paths, Responder }
 import models.metrics.EventDaos
 import play.api.Logger
 
@@ -11,25 +11,45 @@ import play.api.Logger
  */
 trait DSLinkManager {
 
+  protected val log = Logger(getClass)
+
+  /**
+   * Actor system.
+   */
+  def system: ActorSystem
+
   /**
    * Event DAOs.
    */
   def eventDaos: EventDaos
 
-  protected val log = Logger(getClass)
+  /**
+   * Downstream node routee.
+   */
+  val downstream = ActorSelectionRoutee(system.actorSelection("/user" + Paths.Downstream))
 
   /**
-   * Returns a [[Routee]] that can be used for sending messages to a specific dslink.
+   * Upstream node routee.
    */
-  def getDSLinkRoutee(name: String): Routee
+  val upstream = ActorSelectionRoutee(system.actorSelection("/user" + Paths.Upstream))
 
+  /**
+   * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
+   */
+  def getDownlinkRoutee(name: String): Routee
+
+  /**
+   * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
+   */
+  def getUplinkRoutee(name: String): Routee
+  
   /**
    * Sends a message to its DSA destination using actor selection.
    */
   def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit
 
   /**
-   * Creates a new instance of DSLink actor props, according to the
+   * An instance of downlink actor props, according to the
    * `broker.responder.group.call.engine` config settings:
    * <ul>
    * 	<li>`simple`</li> - Basic DSLink implementation, uses local registry.
@@ -38,10 +58,15 @@ trait DSLinkManager {
    *  <li>`dpubsub`</li> - Distributed PubSub implementation, uses cluster-wide subscriptions.
    * </ul>
    */
-  val props = Settings.Responder.GroupCallEngine match {
-    case "simple"  => DSLinkFactory.createSimpleProps(this, eventDaos)
-    case "pooled"  => DSLinkFactory.createPooledProps(this, eventDaos)
-    case "pubsub"  => DSLinkFactory.createPubSubProps(this, eventDaos)
-    case "dpubsub" => DSLinkFactory.createDPubSubProps(this, eventDaos)
+  val dnlinkProps = Responder.GroupCallEngine match {
+    case "simple"  => DSLinkFactory.createSimpleProps(this, Paths.Downstream, downstream, eventDaos)
+    case "pooled"  => DSLinkFactory.createPooledProps(this, Paths.Downstream, downstream, eventDaos)
+    case "pubsub"  => DSLinkFactory.createPubSubProps(this, Paths.Downstream, downstream, eventDaos)
+    case "dpubsub" => DSLinkFactory.createDPubSubProps(this, Paths.Downstream, downstream, eventDaos)
   }
+
+  /**
+   * An instance of uplink actor props.
+   */
+  val uplinkProps = DSLinkFactory.createSimpleProps(this, Paths.Upstream, upstream, eventDaos)
 }
