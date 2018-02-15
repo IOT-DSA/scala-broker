@@ -20,8 +20,8 @@ import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import controllers.BasicController
 import javax.inject.{ Inject, Singleton }
 import models.Settings
-import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager }
-import models.akka.Messages.GetOrCreateDSLink
+import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee }
+import models.akka.Messages.{ GetOrCreateDSLink, RemoveDSLink }
 import models.handshake.{ LocalKeys, RemoteKey }
 import models.metrics.EventDaos
 import models.rpc.DSAMessage
@@ -114,6 +114,14 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
       Ok("Upstream connection established")
     }
+  }
+
+  /**
+   * Terminates a connection to upstream.
+   */
+  def disconnectUplink(name: String) = Action {
+    actors.upstream ! RemoveDSLink(name)
+    Ok(s"Uplink '$name' disconnected")
   }
 
   /**
