@@ -14,6 +14,11 @@ import play.api.libs.json.Json.toJsFieldJsValueWrapper
 object Settings {
 
   val rootConfig = ConfigFactory.load
+  
+  /**
+   * Broker name.
+   */
+  val BrokerName = rootConfig.getString("broker.name")
 
   /**
    * DSA Server Configuration.

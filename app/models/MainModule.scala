@@ -13,6 +13,7 @@ import models.Settings.{ InfluxDb, JDBC, Metrics }
 import models.akka.{ BrokerActors, DSLinkManager }
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
+import models.handshake.LocalKeys
 import models.metrics._
 import models.metrics.NullDaos._
 import models.metrics.influxdb._
@@ -28,6 +29,7 @@ class MainModule extends Module {
   def bindings(environment: Environment, configuration: Configuration) = {
     Seq(
       bind[DSLinkManager].toProvider[DSLinkManagerProvider],
+      bind[LocalKeys].to(LocalKeys.getFromClasspath("/keys")),
       bind[BrokerActors].toSelf.eagerly) ++ createEventDaoBindings
   }
 

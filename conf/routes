@@ -13,8 +13,9 @@ GET    /upstream              controllers.MainController.upstream
 GET    /config                controllers.MainController.viewConfig
 
 # WebSocket facade
-POST   /conn                  facades.websocket.WebSocketController.conn
-GET    /ws                    facades.websocket.WebSocketController.ws
+POST   /conn                  facades.websocket.WebSocketController.dslinkHandshake
+GET    /ws                    facades.websocket.WebSocketController.dslinkWSConnect
+PUT    /upstream              facades.websocket.WebSocketController.uplinkHandshake(url, name)
 
 GET    /metrics/cluster       controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
 GET    /metrics/connections   controllers.MetricController.connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])

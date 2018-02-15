@@ -20,7 +20,7 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
 
     "render the connection response from the application" in {
       val controller = app.injector.instanceOf[WebSocketController]
-      val conn = controller.conn().apply(request)
+      val conn = controller.dslinkHandshake(request)
 
       status(conn) mustBe OK
       contentType(conn) mustBe Some("application/json")
