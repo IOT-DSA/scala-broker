@@ -2,10 +2,11 @@ package controllers
 
 import scala.concurrent.Future
 
+import org.joda.time.DateTime
+
 import akka.actor.ActorSystem
+import akka.cluster.{ Cluster, MemberStatus }
 import akka.pattern.ask
-import akka.cluster.Cluster
-import akka.cluster.ClusterEvent.CurrentClusterState
 import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
 import models.Settings
@@ -42,13 +43,16 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Displays the cluster information.
    */
   def clusterInfo = Action.async {
-    val clusterInfo = getClusterInfo
-    val linkCounts = getDSLinkCounts
-    for (info <- clusterInfo; lc <- linkCounts; upCount <- getUpstreamCount) yield {
-      val countsByAddress = lc.nodeStats.map {
-        case (address, stats) => address -> stats.total
-      }
-      Ok(views.html.cluster(info, countsByAddress, Some(countsByAddress.values.sum), Some(upCount)))
+    val mode = if (isClusterMode) "Clustered" else "Standalone"
+    val startedAt = new DateTime(actorSystem.startTime)
+    val nodes = getClusterNodes
+    val dslinkStats = getDSLinkCounts
+    val uplinkStats = getUplinkCounts
+    for {
+      down <- dslinkStats
+      up <- uplinkStats
+    } yield {
+      Ok(views.html.cluster(mode, startedAt, nodes.map(ni => (ni.address -> ni)).toMap, down, up))
     }
   }
 
@@ -104,12 +108,15 @@ class MainController @Inject() (actorSystem: ActorSystem,
   }
 
   /**
-   * Returns a future with the cluster information.
+   * Returns a future with the cluster node information.
    */
-  //TODO temporary, the view needs to be reworked
-  private def getClusterInfo = (downstream ? GetBrokerInfo).mapTo[BrokerInfo].map {
-    _.clusterInfo.getOrElse(CurrentClusterState())
-  }
+  private def getClusterNodes = if (isClusterMode) {
+    val state = Cluster(actorSystem).state
+    state.members map { m =>
+      val status = if (state.unreachable contains m) "Unreachable" else m.status.toString
+      NodeInfo(m.address, state.leader == Some(m.address), m.uniqueAddress.longUid, m.roles, status)
+    }
+  } else Set(NodeInfo(downstream.path.address, true, -1, Set.empty, MemberStatus.Up.toString))
 
   /**
    * Returns a future with the number of registered dslinks by backend.
@@ -117,21 +124,26 @@ class MainController @Inject() (actorSystem: ActorSystem,
   private def getDSLinkCounts = (downstream ? GetDSLinkStats).mapTo[DSLinkStats]
 
   /**
+   * Returns a future with the number of registered uplinks by backend.
+   */
+  private def getUplinkCounts = (actors.upstream ? GetDSLinkStats).mapTo[DSLinkStats]
+
+  /**
    * Returns a future with the total number of registered dslinks.
    */
   private def getTotalDSLinkCount = getDSLinkCounts map (_.total)
 
   /**
-   * Returns a future with the number of registered upstream connections (currently always 0).
+   * Returns a future with the total number of registered uplinks.
    */
-  private def getUpstreamCount = Future.successful(0)
+  private def getTotalUplinkCount = getUplinkCounts map (_.total)
 
   /**
-   * Combines `getTotalDSLinkCount` and `getUpstreamCount` to produce a future tuple (down, up).
+   * Combines `getTotalDSLinkCount` and `getTotalUplinkCount` to produce a future tuple (down, up).
    */
   private def getDownUpCount = {
     val fDown = getTotalDSLinkCount
-    val fUp = getUpstreamCount
+    val fUp = getTotalUplinkCount
     for (down <- fDown; up <- fUp) yield (down, up)
   }
 
