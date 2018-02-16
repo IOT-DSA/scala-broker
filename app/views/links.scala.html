@@ -126,17 +126,25 @@ function reset() {
 }
 
 function disconnect(linkName) {
-	$.post("/disconnect?link=" + linkName, function(data) {
-		alert(data);
-		location.reload();
-	});
+	$.ajax({
+	    url: 'dslinks/' + linkName + '/stop',
+	    type: 'PUT',
+	    success: function(data) {
+			alert(data);
+			location.reload();
+	    }
+	});	
 }
 
 function remove(linkName) {
-	$.post("/remove?link=" + linkName, function(data) {
-		alert(data);
-		location.reload();
-	});
+	$.ajax({
+	    url: 'dslinks/' + linkName,
+	    type: 'DELETE',
+	    success: function(data) {
+			alert(data);
+			location.reload();
+	    }
+	});	
 }
 </script>
 }{<!-- no tail -->}
