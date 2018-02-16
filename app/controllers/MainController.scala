@@ -29,6 +29,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
   val isClusterMode = actorSystem.hasExtension(Cluster)
 
   val downstream = actors.downstream
+  val upstream = actors.upstream
 
   /**
    * Displays the main app page.
@@ -51,9 +52,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
     for {
       down <- dslinkStats
       up <- uplinkStats
-    } yield {
-      Ok(views.html.cluster(mode, startedAt, nodes.map(ni => (ni.address -> ni)).toMap, down, up))
-    }
+    } yield Ok(views.html.cluster(mode, startedAt, nodes.map(ni => (ni.address -> ni)).toMap, down, up))
   }
 
   /**
@@ -76,6 +75,20 @@ class MainController @Inject() (actorSystem: ActorSystem,
   }
 
   /**
+   * Displays upstream connections.
+   */
+  def uplinks = Action.async {
+    val fLinkNames = getUplinkNames
+    val fDownUpCount = getDownUpCount
+    for {
+      names <- fLinkNames
+      (down, up) <- fDownUpCount
+      links <- Future.sequence(names map (name => (upstream ? GetOrCreateDSLink(name)).mapTo[Routee]))
+      infos <- Future.sequence(links map (link => (link ? GetLinkInfo).mapTo[LinkInfo]))
+    } yield Ok(views.html.upstream(infos, down, Some(down), Some(up)))
+  }
+
+  /**
    * Disconnects the dslink from endpoint.
    */
   def disconnectEndpoint(name: String) = Action.async {
@@ -92,11 +105,6 @@ class MainController @Inject() (actorSystem: ActorSystem,
     downstream ! RemoveDSLink(name)
     Ok(s"DSLink '$name' removed")
   }
-
-  /**
-   * Displays upstream connections.
-   */
-  def upstream = TODO
 
   /**
    * Displays the configuration.
@@ -126,7 +134,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
   /**
    * Returns a future with the number of registered uplinks by backend.
    */
-  private def getUplinkCounts = (actors.upstream ? GetDSLinkStats).mapTo[DSLinkStats]
+  private def getUplinkCounts = (upstream ? GetDSLinkStats).mapTo[DSLinkStats]
 
   /**
    * Returns a future with the total number of registered dslinks.
@@ -152,4 +160,9 @@ class MainController @Inject() (actorSystem: ActorSystem,
    */
   private def getDSLinkNames(regex: String, limit: Int, offset: Int) =
     (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+
+  /**
+   * Returns a future with the list of uplink names.
+   */
+  private def getUplinkNames() = (upstream ? GetDSLinkNames).mapTo[Iterable[String]]
 }

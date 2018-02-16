@@ -119,7 +119,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   /**
    * Terminates a connection to upstream.
    */
-  def disconnectUplink(name: String) = Action {
+  def removeUplink(name: String) = Action {
     actors.upstream ! RemoveDSLink(name)
     Ok(s"Uplink '$name' disconnected")
   }

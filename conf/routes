@@ -3,21 +3,25 @@
 # https://www.playframework.com/documentation/latest/ScalaRouting
 # ~~~~
 
+# UI
 GET      /                      controllers.MainController.index
 GET      /data                  controllers.MainController.dataExplorer
 GET      /cluster               controllers.MainController.clusterInfo
 GET      /links                 controllers.MainController.findDslinks(regex ?= ".*", limit: Int ?= 100, offset: Int ?= 0)
-POST     /disconnect            controllers.MainController.disconnectEndpoint(link)
-POST     /remove                controllers.MainController.removeLink(link)
-GET      /upstream              controllers.MainController.upstream
+GET      /upstream              controllers.MainController.uplinks
 GET      /config                controllers.MainController.viewConfig
 
-# WebSocket facade
+# DSLinks
 POST     /conn                  facades.websocket.WebSocketController.dslinkHandshake
 GET      /ws                    facades.websocket.WebSocketController.dslinkWSConnect
-PUT      /upstream              facades.websocket.WebSocketController.uplinkHandshake(url, name)
-DELETE   /upstream/:name        facades.websocket.WebSocketController.disconnectUplink(name)
+PUT      /dslinks/:name/stop    controllers.MainController.disconnectEndpoint(name)
+DELETE   /dslinks/:name         controllers.MainController.removeLink(name)
 
+# Uplinks
+PUT      /uplinks               facades.websocket.WebSocketController.uplinkHandshake(url, name)
+DELETE   /uplinks/:name         facades.websocket.WebSocketController.removeUplink(name)
+
+# Metrics
 GET      /metrics/cluster       controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
 GET      /metrics/connections   controllers.MetricController.connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
 GET      /metrics/sessions      controllers.MetricController.sessionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
@@ -25,6 +29,7 @@ GET      /metrics/requests      controllers.MetricController.requestStatsByLink(
 GET      /metrics/batches       controllers.MetricController.requestStatsByMethod(from: Option[Long], to: Option[Long])
 GET      /metrics/responses     controllers.MetricController.responseStatsByLink(from: Option[Long], to: Option[Long])
 
+# Benchmark
 GET      /bench/stats           controllers.BenchmarkController.viewStats
 PUT      /bench/start           controllers.BenchmarkController.start(reqCount: Int ?= 5, rspCount: Int ?= 2, rspNodeCount: Int ?= 10, batchSize: Int ?= 100, timeout: Long ?= 2000, parseJson: Boolean ?= true)
 PUT      /bench/stop            controllers.BenchmarkController.stop
