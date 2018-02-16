@@ -73,18 +73,6 @@ object Messages {
                       lastDisconnected: Option[DateTime])
 
   /**
-   * Sent to FrontendActor to request the broker information.
-   * TODO
-   */
-  case object GetBrokerInfo
-
-  /**
-   * Broker information, sent back by FrontendActor in response to [[GetBrokerInfo]] message.
-   * TODO
-   */
-  case class BrokerInfo(backends: Seq[ActorPath], clusterInfo: Option[ClusterEvent.CurrentClusterState])
-
-  /**
    * Sent to Downstream actor to request the aggregated [[DSLinkStats]].
    */
   case object GetDSLinkStats
