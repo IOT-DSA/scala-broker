@@ -45,7 +45,7 @@ trait ClusteredActor extends Actor with ActorLogging {
   protected def peers(includeSelf: Boolean = true) = {
     val members = if (includeSelf) cluster.state.members else cluster.state.members - cluster.selfMember
     members map { member =>
-      context.actorSelection(RootActorPath(member.address) / self.path.elements)
+      member.address -> context.actorSelection(RootActorPath(member.address) / self.path.elements)
     }
   }
 
@@ -53,17 +53,19 @@ trait ClusteredActor extends Actor with ActorLogging {
    * Sends a message to all downstream nodes in the cluster and collects the responses into a map.
    */
   protected def askPeers[T: ClassTag](request: Any, includeSelf: Boolean = true) = {
-    val results = peers(includeSelf) map (p => p.ask(request).mapTo[T].map(x => p.anchorPath.address -> x))
+    val results = peers(includeSelf) map {
+      case (address, selection) => selection.ask(request).mapTo[T].map(x => address -> x)
+    }
     Future.sequence(results) map (_.toMap)
   }
 
   /**
    * Sends a message to all peers.
    */
-  protected def tellPeers(msg: Any, includeSelf: Boolean = true) = peers(includeSelf) foreach (_ ! msg)
+  protected def tellPeers(msg: Any, includeSelf: Boolean = true) = peers(includeSelf) foreach (_._2 ! msg)
 
   /**
    * Forwards a message to all peers.
    */
-  protected def forwardToPeers(msg: Any, includeSelf: Boolean = true) = peers(includeSelf) foreach (_.forward(msg))
+  protected def forwardToPeers(msg: Any, includeSelf: Boolean = true) = peers(includeSelf) foreach (_._2.forward(msg))
 }
