@@ -90,10 +90,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
    * Initiates a web socket connection with the upstream.
    */
   private def uplinkWSConnect(url: String, name: String, dsId: String) = {
+    import Settings.WebSocket._
+
     val ci = ConnectionInfo(dsId, name, true, true)
     val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
     val sessionInfo = DSLinkSessionInfo(ci, sessionId)
-    val dsaFlow = createWSFlow(sessionInfo, actors.upstream)
+    val dsaFlow = createWSFlow(sessionInfo, actors.upstream, BufferSize, OnOverflow)
 
     dsaFlow map { flow =>
       val inFlow = Flow[Message].collect {
@@ -149,13 +151,15 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
    * Establishes a WebSocket connection.
    */
   def dslinkWSConnect = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
+    import Settings.WebSocket._
+
     log.debug(s"WS request received: $request")
     val dsId = getDsId(request)
     val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
     log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
     sessionInfo map { si =>
-      createWSFlow(si, actors.downstream) map Right[Result, DSAFlow]
+      createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
     } getOrElse
       Future.successful(Left[Result, DSAFlow](Forbidden))
 
@@ -166,8 +170,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
    */
   private def createWSFlow(sessionInfo: DSLinkSessionInfo,
                            registry:    ActorRef,
-                           bufferSize:  Int               = 16,
-                           overflow:    OverflowStrategy  = OverflowStrategy.dropNew) = {
+                           bufferSize:  Int,
+                           overflow:    OverflowStrategy) = {
     import akka.actor.Status._
 
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
