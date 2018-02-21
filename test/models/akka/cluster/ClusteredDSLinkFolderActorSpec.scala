@@ -13,6 +13,7 @@ import akka.util.Timeout
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
 import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
+import akka.actor.Address
 
 /**
  * ClusteredDSLinkFolderActor test suite.
@@ -24,6 +25,8 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   import models.Settings._
 
   import system.dispatcher
+
+  type FoundLinks = Map[Address, Iterable[String]]
 
   implicit val timeout = Timeout(3 seconds)
   val dsId = "link" + "?" * 44
@@ -161,9 +164,15 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "FindDSLinks" should {
     "search for matching dslinks" in {
-      whenReady(downstream2 ? FindDSLinks("a.*", 100, 0)) { _ mustBe List("aaa") }
-      whenReady(downstream1 ? FindDSLinks("[ad].*", 100, 0)) { _ mustBe List("aaa", "ddd") }
-      whenReady(downstream3 ? FindDSLinks("[aed].*", 100, 0)) { _ mustBe List("aaa", "ddd", "eee") }
+      whenReady((downstream2 ? FindDSLinks("a.*", 100, 0)).mapTo[FoundLinks]) {
+        _.flatMap(_._2) mustBe List("aaa")
+      }
+      whenReady((downstream1 ? FindDSLinks("[ad].*", 100, 0)).mapTo[FoundLinks]) {
+        _.flatMap(_._2).toSet mustBe Set("aaa", "ddd")
+      }
+      whenReady((downstream3 ? FindDSLinks("[aed].*", 100, 0)).mapTo[FoundLinks]) {
+        _.flatMap(_._2).toSet mustBe Set("aaa", "ddd", "eee")
+      }
     }
   }
 

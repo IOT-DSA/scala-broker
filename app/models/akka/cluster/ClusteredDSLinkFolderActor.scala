@@ -81,11 +81,7 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
     case FindDSLinks(regex, limit, offset) =>
       val nodeLinks = askPeers[Seq[String]](PeerMessage(FindDSLinks(regex, limit, offset)))
-      val aggregated = nodeLinks map (_.flatMap(_._2).toList)
-      val truncated = aggregated map { list =>
-        list.sorted.drop(offset).take(limit)
-      }
-      truncated pipeTo sender
+      nodeLinks pipeTo sender
 
     case RemoveDisconnectedDSLinks =>
       removeDisconnectedDSLinks

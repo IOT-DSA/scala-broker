@@ -48,9 +48,10 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
       val stats = buildDSLinkNodeStats
       sender ! DSLinkStats(Map(stats.address -> stats))
 
-    case FindDSLinks(regex, limit, offset) => sender ! findDSLinks(regex, limit, offset)
+    case FindDSLinks(regex, limit, offset) =>
+      sender ! Map(self.path.address -> findDSLinks(regex, limit, offset))
 
-    case RemoveDisconnectedDSLinks         => removeDisconnectedDSLinks
+    case RemoveDisconnectedDSLinks => removeDisconnectedDSLinks
   }
 
   /**
