@@ -13,6 +13,7 @@ import models.Settings
 import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
 import models.metrics.EventDaos
 import play.api.mvc.ControllerComponents
+import akka.actor.Address
 
 /**
  * Handles main web requests.
@@ -67,11 +68,16 @@ class MainController @Inject() (actorSystem: ActorSystem,
     val fLinkNames = getDSLinkNames(regex, limit, offset)
     val fDownUpCount = getDownUpCount
     for {
-      names <- fLinkNames
+      linksByAddress <- fLinkNames
       (down, up) <- fDownUpCount
-      links <- Future.sequence(names map (name => (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]))
-      infos <- Future.sequence(links map (link => (link ? GetLinkInfo).mapTo[LinkInfo]))
-    } yield Ok(views.html.links(regex, limit, offset, infos, down, Some(down), Some(up)))
+      listOfFutures = linksByAddress map {
+        case (address, names) => 
+          val links = names.map(getDSLinkRoutee)
+          val fInfos = Future.sequence(links.map(fLink => fLink.flatMap(link => (link ? GetLinkInfo).mapTo[LinkInfo])))
+          fInfos.map(infos => address -> infos)
+      }
+      infos <- Future.sequence(listOfFutures).map(_.toMap)
+      } yield Ok(views.html.links(regex, limit, offset, infos, down, Some(down), Some(up)))
   }
 
   /**
@@ -83,7 +89,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
     for {
       names <- fLinkNames
       (down, up) <- fDownUpCount
-      links <- Future.sequence(names map (name => (upstream ? GetOrCreateDSLink(name)).mapTo[Routee]))
+      links <- Future.sequence(names map getUplinkRoutee)
       infos <- Future.sequence(links map (link => (link ? GetLinkInfo).mapTo[LinkInfo]))
     } yield Ok(views.html.upstream(infos, down, Some(down), Some(up)))
   }
@@ -92,7 +98,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Disconnects the dslink from endpoint.
    */
   def disconnectEndpoint(name: String) = Action.async {
-    (downstream ? GetOrCreateDSLink(name)).mapTo[Routee] map { routee =>
+    getDSLinkRoutee(name) map { routee =>
       routee ! DisconnectEndpoint(true)
       Ok(s"Endpoint '$name' disconnected")
     }
@@ -159,10 +165,20 @@ class MainController @Inject() (actorSystem: ActorSystem,
    * Returns a future with the list of dslink names matching the criteria.
    */
   private def getDSLinkNames(regex: String, limit: Int, offset: Int) =
-    (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Iterable[String]]
+    (downstream ? FindDSLinks(regex, limit, offset)).mapTo[Map[Address, Iterable[String]]]
 
   /**
    * Returns a future with the list of uplink names.
    */
   private def getUplinkNames() = (upstream ? GetDSLinkNames).mapTo[Iterable[String]]
+
+  /**
+   * Returns a future Routee for a given dslink.
+   */
+  private def getDSLinkRoutee(name: String) = (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]
+
+  /**
+   * Returns a future Routee for a given uplink.
+   */
+  private def getUplinkRoutee(name: String) = (upstream ? GetOrCreateDSLink(name)).mapTo[Routee]
 }

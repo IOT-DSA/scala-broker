@@ -11,6 +11,7 @@ import akka.util.Timeout
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
 import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
 import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
+import akka.actor.Address
 
 /**
  * LocalDSLinkFolderActor test suite.
@@ -19,6 +20,8 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   import models.Settings._
   import models.akka.Messages._
   import models.rpc.DSAValue._
+  
+  type FoundLinks = Map[Address, Iterable[String]]
 
   implicit val timeout = Timeout(3 seconds)
   val dsId = "link" + "?" * 44
@@ -82,8 +85,9 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "FindDSLinks" should {
     "search for matching dslinks" in {
-      whenReady(downstream ? FindDSLinks("a.*", 100, 0)) {
-        _ mustBe List("aaa")
+      whenReady((downstream ? FindDSLinks("a.*", 100, 0)).mapTo[FoundLinks]) { result =>
+        result.size mustBe 1
+        result.values.head mustBe List("aaa")
       }
     }
   }

@@ -1,6 +1,8 @@
 package models
 
-import scala.collection.JavaConverters._
+import _root_.akka.stream.OverflowStrategy
+
+import scala.collection.JavaConverters.asScalaSetConverter
 import scala.concurrent.duration.DurationLong
 
 import com.typesafe.config.ConfigFactory
@@ -14,7 +16,7 @@ import play.api.libs.json.Json.toJsFieldJsValueWrapper
 object Settings {
 
   val rootConfig = ConfigFactory.load
-  
+
   /**
    * Broker name.
    */
@@ -77,6 +79,21 @@ object Settings {
    * The maximum number of children in LIST response.
    */
   val ChildrenPerListResponse = rootConfig.getInt("broker.children.per.response")
+
+  /**
+   * WebSocket configuration.
+   */
+  object WebSocket {
+    private val cfg = rootConfig.getConfig("broker.ws")
+
+    val BufferSize = cfg.getInt("buffer")
+    val OnOverflow = cfg.getString("overflow.strategy").toLowerCase match {
+      case "drophead"   => OverflowStrategy.dropHead
+      case "droptail"   => OverflowStrategy.dropTail
+      case "dropbuffer" => OverflowStrategy.dropBuffer
+      case _            => OverflowStrategy.dropNew
+    }
+  }
 
   /**
    * Responder configuration.
