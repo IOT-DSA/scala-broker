@@ -107,6 +107,7 @@
 					<div class="col-sm-offset-2 col-sm-10">
 						<button type="button" class="btn btn-primary" onclick="search()">Search</button>
 						<button type="button" class="btn btn-default" onclick="reset()">Reset</button>
+						<button type="button" class="btn btn-danger" onclick="removeDisconnected()">Remove Disconnected</button>
 					</div>
 				</div>				
 			</form>
@@ -153,6 +154,17 @@ function remove(linkName) {
 			location.reload();
 	    }
 	});	
+}
+
+function removeDisconnected() {
+	$.ajax({
+	    url: 'dslinks',
+	    type: 'DELETE',
+	    success: function(data) {
+			alert(data);
+			location.reload();
+	    }
+	});
 }
 </script>
 }{<!-- no tail -->}
