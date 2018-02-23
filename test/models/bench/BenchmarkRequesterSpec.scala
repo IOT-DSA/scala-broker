@@ -25,12 +25,12 @@ class BenchmarkRequesterSpec extends AbstractActorSpec with Inside {
   val probe = TestProbe()
   val routee = new ActorRefRoutee(probe.ref)
   val stats = TestProbe()
-  val config = BenchmarkRequesterConfig(nodePath, 5, 200 milliseconds, true, 100 milliseconds, Some(stats.ref))
+  val config = BenchmarkRequesterConfig(true, nodePath, 5, 200 milliseconds, true, 100 milliseconds, Some(stats.ref))
   val requester = system.actorOf(BenchmarkRequester.props(reqName, routee, nullDaos, config))
 
   "BenchmarkRequester" should {
     "register with proxy" in {
-      val ci = ConnectionInfo(reqName + "0" * 44, reqName, true, false)
+      val ci = ConnectionInfo(reqName + "0" * 44, reqName, true, false, None, "1.1.2", List("json"))
       probe.expectMsg(ConnectEndpoint(requester, ci))
     }
     "subscribe to events" in {
