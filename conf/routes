@@ -16,6 +16,7 @@ POST     /conn                  facades.websocket.WebSocketController.dslinkHand
 GET      /ws                    facades.websocket.WebSocketController.dslinkWSConnect
 PUT      /dslinks/:name/stop    controllers.MainController.disconnectEndpoint(name)
 DELETE   /dslinks/:name         controllers.MainController.removeLink(name)
+DELETE   /dslinks               controllers.MainController.removeDisconnectedLinks               
 
 # Uplinks
 PUT      /uplinks               facades.websocket.WebSocketController.uplinkHandshake(url, name)
@@ -31,7 +32,7 @@ GET      /metrics/responses     controllers.MetricController.responseStatsByLink
 
 # Benchmark
 GET      /bench/stats           controllers.BenchmarkController.viewStats
-PUT      /bench/start           controllers.BenchmarkController.start(reqCount: Int ?= 5, rspCount: Int ?= 2, rspNodeCount: Int ?= 10, batchSize: Int ?= 100, timeout: Long ?= 2000, parseJson: Boolean ?= true)
+PUT      /bench/start           controllers.BenchmarkController.start(subscribe: Boolean ?= false, reqCount: Int ?= 5, rspCount: Int ?= 2, rspNodeCount: Int ?= 10, batchSize: Int ?= 100, timeout: Long ?= 2000, parseJson: Boolean ?= false)
 PUT      /bench/stop            controllers.BenchmarkController.stop
 PUT      /bench/reset           controllers.BenchmarkController.reset
 

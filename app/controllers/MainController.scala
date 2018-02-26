@@ -111,6 +111,14 @@ class MainController @Inject() (actorSystem: ActorSystem,
     downstream ! RemoveDSLink(name)
     Ok(s"DSLink '$name' removed")
   }
+  
+  /**
+   * Removes disconnected dslinks.
+   */
+  def removeDisconnectedLinks() = Action {
+    downstream ! RemoveDisconnectedDSLinks
+    Ok("All disconnected dslinks removed")
+  }
 
   /**
    * Displays the configuration.

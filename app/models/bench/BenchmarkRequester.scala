@@ -21,6 +21,8 @@ import models.rpc._
 class BenchmarkRequester(linkName: String, routee: Routee, eventDaos: EventDaos, config: BenchmarkRequesterConfig)
   extends AbstractEndpointActor(linkName, DSLinkMode.Requester, routee, config) {
 
+  import BenchmarkRequester._
+
   import context.dispatcher
   import eventDaos._
 
@@ -28,63 +30,88 @@ class BenchmarkRequester(linkName: String, routee: Routee, eventDaos: EventDaos,
   private var invokeJob: Cancellable = null
 
   private var lastReportedAt: DateTime = _
-  private val invokesSent = new AtomicInteger(0)
-  private val updatesRcvd = new AtomicInteger(0)
+  private var invokesSent: Int = 0
+  private var updatesRcvd: Int = 0
 
   private val linkAddress = "localhost"
 
+  private val invPath = config.path + "/incCounter"
+
+  /**
+   * Optionally subscribes to the node's updates and schedules a regular job for pushing request batches.
+   */
   override def preStart() = {
     super.preStart
 
     lastReportedAt = DateTime.now
 
     // subscribe to path events
-    val subReq = SubscribeRequest(ridGen.inc, SubscriptionPath(config.path, 101))
-    sendToProxy(RequestMessage(localMsgId.inc, None, List(subReq)))
-    log.info("[{}] subscribed to [{}]", linkName, config.path)
+    if (config.subscribe) {
+      val subReq = SubscribeRequest(ridGen.inc, SubscriptionPath(config.path, 101))
+      sendToProxy(RequestMessage(localMsgId.inc, None, List(subReq)))
+      log.info("[{}] subscribed to [{}]", linkName, config.path)
+    }
 
     // schedule action invocation
-    val invPath = config.path + "/incCounter"
-    invokeJob = context.system.scheduler.schedule(config.timeout, config.timeout) {
-      val requests = (1 to config.batchSize) map (_ => InvokeRequest(ridGen.inc, invPath))
-      sendToProxy(RequestMessage(localMsgId.inc, None, requests.toList))
-      invokesSent.addAndGet(config.batchSize)
-      log.debug("[{}]: sent a batch of {} InvokeRequests to {}", linkName, config.batchSize, config.path)
-    }
+    invokeJob = context.system.scheduler.schedule(config.timeout, config.timeout, self, SendBatch)
   }
 
+  /**
+   * Unsubscribes from the responder's updates.
+   */
   override def postStop() = {
     invokeJob.cancel
 
     // unsubscribe from path
-    val unsReq = UnsubscribeRequest(ridGen.inc, List(101))
-    sendToProxy(RequestMessage(localMsgId.inc, None, List(unsReq)))
-    log.info("Requester[{}] unsubscribed from [{}]", linkName, config.path)
+    if (config.subscribe) {
+      val unsReq = UnsubscribeRequest(ridGen.inc, List(101))
+      sendToProxy(RequestMessage(localMsgId.inc, None, List(unsReq)))
+      log.info("Requester[{}] unsubscribed from [{}]", linkName, config.path)
+    }
 
     super.postStop
   }
 
+  /**
+   * Event loop.
+   */
   override def receive = super.receive orElse {
     case env: ResponseEnvelope =>
       val responses = viaJson(env).responses
       log.debug("[{}]: received {}", linkName, env)
-      val updateCount = responses.map(_.updates.getOrElse(Nil).size).sum
-      updatesRcvd.addAndGet(updateCount)
+      val updateCount = responses.map { rsp =>
+        math.max(rsp.updates.getOrElse(Nil).size, 1)
+      }.sum
+      updatesRcvd += updateCount
       responseEventDao.saveResponseMessageEvent(DateTime.now, false, linkName, linkAddress,
         localMsgId.inc, responses.size, updateCount, 0)
+
+    case SendBatch =>
+      val requests = (1 to config.batchSize) map (_ => InvokeRequest(ridGen.inc, invPath))
+      sendToProxy(RequestMessage(localMsgId.inc, None, requests.toList))
+      invokesSent += config.batchSize
+      log.debug("[{}]: sent a batch of {} InvokeRequests to {}", linkName, config.batchSize, config.path)
 
     case msg => log.warning("[{}]: received unknown message - {}", msg)
   }
 
+  /**
+   * Sends the statistics to the aggregator.
+   */
   protected def reportStats() = {
     val now = DateTime.now
     val interval = new Interval(lastReportedAt, now)
-    val stats = ReqStatsSample(linkName, interval, invokesSent.getAndSet(0), updatesRcvd.getAndSet(0))
+    val stats = ReqStatsSample(linkName, interval, invokesSent, updatesRcvd)
     log.debug("[{}]: collected {}", linkName, stats)
     config.statsCollector foreach (_ ! stats)
+    invokesSent = 0
+    updatesRcvd = 0
     lastReportedAt = now
   }
 
+  /**
+   * Sends request message to the DSLink actor.
+   */
   protected def sendToProxy(msg: RequestMessage) = {
     val message = viaJson[RequestMessage, DSAMessage](msg)
     routee ! message
@@ -99,9 +126,17 @@ object BenchmarkRequester {
   import AbstractEndpointActor._
 
   /**
+   * Message sent by the scheduler to trigger a batch sending.
+   */
+  case object SendBatch
+
+  /**
    * BenchmarkRequester configuration.
    */
-  case class BenchmarkRequesterConfig(path: String, batchSize: Int, timeout: FiniteDuration,
+  case class BenchmarkRequesterConfig(subscribe:      Boolean,
+                                      path:           String,
+                                      batchSize:      Int,
+                                      timeout:        FiniteDuration,
                                       parseJson:      Boolean,
                                       statsInterval:  FiniteDuration   = 5 seconds,
                                       statsCollector: Option[ActorRef] = None) extends EndpointConfig

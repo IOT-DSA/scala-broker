@@ -7,7 +7,6 @@ import scala.concurrent.duration.{ Duration, DurationInt, DurationLong, FiniteDu
 import scala.util.Random
 
 import org.joda.time.DateTime
-import org.joda.time.format.{ DateTimeFormat, PeriodFormat }
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill }
 import akka.pattern.ask
@@ -15,8 +14,8 @@ import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
 import models.akka.{ BrokerActors, DSLinkManager }
 import models.akka.Messages.GetOrCreateDSLink
-import models.bench._
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
+import models.bench.{ BenchmarkRequester, BenchmarkResponder, BenchmarkStatsAggregator }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
 import models.metrics.EventDaos
@@ -34,16 +33,6 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
                                      cc:          ControllerComponents) extends BasicController(cc) {
 
   import models.bench.BenchmarkStatsAggregator._
-
-  private val dateFmt = DateTimeFormat.mediumTime
-  private val periodFmt = PeriodFormat.getDefault
-
-  implicit val durationWrites = Writes[org.joda.time.Duration] { duration =>
-    Json.toJson(periodFmt.print(duration.toPeriod))
-  }
-  implicit val intervalWrites = Writes[org.joda.time.Interval] { interval =>
-    Json.toJson(periodFmt.print(interval.toPeriod) + " starting at " + dateFmt.print(interval.getStart))
-  }
 
   implicit val reqStatsSampleWrites = Writes[ReqStatsSample] { sample =>
     Json.obj("id" -> sample.id, "interval" -> sample.interval) ++ reqStats2json(sample)
@@ -82,7 +71,10 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
   /**
    * Starts benchmark.
    */
-  def start(reqCount: Int, rspCount: Int, rspNodeCount: Int, batchSize: Int, timeout: Long, parseJson: Boolean) = Action {
+  def start(subscribe: Boolean, reqCount: Int, rspCount: Int, rspNodeCount: Int,
+            batchSize: Int, timeout: Long,
+            parseJson: Boolean) = Action {
+
     if (isTestRunning) BadRequest("Test already running")
     else {
       aggregator ! ResetStats
@@ -97,18 +89,18 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
         val rspIndex = Random.nextInt(rspCount) + 1
         val nodeIndex = Random.nextInt(rspNodeCount) + 1
         val path = s"/downstream/$rspNamePrefix$rspIndex/data$nodeIndex"
-        val req = createBenchRequester(reqNamePrefix + index, batchSize, timeout milliseconds,
-          parseJson, statsInterval, path)
+        val req = createBenchRequester(subscribe, reqNamePrefix + index, batchSize, timeout milliseconds,
+          statsInterval, path, parseJson)
         Tuple2(req, (rspIndex, nodeIndex))
       }
 
       requesters = reqTargets.map(_._1)
 
-      expectedUpdateToInvokeRatio = {
+      expectedUpdateToInvokeRatio = if (subscribe) {
         val targets = reqTargets.map(_._2)
         val expectedEvents = targets.groupBy(identity).map(_._2.size).map(a => a * a).sum
-        expectedEvents * 1.0 / reqCount
-      }
+        (expectedEvents + reqCount).toDouble / reqCount
+      } else 1.0
 
       testRunning.set(true)
       Ok("Test started. Check statistics at /bench/stats")
@@ -149,10 +141,16 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
       val jsAll = Json.toJson(allStats)
       val jsGlobal = Json.toJson(globalStats)
       Json.obj(
-        "now" -> dateFmt.print(DateTime.now),
-        "running" -> isTestRunning, "expectedInvokesSentPerSec" -> expectedInvokeRate,
-        "expectedUpdateToInvokeRatio" -> expectedUpdateToInvokeRatio,
-        "global" -> jsGlobal, "all" -> jsAll): Result
+        "now" -> DateFmt.print(DateTime.now),
+        "running" -> isTestRunning,
+        "configuration" -> Json.obj(
+          "requesters" -> requesters.size,
+          "responders" -> responders.size,
+          "expectedInvokesSentPerSec" -> expectedInvokeRate,
+          "expectedUpdateToInvokeRatio" -> expectedUpdateToInvokeRatio,
+          "expectedUpdatesRcvdPerSec" -> (expectedInvokeRate * expectedUpdateToInvokeRatio).toInt),
+        "global" -> jsGlobal,
+        "all" -> jsAll): Result
     }
   }
 
@@ -172,9 +170,11 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
    * Creates a benchmark requester.
    * TODO refactor to remove blocking
    */
-  private def createBenchRequester(name: String, batchSize: Int, tout: FiniteDuration,
-                                   parseJson: Boolean, statsInterval: FiniteDuration, path: String) = {
-    val config = BenchmarkRequester.BenchmarkRequesterConfig(path, batchSize, tout, parseJson, statsInterval, Some(aggregator))
+  private def createBenchRequester(subscribe: Boolean, name: String, batchSize: Int, tout: FiniteDuration,
+                                   statsInterval: FiniteDuration, path: String,
+                                   parseJson: Boolean) = {
+    val config = BenchmarkRequester.BenchmarkRequesterConfig(subscribe, path, batchSize, tout,
+      parseJson, statsInterval, Some(aggregator))
     val routee = (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]
     val ref = routee map (r => actorSystem.actorOf(BenchmarkRequester.props(name, r, eventDaos, config)))
     Await.result(ref, Duration.Inf)

@@ -30,19 +30,25 @@ class BenchmarkResponder(linkName: String, routee: Routee, eventDaos: EventDaos,
   private val subscriptions = collection.mutable.Map.empty[String, Int]
 
   private var lastReportedAt: DateTime = _
-  private var invokesRcvd = 0
-  private var updatesSent = 0
+  private var invokesRcvd: Int = 0
+  private var updatesSent: Int = 0
 
   private val linkAddress = "localhost"
 
   private val actionCache = new SimpleCache[String, Action](100, 1)
 
+  /**
+   * Marks the start time.
+   */
   override def preStart() = {
     super.preStart
 
     lastReportedAt = DateTime.now
   }
 
+  /**
+   * Event loop.
+   */
   override def receive = super.receive orElse {
     case env: RequestEnvelope =>
       val requests = viaJson(env).requests
@@ -55,6 +61,9 @@ class BenchmarkResponder(linkName: String, routee: Routee, eventDaos: EventDaos,
     case msg => log.warning("[{}]: received unknown message - {}", linkName, msg)
   }
 
+  /**
+   * Processes the incoming request and returns a list of responses to deliver.
+   */
   private def processRequest: PartialFunction[DSARequest, Seq[DSAResponse]] = {
     case SubscribeRequest(rid, paths) =>
       paths foreach { path =>
@@ -72,11 +81,17 @@ class BenchmarkResponder(linkName: String, routee: Routee, eventDaos: EventDaos,
     case req: InvokeRequest => processInvokeRequest(req)
   }
 
+  /**
+   * Processes an INVOKE request.
+   */
   private def processInvokeRequest(req: InvokeRequest) = {
     val action = actionCache.getOrElseUpdate(req.path, createAction(req.path))
     replyToInvoke(req) +: action()
   }
 
+  /**
+   * Creates either `incCounter` or `resetCounter` action, depending on the path.
+   */
   private def createAction(path: String): Action = path match {
     case r"/data(\d+)$index/incCounter" => new Action {
       def apply = incCounter(index.toInt)
@@ -86,11 +101,17 @@ class BenchmarkResponder(linkName: String, routee: Routee, eventDaos: EventDaos,
     }
   }
 
+  /**
+   * Increments the value of the specified node.
+   */
   private def incCounter(index: Int) = {
     data(index - 1) += 1
     notifySubs(index)
   }
 
+  /**
+   * Resets the value of the specified node to 0.
+   */
   private def resetCounter(index: Int) = {
     data(index - 1) = 0
     notifySubs(index)
@@ -98,9 +119,13 @@ class BenchmarkResponder(linkName: String, routee: Routee, eventDaos: EventDaos,
 
   private def replyToInvoke(req: InvokeRequest) = {
     invokesRcvd += 1
+    updatesSent += 1
     emptyResponse(req.rid)
   }
 
+  /**
+   * Generates a response to deliver to the node subscribers.
+   */
   private def notifySubs(index: Int) = subscriptions.get("/data" + index) map { sid =>
     val update = DSAValue.obj("sid" -> sid, "value" -> data(index - 1), "ts" -> DateTime.now.toString)
     updatesSent += 1
@@ -108,8 +133,14 @@ class BenchmarkResponder(linkName: String, routee: Routee, eventDaos: EventDaos,
     DSAResponse(0, Some(StreamState.Open), Some(List(update)))
   } toSeq
 
+  /**
+   * Creates an empty DSA response with the specified RID.
+   */
   private def emptyResponse(rid: Int) = DSAResponse(rid, Some(StreamState.Closed))
 
+  /**
+   * Sends the statistics to the aggregator.
+   */
   protected def reportStats() = {
     val now = DateTime.now
     val interval = new Interval(lastReportedAt, now)
@@ -121,6 +152,9 @@ class BenchmarkResponder(linkName: String, routee: Routee, eventDaos: EventDaos,
     updatesSent = 0
   }
 
+  /**
+   * Sends response message to the DSLink actor.
+   */
   protected def sendToProxy(msg: ResponseMessage) = {
     val message = viaJson[ResponseMessage, DSAMessage](msg)
     routee ! message
