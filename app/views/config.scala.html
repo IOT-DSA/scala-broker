@@ -1,20 +1,98 @@
 @import com.typesafe.config._
+@import scala.collection.JavaConverters._
 
 @(config: ConfigObject, downCount: Option[Int], upCount: Option[Int])
+
+@extractCfg(key: String) = @{Option(config.get(key)).map(_.render(ConfigRenderOptions.concise)).getOrElse("{}")}
 
 @main(ViewConfig("DSA Broker: Config", "Configuration", "Configuration", "Broker Configuration", downCount, upCount)) {
 <div class="matter">
 	<div class="container-fluid">
 		<div class="row-fluid">
-			<pre id="config">Loading configuration...</pre>
+			<!-- <pre id="config">Loading configuration...</pre> -->
+			<ul id="configTab" class="nav nav-tabs">
+				<li class="active"><a href="#broker" data-toggle="tab">Broker</a></li>
+				<li><a href="#akka" data-toggle="tab">Akka</a></li>
+				<li><a href="#play" data-toggle="tab">Play</a></li>
+				<li><a href="#influx" data-toggle="tab">InfluxDB</a></li>
+				<li><a href="#jdbc" data-toggle="tab">JDBC</a></li>
+				<li><a href="#env" data-toggle="tab">Environment</a></li>
+				<li><a href="#props" data-toggle="tab">JVM Properties</a></li>
+			</ul>
+			<div id="configTabContent" class="tab-content">
+				<div class="tab-pane fade in active" id="broker">
+					Loading Broker configuration...
+				</div>
+				<div class="tab-pane fade" id="akka">
+					Loading Akka configuration...
+				</div>
+				<div class="tab-pane fade" id="play">
+					Loading Play Framework configuration...
+				</div>				
+				<div class="tab-pane fade" id="influx">
+					Loading InfluxDB configuration...
+				</div>				
+				<div class="tab-pane fade" id="jdbc">
+					Loading JDBC configuration...
+				</div>
+				<div class="tab-pane fade" id="env">
+					<div class="table-responsive">
+						<table class="table table-striped table-bordered table-hover">
+							<thead>
+								<tr>
+									<th>Key</th>
+									<th>Value</th>
+								</tr>
+							</thead>
+							<tbody>
+							@for(entry <- System.getenv.asScala) {
+								<tr>
+									<td>@entry._1</td>
+									<td>@entry._2</td>
+								</tr>
+							}
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="tab-pane fade" id="props">
+					<div class="table-responsive">
+						<table class="table table-striped table-bordered table-hover">
+							<thead>
+								<tr>
+									<th>Key</th>
+									<th>Value</th>
+								</tr>
+							</thead>
+							<tbody>
+							@for(entry <- System.getProperties.asScala) {
+								<tr>
+									<td>@entry._1</td>
+									<td>@entry._2</td>
+								</tr>
+							}
+							</tbody>
+						</table>
+					</div>
+				</div>				
+			</div>
 		</div>
 	</div>
 </div>
 <script type="text/javascript">
         var div = document.createElement('div');
-        div.innerHTML = "@config.render(ConfigRenderOptions.concise)";
-        var data = JSON.parse(div.firstChild.nodeValue.replace(/\n/g, " "));
-        var js = JSON.stringify(data, undefined, 2);
-        document.getElementById('config').innerHTML = js;
+
+        function render(text, elem) {
+            div.innerHTML = text
+            var data = JSON.parse(div.firstChild.nodeValue.replace(/\n/g, " "));
+            var js = JSON.stringify(data, undefined, 2);
+            document.getElementById(elem).innerHTML = "<pre>" + js + "</pre>";            
+        }
+
+        render("@extractCfg("broker")", "broker")
+        render("@extractCfg("akka")", "akka")
+        render("@extractCfg("play")", "play")
+        render("@extractCfg("influx")", "influx")
+        render("@extractCfg("db")", "jdbc")
 </script>  
 }{<!-- no tail -->}
