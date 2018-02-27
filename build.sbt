@@ -66,6 +66,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
   "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
   "org.bouncycastle"         % "bcprov-jdk15on"          % "1.51",
+  "com.github.romix.akka"   %% "akka-kryo-serialization" % "0.5.1",
   "com.h2database"           % "h2"                      % "1.4.193",
   "com.typesafe.play"       %% "anorm"                   % "2.5.3",
   "com.maxmind.geoip2"       % "geoip2"                  % "2.10.0",
