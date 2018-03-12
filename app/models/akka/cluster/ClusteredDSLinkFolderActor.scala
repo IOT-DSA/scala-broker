@@ -29,7 +29,7 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
     case RegisterDSLink(name, mode, connected)     => notifyOnRegister(name)
 
-    case GetDSLinkNames                            => sender ! links.keys
+    case GetDSLinkNames                            => sender ! links.keys.toList
 
     case UnregisterDSLink(name)                    => notifyOnRemove(name)
 
