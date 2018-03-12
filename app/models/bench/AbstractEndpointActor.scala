@@ -11,12 +11,14 @@ import models.akka.{ ConnectionInfo, IntCounter, RichRoutee }
 import models.akka.DSLinkMode.{ DSLinkMode, Dual, Requester, Responder }
 import models.akka.Messages.{ ConnectEndpoint, DisconnectEndpoint }
 import play.api.libs.json.{ Json, Reads, Writes }
+import akka.dispatch._
 
 /**
  * Base class for benchmark endpoint actors.
  */
 abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, routee: Routee,
-                                     config: EndpointConfig) extends Actor with ActorLogging {
+                                     config: EndpointConfig) extends Actor with ActorLogging 
+                                     with RequiresMessageQueue[BoundedMessageQueueSemantics] {
 
   import context.dispatcher
 

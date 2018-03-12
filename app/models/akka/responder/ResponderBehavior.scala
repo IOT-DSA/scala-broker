@@ -14,9 +14,9 @@ import models.rpc.DSAValue.{ ArrayValue, DSAVal, MapValue, StringValue, array }
  */
 trait ResponderBehavior { me: Actor with ActorLogging =>
   import RidRegistry._
-  
+
   protected def linkPath: String
-  
+
   protected def ownId: String
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
@@ -30,6 +30,10 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
 
   // stores responder's nodes' attributes locally
   private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
+
+  // processes request using the appropriate handler
+  private val requestHandler = handlePassthroughRequest orElse handleListRequest orElse
+    handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
   /**
    * Processes incoming requests and responses.
@@ -55,13 +59,11 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
    * as well as the responses that need to be delivered to the originators.
    */
   private def processRequests(requests: Seq[DSARequest]): HandlerResult = {
-    val handler = handleListRequest orElse handlePassthroughRequest orElse
-      handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
     val results = requests map (request => try {
-      handler(request)
+      requestHandler(request)
     } catch {
-      case NonFatal(e) => log.error(s"$ownId: error handling request $request - {}", e); HandlerResult.Empty
+      case NonFatal(e) => log.error("{}: error handling request {} - {}", ownId, request, e); HandlerResult.Empty
     })
 
     log.debug("{}: RID after Req: {}", ownId, ridRegistry.info)
@@ -87,7 +89,7 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
   /**
    * Handles List request.
    */
-  private val handleListRequest: RequestHandler = {
+  private def handleListRequest: RequestHandler = {
     case ListRequest(rid, path) =>
       val origin = Origin(sender, rid)
       ridRegistry.lookupByPath(path) match {
@@ -145,7 +147,7 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
   /**
    * Handles Subscribe request.
    */
-  private val handleSubscribeRequest: RequestHandler = {
+  private def handleSubscribeRequest: RequestHandler = {
     case req @ SubscribeRequest(srcRid, _) =>
       val srcPath = req.path // to ensure there's only one path (see requester actor)
       val ridOrigin = Origin(sender, srcRid)
@@ -168,7 +170,7 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
   /**
    * Handles Unsubscribe request.
    */
-  private val handleUnsubscribeRequest: RequestHandler = {
+  private def handleUnsubscribeRequest: RequestHandler = {
     case req @ UnsubscribeRequest(rid, _) =>
       val ridOrigin = Origin(sender, rid)
       val sidOrigin = Origin(sender, req.sid)
@@ -182,7 +184,7 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
   /**
    * Handles Close request.
    */
-  private val handleCloseRequest: RequestHandler = {
+  private def handleCloseRequest: RequestHandler = {
     case CloseRequest(rid) =>
       val origin = Origin(sender, rid)
       ridRegistry.lookupByOrigin(origin) match {
@@ -279,7 +281,7 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
    * Delivers a SUBSCRIBE response to its recipients.
    */
   protected def deliverSubscribeResponse(rsp: DSAResponse): Unit
-  
+
   /**
    * Sends a message to the endpoint, if connected.
    */

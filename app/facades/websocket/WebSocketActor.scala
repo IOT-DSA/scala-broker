@@ -1,7 +1,9 @@
 package facades.websocket
 
 import org.joda.time.DateTime
+
 import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
+import akka.dispatch.{ BoundedMessageQueueSemantics, RequiresMessageQueue }
 import akka.routing.Routee
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.{ ConnectionInfo, IntCounter, RichRoutee }
@@ -18,7 +20,8 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, sal
 /**
  * Represents a WebSocket connection and communicates to the DSLink actor.
  */
-class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config: WebSocketActorConfig) extends Actor with ActorLogging {
+class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config: WebSocketActorConfig)
+  extends Actor with ActorLogging with RequiresMessageQueue[BoundedMessageQueueSemantics] {
 
   import eventDaos._
 

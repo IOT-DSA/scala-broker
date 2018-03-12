@@ -87,7 +87,7 @@ class BenchmarkRequester(linkName: String, routee: Routee, eventDaos: EventDaos,
         localMsgId.inc, responses.size, updateCount, 0)
 
     case SendBatch =>
-      val requests = (1 to config.batchSize) map (_ => InvokeRequest(ridGen.inc, invPath))
+      val requests = ridGen.inc(config.batchSize) map (idx => InvokeRequest(idx, invPath))
       sendToProxy(RequestMessage(localMsgId.inc, None, requests.toList))
       invokesSent += config.batchSize
       log.debug("[{}]: sent a batch of {} InvokeRequests to {}", linkName, config.batchSize, config.path)
