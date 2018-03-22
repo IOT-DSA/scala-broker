@@ -2,22 +2,21 @@ package controllers
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import scala.concurrent.Await
-import scala.concurrent.duration.{ Duration, DurationInt, DurationLong, FiniteDuration }
-import scala.util.Random
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 import org.joda.time.DateTime
 
-import akka.actor.{ ActorRef, ActorSystem, PoisonPill }
+import akka.actor.{ ActorSystem, RootActorPath }
+import akka.cluster.Cluster
 import akka.pattern.ask
-import akka.routing.Routee
+import akka.routing.{ ActorRefRoutee, ActorSelectionRoutee, Routee }
 import javax.inject.{ Inject, Singleton }
-import models.akka.{ BrokerActors, DSLinkManager }
-import models.akka.Messages.GetOrCreateDSLink
+import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
-import models.bench.{ BenchmarkRequester, BenchmarkResponder, BenchmarkStatsAggregator }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
+import models.bench.BenchmarkStatsAggregator
 import models.metrics.EventDaos
 import play.api.libs.json.{ JsObject, Json, Writes }
 import play.api.mvc.{ ControllerComponents, Result }
@@ -32,6 +31,7 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
                                      eventDaos:   EventDaos,
                                      cc:          ControllerComponents) extends BasicController(cc) {
 
+  import models.bench.BenchmarkActor._
   import models.bench.BenchmarkStatsAggregator._
 
   implicit val reqStatsSampleWrites = Writes[ReqStatsSample] { sample =>
@@ -56,51 +56,45 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
   private val testRunning = new AtomicBoolean(false)
   def isTestRunning = testRunning.get
 
+  val isClusterMode = actorSystem.hasExtension(Cluster)
+  val cluster = if (isClusterMode) Some(Cluster(actorSystem)) else None
+
   private val statsInterval = 5 seconds
-  private val rspNamePrefix = "BenchRSP"
-  private val reqNamePrefix = "BenchREQ"
 
   val aggregator = actorSystem.actorOf(BenchmarkStatsAggregator.props, "benchmarkAggregator")
-  private var responders: Iterable[ActorRef] = Nil
-  private var requesters: Iterable[ActorRef] = Nil
-  private var expectedInvokeRate: Int = _
-  private var expectedUpdateToInvokeRatio: Double = _
 
-  private val downstream = actors.downstream
+  private var config: BenchmarkConfig = BenchmarkConfig.Default
+  private var expectedUpdateToInvokeRatio: Double = _
 
   /**
    * Starts benchmark.
    */
-  def start(subscribe: Boolean, reqCount: Int, rspCount: Int, rspNodeCount: Int,
-            batchSize: Int, timeout: Long,
-            parseJson: Boolean) = Action {
-
+  def start(config: BenchmarkConfig) = Action {
     if (isTestRunning) BadRequest("Test already running")
     else {
       aggregator ! ResetStats
 
-      expectedInvokeRate = (reqCount * batchSize * 1000L / timeout).toInt
+      this.config = config
 
-      responders = (1 to rspCount) map { index =>
-        createBenchResponder(rspNamePrefix + index, rspNodeCount, statsInterval, parseJson)
+      val rspChunks = 1 to config.rspCount groupBy (_ % routees.size) values
+
+      val fRspReady = Future.sequence(routees zip rspChunks map {
+        case (routee, rspIndices) => createResponders(routee, rspIndices, config.rspNodeCount, config.parseJson)
+      })
+
+      val fReqStarted = fRspReady flatMap { _ =>
+        val reqChunks = 1 to config.reqCount groupBy (_ % routees.size) values
+
+        Future.sequence(routees zip reqChunks map {
+          case (routee, reqIndices) => createRequesters(routee, config.subscribe, reqIndices,
+            config.rspCount, config.rspNodeCount, config.batchSize, config.batchTimeout, config.parseJson)
+        })
       }
 
-      val reqTargets = (1 to reqCount) map { index =>
-        val rspIndex = Random.nextInt(rspCount) + 1
-        val nodeIndex = Random.nextInt(rspNodeCount) + 1
-        val path = s"/downstream/$rspNamePrefix$rspIndex/data$nodeIndex"
-        val req = createBenchRequester(subscribe, reqNamePrefix + index, batchSize, timeout milliseconds,
-          statsInterval, path, parseJson)
-        Tuple2(req, (rspIndex, nodeIndex))
+      fReqStarted foreach { rs =>
+        val targets = rs.flatMap(_.requesters).map(_._2)
+        expectedUpdateToInvokeRatio = config.calculateExpectedUpdateToInvokeRatio(targets)
       }
-
-      requesters = reqTargets.map(_._1)
-
-      expectedUpdateToInvokeRatio = if (subscribe) {
-        val targets = reqTargets.map(_._2)
-        val expectedEvents = targets.groupBy(identity).map(_._2.size).map(a => a * a).sum
-        (expectedEvents + reqCount).toDouble / reqCount
-      } else 1.0
 
       testRunning.set(true)
       Ok("Test started. Check statistics at /bench/stats")
@@ -113,8 +107,7 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
   def stop = Action {
     if (!isTestRunning) BadRequest("Test not running")
     else {
-      requesters foreach (_ ! PoisonPill)
-      responders foreach (_ ! PoisonPill)
+      routees foreach (_ ! StopAll)
       testRunning.set(false)
       Ok("Test stopped.")
     }
@@ -144,40 +137,41 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
         "now" -> DateFmt.print(DateTime.now),
         "running" -> isTestRunning,
         "configuration" -> Json.obj(
-          "requesters" -> requesters.size,
-          "responders" -> responders.size,
-          "expectedInvokesSentPerSec" -> expectedInvokeRate,
+          "requesters" -> config.reqCount,
+          "responders" -> config.rspCount,
+          "expectedInvokesSentPerSec" -> config.expectedInvokeRate,
           "expectedUpdateToInvokeRatio" -> expectedUpdateToInvokeRatio,
-          "expectedUpdatesRcvdPerSec" -> (expectedInvokeRate * expectedUpdateToInvokeRatio).toInt),
+          "expectedUpdatesRcvdPerSec" -> (config.expectedInvokeRate * expectedUpdateToInvokeRatio).toInt),
         "global" -> jsGlobal,
         "all" -> jsAll): Result
     }
   }
 
   /**
-   * Creates a benchmark responder.
-   * TODO refactor to remove blocking
+   * Returns a list of routees for benchmark actors. It will be a list with a single element for
+   * a standalone broker and one or more elements for a clustered broker.
    */
-  private def createBenchResponder(name: String, nodeCount: Int, statsInterval: FiniteDuration,
-                                   parseJson: Boolean) = {
-    val config = BenchmarkResponder.BenchmarkResponderConfig(nodeCount, statsInterval, parseJson, Some(aggregator))
-    val routee = (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]
-    val ref = routee map (r => actorSystem.actorOf(BenchmarkResponder.props(name, r, eventDaos, config)))
-    Await.result(ref, Duration.Inf)
+  private def routees: Seq[Routee] = cluster.map(_.state.members.map { member =>
+    ActorSelectionRoutee(actorSystem.actorSelection(RootActorPath(member.address) / "user" / "benchmark"))
+  }.toList).getOrElse(List(ActorRefRoutee(actors.benchmark)))
+
+  /**
+   * Asks a benchmark actor to create a set of responders.
+   */
+  private def createResponders(routee: Routee, rspIndices: Seq[Int], rspNodeCount: Int, parseJson: Boolean) = {
+    val message = CreateResponders(rspIndices, rspNodeCount, statsInterval, Some(aggregator), parseJson)
+    (routee ? message).mapTo[RespondersReady]
   }
 
   /**
-   * Creates a benchmark requester.
-   * TODO refactor to remove blocking
+   * Asks a benchmark actor to create and start a set of requesters.
    */
-  private def createBenchRequester(subscribe: Boolean, name: String, batchSize: Int, tout: FiniteDuration,
-                                   statsInterval: FiniteDuration, path: String,
-                                   parseJson: Boolean) = {
-    val config = BenchmarkRequester.BenchmarkRequesterConfig(subscribe, path, batchSize, tout,
-      parseJson, statsInterval, Some(aggregator))
-    val routee = (downstream ? GetOrCreateDSLink(name)).mapTo[Routee]
-    val ref = routee map (r => actorSystem.actorOf(BenchmarkRequester.props(name, r, eventDaos, config)))
-    Await.result(ref, Duration.Inf)
+  private def createRequesters(routee: Routee, subscribe: Boolean, reqIndices: Seq[Int],
+                               rspCount: Int, rspNodeCount: Int,
+                               batchSize: Int, batchTimeout: Long, parseJson: Boolean) = {
+    val message = CreateAndStartRequesters(subscribe, reqIndices, rspCount, rspNodeCount,
+      batchSize, batchTimeout, statsInterval, Some(aggregator), parseJson)
+    (routee ? message).mapTo[RequestersStarted]
   }
 
   /**

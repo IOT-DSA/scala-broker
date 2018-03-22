@@ -32,7 +32,7 @@ GET      /metrics/responses     controllers.MetricController.responseStatsByLink
 
 # Benchmark
 GET      /bench/stats           controllers.BenchmarkController.viewStats
-PUT      /bench/start           controllers.BenchmarkController.start(subscribe: Boolean ?= false, reqCount: Int ?= 5, rspCount: Int ?= 2, rspNodeCount: Int ?= 10, batchSize: Int ?= 100, timeout: Long ?= 2000, parseJson: Boolean ?= false)
+PUT      /bench/start           controllers.BenchmarkController.start(config: controllers.BenchmarkConfig)
 PUT      /bench/stop            controllers.BenchmarkController.stop
 PUT      /bench/reset           controllers.BenchmarkController.reset
 
