@@ -62,47 +62,38 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
   private val statsInterval = 5 seconds
 
   val aggregator = actorSystem.actorOf(BenchmarkStatsAggregator.props, "benchmarkAggregator")
-  private var rspCount: Int = _
-  private var reqCount: Int = _
-  private var expectedInvokeRate: Int = _
+
+  private var config: BenchmarkConfig = BenchmarkConfig.Default
   private var expectedUpdateToInvokeRatio: Double = _
 
   /**
    * Starts benchmark.
    */
-  def start(subscribe: Boolean, reqCount: Int, rspCount: Int, rspNodeCount: Int,
-            batchSize: Int, batchTimeout: Long,
-            parseJson: Boolean) = Action {
-
+  def start(config: BenchmarkConfig) = Action {
     if (isTestRunning) BadRequest("Test already running")
     else {
       aggregator ! ResetStats
 
-      this.reqCount = reqCount
-      this.rspCount = rspCount
-      expectedInvokeRate = (reqCount * batchSize * 1000L / batchTimeout).toInt
+      this.config = config
 
-      val rspChunks = 1 to rspCount groupBy (_ % routees.size) values
+      val rspChunks = 1 to config.rspCount groupBy (_ % routees.size) values
 
       val fRspReady = Future.sequence(routees zip rspChunks map {
-        case (routee, rspIndices) => createResponders(routee, rspIndices, rspNodeCount, parseJson)
+        case (routee, rspIndices) => createResponders(routee, rspIndices, config.rspNodeCount, config.parseJson)
       })
 
       val fReqStarted = fRspReady flatMap { _ =>
-        val reqChunks = 1 to reqCount groupBy (_ % routees.size) values
+        val reqChunks = 1 to config.reqCount groupBy (_ % routees.size) values
 
         Future.sequence(routees zip reqChunks map {
-          case (routee, reqIndices) => createRequesters(routee, subscribe, reqIndices, rspCount, rspNodeCount,
-            batchSize, batchTimeout, parseJson)
+          case (routee, reqIndices) => createRequesters(routee, config.subscribe, reqIndices,
+            config.rspCount, config.rspNodeCount, config.batchSize, config.batchTimeout, config.parseJson)
         })
       }
 
       fReqStarted foreach { rs =>
-        expectedUpdateToInvokeRatio = if (subscribe) {
-          val targets = rs.flatMap(_.requesters).map(_._2)
-          val expectedEvents = targets.groupBy(identity).map(_._2.size).map(a => a * a).sum
-          (expectedEvents + reqCount).toDouble / reqCount
-        } else 1.0
+        val targets = rs.flatMap(_.requesters).map(_._2)
+        expectedUpdateToInvokeRatio = config.calculateExpectedUpdateToInvokeRatio(targets)
       }
 
       testRunning.set(true)
@@ -146,11 +137,11 @@ class BenchmarkController @Inject() (actorSystem: ActorSystem,
         "now" -> DateFmt.print(DateTime.now),
         "running" -> isTestRunning,
         "configuration" -> Json.obj(
-          "requesters" -> reqCount,
-          "responders" -> rspCount,
-          "expectedInvokesSentPerSec" -> expectedInvokeRate,
+          "requesters" -> config.reqCount,
+          "responders" -> config.rspCount,
+          "expectedInvokesSentPerSec" -> config.expectedInvokeRate,
           "expectedUpdateToInvokeRatio" -> expectedUpdateToInvokeRatio,
-          "expectedUpdatesRcvdPerSec" -> (expectedInvokeRate * expectedUpdateToInvokeRatio).toInt),
+          "expectedUpdatesRcvdPerSec" -> (config.expectedInvokeRate * expectedUpdateToInvokeRatio).toInt),
         "global" -> jsGlobal,
         "all" -> jsAll): Result
     }
