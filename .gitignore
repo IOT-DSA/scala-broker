@@ -19,5 +19,8 @@ project/plugins/project/
 .worksheet
 .classpath
 .project
+.idea
 .settings/
 /bin/
+docker/docker-compose/target
+docker/docker-compose/docker-compose.yaml.original

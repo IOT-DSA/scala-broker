@@ -1,0 +1,67 @@
+version: '2'
+services:
+  broker:
+    # build:
+    #   context: ./broker
+    image: iotdsa/broker-scala:0.4.0-SNAPSHOT
+    container_name: broker
+    environment:
+      JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
+    ports:
+      - "9000:9000"
+      - "9005:9005"
+      - "2551:2551"
+      - "9443:9443"
+    networks:
+      - dsnet
+  shell:
+    build: 
+      context: ./shell-dslink
+    image: shell-dslink:latest
+    stdin_open: true
+    tty: true
+    container_name: shell-dslink
+    environment:
+      BROKER_HOST: broker
+      BROKER_PORT: 9000
+    depends_on:
+      - broker
+    links:
+      - broker
+    networks:
+      - dsnet
+
+  weather:
+    build: 
+      context: ./weather-dslink
+    image: weather-dslink:latest
+    container_name: weather-dslink
+    environment:
+      BROKER_HOST: broker
+      BROKER_PORT: 9000
+    depends_on:
+      - broker
+    links:
+      - broker
+    networks:
+      - dsnet
+
+  system:
+    build: 
+      context: ./system
+    image: system-dslink:latest
+    container_name: system-dslink
+    environment:
+      BROKER_HOST: broker
+      BROKER_PORT: 9000
+    depends_on:
+      - broker
+    links:
+      - broker
+    networks:
+      - dsnet
+
+networks:
+  dsnet:
+    external:
+      name:  automation_dsnet
