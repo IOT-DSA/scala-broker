@@ -41,7 +41,7 @@ VERSION=$( find '.' -name "build.sbt" |
 cd ${THIS_DIR}
 echo "project version = $VERSION"  
 echo "changing project version in docker-compose.yaml"
-sed -i '.original' 's|image: iotdsa/broker-scala:.*|image: iotdsa/broker-scala:'${VERSION}'|g' "docker-compose.yaml"
+sed -i'.original' 's|image: iotdsa/broker-scala:.*|image: iotdsa/broker-scala:'${VERSION}'|g' "docker-compose.yaml"
 
 if [ "$REBUILD" = true ] ; then
 
