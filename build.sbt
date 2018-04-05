@@ -1,8 +1,11 @@
+import Testing.itTest
+
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
 val AKKA_VERSION = "2.5.8"
 val JSON_VERSION = "2.6.8"
+
 
 // settings
 name := "scala-broker"
@@ -10,7 +13,19 @@ organization := "org.iot-dsa"
 version := APP_VERSION
 scalaVersion := SCALA_VERSION
 
-lazy val root = (project in file(".")).enablePlugins(PlayScala)
+// base play-akka project
+lazy val root = (project in file("."))
+  .enablePlugins(PlayScala)
+  .settings(
+  libraryDependencies ++= commonDependencies.union(playTestDependencies)
+)
+
+// project for integrational tests
+lazy val it = project.in(file("it"))
+  .settings(Testing.settings(Docker): _*)
+  .settings(
+    libraryDependencies ++= testDependencies.union(itDependencies)
+  ).aggregate(root)
 
 // eclipse
 EclipseKeys.preTasks := Seq(compile in Compile, compile in Test)
@@ -20,14 +35,14 @@ EclipseKeys.withJavadoc := true
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
 scalacOptions ++= Seq(
-  "-feature", 
-  "-unchecked", 
-  "-deprecation", 
-  "-Yno-adapted-args", 
-  "-Ywarn-dead-code", 
-  "-language:_", 
-  "-target:jvm-1.8", 
-  "-encoding", "UTF-8", 
+  "-feature",
+  "-unchecked",
+  "-deprecation",
+  "-Yno-adapted-args",
+  "-Ywarn-dead-code",
+  "-language:_",
+  "-target:jvm-1.8",
+  "-encoding", "UTF-8",
   "-Xexperimental")
 
 // packaging
@@ -37,6 +52,7 @@ maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
 dockerExposedPorts := Seq(9000, 9443, 2551)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
+dockerUpdateLatest := true
 
 mappings in Universal ++= Seq(
   file("scripts/setup-influx") -> "bin/setup-influx",
@@ -51,8 +67,8 @@ mappings in Universal ++= Seq(
 coverageMinimum := 80
 coverageFailOnMinimum := true
 
-// dependencies
-libraryDependencies ++= Seq(
+// dependencies for scala-broker application
+lazy val commonDependencies = Seq(
   guice,
   ehcache,
   jdbc,
@@ -71,9 +87,31 @@ libraryDependencies ++= Seq(
   "com.typesafe.play"       %% "anorm"                   % "2.5.3",
   "com.maxmind.geoip2"       % "geoip2"                  % "2.10.0",
   "ch.qos.logback"           % "logback-classic"         % "1.2.3",
+  "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
+  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force()
+)
+
+// akka and play test dependencies
+lazy val playTestDependencies = Seq(
+  "org.scalatestplus.play"  %% "scalatestplus-play"      % "3.1.2"         % "test",
+  "com.typesafe.akka"       %% "akka-testkit"            % AKKA_VERSION    % "test"
+).union(testDependencies)
+
+// common test dependencies
+lazy val testDependencies = Seq(
   "org.scalatest"           %% "scalatest"               % "3.0.4"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.13.5"        % "test",
-  "org.scalatestplus.play"  %% "scalatestplus-play"      % "3.1.2"         % "test",
-  "org.mockito"              % "mockito-core"            % "2.13.0"        % "test",
-  "com.typesafe.akka"       %% "akka-testkit"            % AKKA_VERSION    % "test"
+  "org.mockito"              % "mockito-core"            % "2.13.0"        % "test"
 )
+
+// dependencies for it module
+lazy val itDependencies = Seq(
+  "com.whisk" %% "docker-testkit-scalatest" % "0.9.5" % "test",
+  "com.whisk" %% "docker-testkit-impl-spotify" % "0.9.5" % "test",
+  "com.spotify" % "docker-client" % "8.10.0" % "test",
+  "org.iot-dsa" % "dslink" % "0.18.3" % "test"
+)
+
+
+
+
