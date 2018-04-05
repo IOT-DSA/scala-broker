@@ -5,20 +5,20 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 import org.joda.time.{ Duration => JodaDuration }
 
 import AbstractEndpointActor.{ EndpointConfig, StatsTick }
-import akka.actor.{ Actor, ActorLogging, ActorRef, Cancellable }
+import akka.actor.{ Actor, ActorLogging, ActorRef, Cancellable, PoisonPill }
+import akka.dispatch.{ BoundedMessageQueueSemantics, RequiresMessageQueue }
 import akka.routing.Routee
 import models.akka.{ ConnectionInfo, IntCounter, RichRoutee }
 import models.akka.DSLinkMode.{ DSLinkMode, Dual, Requester, Responder }
-import models.akka.Messages.{ ConnectEndpoint, DisconnectEndpoint }
+import models.akka.Messages.ConnectEndpoint
 import play.api.libs.json.{ Json, Reads, Writes }
-import akka.dispatch._
 
 /**
  * Base class for benchmark endpoint actors.
  */
 abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, routee: Routee,
-                                     config: EndpointConfig) extends Actor with ActorLogging 
-                                     with RequiresMessageQueue[BoundedMessageQueueSemantics] {
+                                     config: EndpointConfig) extends Actor with ActorLogging
+  with RequiresMessageQueue[BoundedMessageQueueSemantics] {
 
   import context.dispatcher
 
@@ -26,7 +26,7 @@ abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, routee:
   val isResponder = mode == Responder || mode == Dual
 
   val connInfo = ConnectionInfo(linkName + "0" * 44, linkName, isRequester, isResponder,
-      None, "1.1.2", List("json"))
+    None, "1.1.2", List("json"))
 
   protected val localMsgId = new IntCounter(1)
 
@@ -50,7 +50,7 @@ abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, routee:
   override def postStop() = {
     statsJob.foreach(_.cancel)
 
-    routee ! DisconnectEndpoint
+    routee ! PoisonPill
     log.info("[{}] stopped", linkName)
   }
 

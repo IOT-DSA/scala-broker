@@ -5,19 +5,21 @@ import akka.cluster.Cluster
 import javax.inject.{ Inject, Singleton }
 import models.akka.cluster.ClusteredDSLinkFolderActor
 import models.akka.local.LocalDSLinkFolderActor
+import models.bench.BenchmarkActor
+import models.metrics.EventDaos
 
 /**
  * A wrapper for essential actors to be started when the application starts.
  */
 @Singleton
-class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager) {
+class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager, eventDaos: EventDaos) {
   import models.Settings._
   import models.rpc.DSAValue._
 
   private val downExtra: Seq[(String, DSAVal)] = List("downstream" -> true)
   private val upExtra: Seq[(String, DSAVal)] = List("upstream" -> true)
 
-  val (root, downstream, upstream) = if (actorSystem.hasExtension(Cluster))
+  val (root, downstream, upstream, benchmark) = if (actorSystem.hasExtension(Cluster))
     createClusteredActors
   else
     createLocalActors
@@ -34,7 +36,9 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
     val upstream = actorSystem.actorOf(LocalDSLinkFolderActor.props(
       Paths.Upstream, dslinkMgr.uplinkProps, upExtra: _*), Nodes.Upstream)
 
-    (root, downstream, upstream)
+    val bench = actorSystem.actorOf(BenchmarkActor.props(eventDaos), "benchmark")
+
+    (root, downstream, upstream, bench)
   }
 
   /**
@@ -49,6 +53,8 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
     val upstream = actorSystem.actorOf(ClusteredDSLinkFolderActor.props(
       Paths.Upstream, dslinkMgr.getUplinkRoutee, upExtra: _*), Nodes.Upstream)
 
-    (root, downstream, upstream)
+    val bench = actorSystem.actorOf(BenchmarkActor.props(eventDaos), "benchmark")
+
+    (root, downstream, upstream, bench)
   }
 }
