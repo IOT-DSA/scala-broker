@@ -3,6 +3,8 @@
 to run all tests use in sbt console
 
 ```bash
+project root
+docker:publishLocal
 project it
 it-tests
 ```
@@ -10,6 +12,8 @@ it-tests
 to run specific test or test package
 
 ```bash
+project root
+docker:publishLocal
 project it
 
 # runs all it tests in package it

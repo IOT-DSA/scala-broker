@@ -50,9 +50,6 @@ class TestResponderHandler extends BaseDSLinkHandler {
       setAction(new Action(Permission.WRITE,
         new Handler[ActionResult] {
           def handle(event: ActionResult) = {
-            event.getJsonIn.get("rid")
-            event.getJsonIn.get("params")
-
             val jsonParams = event.getJsonIn.get[JsonObject]("params")
 
             val value = jsonParams.get[String]("value")
