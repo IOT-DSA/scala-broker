@@ -106,7 +106,9 @@ class TestRequesterHandler extends BaseDSLinkHandler {
 
     val handler = new Handler[R] {
       override def handle(event: R): Unit = {
-        promise.success(event)
+        if(!promise.isCompleted){
+          promise.success(event)
+        }
       }
     }
 
