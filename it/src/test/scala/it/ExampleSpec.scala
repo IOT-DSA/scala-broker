@@ -8,7 +8,6 @@ import org.dsa.iot.dslink.util.json.JsonObject
 import org.dsa.iot.dslink.util.log.LogManager
 import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 
@@ -47,19 +46,19 @@ class ExampleSpec extends FlatSpec
       data.put("id", "new_string")
       data.put("name", "Dmitry")
 
-      val futureInvoke = requester.invoke("/downstream/responder1/Create_Node", data)
-      val invokeResponse = Await.result(futureInvoke, 3 second)
+      val invokeResponse = requester
+        .invoke("/downstream/responder1/Create_Node", data)
+          .blockFirst(3 second)
 
       Then("it should be created successfully")
-      invokeResponse.getState.name() shouldBe "CLOSED"
-      invokeResponse.getError shouldBe null
+      invokeResponse.get.getState.name() shouldBe "CLOSED"
+      invokeResponse.get.getError shouldBe null
 
-      val nodeListFuture = requester.list("/downstream/responder1")
-      val nodeList = Await.result(nodeListFuture, 3 second)
-
+      val nodeList = requester.list("/downstream/responder1")
+        .blockFirst(3 seconds)
 
       And("it should present in nodes list")
-      nodeList.getNode.getChildren.entrySet()
+      nodeList.get.getNode.getChildren.entrySet()
         .asScala
         .filter(_.getKey == "new_string")
         .headOption.isDefined shouldBe true
@@ -68,13 +67,16 @@ class ExampleSpec extends FlatSpec
       val subscription = requester.subscribe("/downstream/responder1/new_string")
 
       And("set new value")
-      val futureSet = requester.set("/downstream/responder1/new_string", new Value("changed"))
-      val setResult = Await.result(futureSet, 3 second)
+      val setResult = requester.set("/downstream/responder1/new_string", new Value("changed"))
+        .block(3 seconds)
 
       Then("we should get new value from subscription")
-      val subs = Await.result(subscription, 3 seconds)
-      subs.getValue.getString shouldBe "changed"
-      subs.getPath shouldBe "/downstream/responder1/new_string"
+      val subs = subscription
+        .filter(_.getValue.getString == "changed")
+        .blockFirst(3 seconds)
+
+      subs.get.getValue.getString shouldBe "changed"
+      subs.get.getPath shouldBe "/downstream/responder1/new_string"
       setResult.getError shouldBe null
 
     }

@@ -17,13 +17,15 @@ scalaVersion := SCALA_VERSION
 lazy val root = (project in file("."))
   .enablePlugins(PlayScala)
   .settings(
-  libraryDependencies ++= commonDependencies.union(playTestDependencies)
+    scalaVersion := SCALA_VERSION,
+    libraryDependencies ++= commonDependencies.union(playTestDependencies)
 )
 
 // project for integrational tests
 lazy val it = project.in(file("it"))
   .settings(Testing.settings(Docker): _*)
   .settings(
+    scalaVersion := SCALA_VERSION,
     libraryDependencies ++= testDependencies.union(itDependencies)
   ).aggregate(root)
 
@@ -109,7 +111,10 @@ lazy val itDependencies = Seq(
   "com.whisk" %% "docker-testkit-scalatest" % "0.9.5" % "test",
   "com.whisk" %% "docker-testkit-impl-spotify" % "0.9.5" % "test",
   "com.spotify" % "docker-client" % "8.10.0" % "test",
-  "org.iot-dsa" % "dslink" % "0.18.3" % "test"
+  "org.iot-dsa" % "dslink" % "0.18.3" % "test",
+  "io.projectreactor" % "reactor-core" % "3.1.6.RELEASE",
+  "io.projectreactor" %% "reactor-scala-extensions" % "0.3.4"
+
 )
 
 

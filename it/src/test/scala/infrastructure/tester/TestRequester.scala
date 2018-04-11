@@ -1,14 +1,19 @@
 package infrastructure.tester
 
+import java.util.function.Consumer
+
 import infrastructure.IT
 import org.dsa.iot.dslink.DSLink
 import org.dsa.iot.dslink.link.Requester
+import org.dsa.iot.dslink.methods.StreamState
 import org.dsa.iot.dslink.methods.requests.{InvokeRequest, ListRequest, SetRequest}
 import org.dsa.iot.dslink.methods.responses.{InvokeResponse, ListResponse, SetResponse}
 import org.dsa.iot.dslink.node.value.{SubscriptionValue, Value}
 import org.dsa.iot.dslink.util.handler.Handler
 import org.dsa.iot.dslink.util.json.JsonObject
 import org.slf4j.{Logger, LoggerFactory}
+import reactor.core.publisher.{Flux => JFlux, FluxSink => JFluxSink, Mono => JMono, MonoSink => JMonoSink}
+import reactor.core.scala.publisher.{Flux, Mono}
 
 import scala.concurrent.{Future, Promise}
 
@@ -51,51 +56,76 @@ class TestRequesterHandler extends BaseDSLinkHandler {
 
   /**
     * subscription to node events
+    *
     * @param path node path
     * @return future of next event
     */
-  def subscribe(path: String): Future[SubscriptionValue] = withPromise[SubscriptionValue]{
-    handler =>
-      requester.subscribe(path, handler)
-  }
+  def subscribe(path: String): Flux[SubscriptionValue] = withFlux[SubscriptionValue] {
+    handler: Handler[SubscriptionValue] => requester.subscribe(path, handler)
+  }()
 
   /**
     * list of child nodes
+    *
     * @param path node path
     * @return
     */
-  def list(path: String): Future[ListResponse] = withPromise[ListResponse]{
-    handler =>
+  def list(path: String): Flux[ListResponse] = withFlux[ListResponse] {
+    handler: Handler[ListResponse] => {
       val request = new ListRequest(path)
       requester.list(request, handler)
-  }
+    }
+  }()
 
   /**
     * invoke method call
-    * @param path action node path
+    *
+    * @param path   action node path
     * @param params invoke arguments
     * @return future of invoke result
     */
-  def invoke(path: String, params: JsonObject): Future[InvokeResponse] = withPromise[InvokeResponse]{
-    handler =>
+  def invoke(path: String, params: JsonObject): Flux[InvokeResponse] = withFlux[InvokeResponse](
+    handler => {
       val req = new InvokeRequest(path, params)
       requester.invoke(req, handler)
-  }
+    })(_.getState == StreamState.CLOSED)
 
   /**
     * setting new value to node
-    * @param path node path
+    *
+    * @param path  node path
     * @param value new value
     * @return future response
     */
-  def set(path: String, value: Value): Future[SetResponse] = withPromise[SetResponse]{
+  def set(path: String, value: Value): Mono[SetResponse] = withMono[SetResponse] {
     handler =>
       val req = new SetRequest(path, value)
       requester.set(req, handler)
   }
 
+  private def withoutCheck[R](value: R): Boolean = false
+
+  private def withFlux[R](f: Handler[R] => Unit)(isItDone: R => Boolean = withoutCheck _): Flux[R] = Flux.create {
+    sink => {
+      val handler: Handler[R] = { event =>
+        sink.next(event)
+        if (isItDone(event)) sink.complete()
+      }
+
+      f.apply(handler)
+    }
+  }
+
+  private def withMono[R](f: Handler[R] => Unit): Mono[R] = Mono.create[R] {
+    sink => {
+      val handler: Handler[R] = event => sink.success(event)
+      f.apply(handler)
+    }
+  }
+
   /**
     * wraps requester method with future as result
+    *
     * @param f some requester method with handler as argument
     * @tparam R response
     * @return future of response
@@ -106,7 +136,7 @@ class TestRequesterHandler extends BaseDSLinkHandler {
 
     val handler = new Handler[R] {
       override def handle(event: R): Unit = {
-        if(!promise.isCompleted){
+        if (!promise.isCompleted) {
           promise.success(event)
         }
       }
