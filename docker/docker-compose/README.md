@@ -40,7 +40,7 @@ docker-compose up
 ```bash
 # recreating images
 cd dir_where_dockerfiles_located
-docker build --no-cache --force-rm --no-cache .
+docker build --no-cache --force-rm .
 ```
 
 ## Stopping and starting one of the dockers
