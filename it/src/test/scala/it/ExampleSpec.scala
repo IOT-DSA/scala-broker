@@ -19,7 +19,7 @@ import scala.collection.JavaConverters._
   * 4. gets list of child nodes
   * 5. changes value of node
   */
-class ExampleSpec extends FlatSpec
+class ExampleSpec (proto: String = "http", port: Int = 9000) extends FlatSpec
   with SingleNodeIT
   with GivenWhenThen
   with Matchers
@@ -34,6 +34,8 @@ class ExampleSpec extends FlatSpec
 
     And("Responder instance should be initialized")
     withRequesterAndResponder(
+      proto = proto,
+      port = port,
       requesterName = "requester1",
       responderName = "responder1"
     ){ (responder, requester )=>

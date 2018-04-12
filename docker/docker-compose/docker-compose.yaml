@@ -23,7 +23,7 @@ services:
     container_name: shell-dslink
     environment:
       BROKER_HOST: broker
-      BROKER_PORT: 9443
+      BROKER_PORT: 9000
     depends_on:
       - broker
     links:
@@ -38,7 +38,7 @@ services:
     container_name: weather-dslink
     environment:
       BROKER_HOST: broker
-      BROKER_PORT: 9443
+      BROKER_PORT: 9000
     depends_on:
       - broker
     links:
@@ -53,7 +53,7 @@ services:
     container_name: system-dslink
     environment:
       BROKER_HOST: broker
-      BROKER_PORT: 9443
+      BROKER_PORT: 9000
     depends_on:
       - broker
     links:
