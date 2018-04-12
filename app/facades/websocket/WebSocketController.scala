@@ -80,7 +80,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val salt = (serverConfig \ "salt").as[String].getBytes("UTF-8")
 
       val auth = buildAuth(tempKey, salt)
-      val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=json"
+      val wsUrl = s"wss://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=json"
 
       uplinkWSConnect(wsUrl, name, dsId)
     }
