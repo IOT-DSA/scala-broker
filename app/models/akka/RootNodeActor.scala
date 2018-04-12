@@ -60,7 +60,9 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /data node.
    */
   private def createDataNode = {
-    val dataNode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
+    import akka.actor.typed.scaladsl.adapter._
+    val dataNode = DSANode.behavior(None, context) // val dataNode: ActorRef[DSANode] = context.spawn(DSANode.behavior(None, context), Data)
+    //val dataNode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode

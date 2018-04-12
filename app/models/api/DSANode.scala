@@ -1,18 +1,17 @@
 package models.api
 
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
-
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
-
-import DSAValueType.{ DSADynamic, DSAValueType }
-import akka.actor.{ ActorRef, TypedActor, TypedProps }
+import DSAValueType.{DSADynamic, DSAValueType}
 import akka.event.Logging
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.rpc._
-import models.rpc.DSAValue.{ DSAMap, DSAVal, StringValue, array, longToNumericValue, obj }
+import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, longToNumericValue, obj}
+import akka.actor.typed.scaladsl._
+import akka.actor.typed.{ActorContext, ActorRef, Behavior, Props, Terminated, scaladsl}
 
 /**
  * A structural unit in Node API.
@@ -54,22 +53,21 @@ trait DSANode {
 
   def invoke(params: DSAMap): Unit
 
-  def subscribe(sid: Int, ref: ActorRef): Unit
+  def subscribe(sid: Int, ref: ActorRef[DSANode]): Unit
   def unsubscribe(sid: Int): Unit
 
-  def list(rid: Int, ref: ActorRef): Unit
+  def list(rid: Int, ref: ActorRef[DSANode]): Unit
   def unlist(rid: Int): Unit
 }
 
 /**
  * DSA Node actor-based implementation.
  */
-class DSANodeImpl(val parent: Option[DSANode])
-    extends DSANode with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
+class DSANodeImpl(val parent: Option[DSANode], val context: akka.actor.ActorContext)
+    extends DSANode with Behaviors.MutableBehavior[DSANode] {
 
-  protected val log = Logging(TypedActor.context.system, getClass)
-
-  val name = TypedActor.context.self.path.name
+  protected val log = Logging(context.system, getClass)
+  val name = context.self.path.name
   val path = parent.map(_.path).getOrElse("") + "/" + name
 
   protected def ownId = s"[$path]"
@@ -129,15 +127,15 @@ class DSANodeImpl(val parent: Option[DSANode])
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
-    val props = DSANode.props(Some(TypedActor.self))
-    val child = TypedActor(TypedActor.context).typedActorOf(props, name)
+    val child: DSANode = DSANode.behavior(None, context)
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
     notifyListActors(array(name, obj("$is" -> "node")))
     Future.successful(child)
   }
   def removeChild(name: String) = {
-    _children remove name foreach TypedActor(TypedActor.context).stop
+    // Should map contains ActorRef[DSANode] ?
+    _children remove name foreach context.stop
     log.debug(s"$ownId: removed child '$name'")
     notifyListActors(obj("name" -> name, "change" -> "remove"))
   }
@@ -155,18 +153,18 @@ class DSANodeImpl(val parent: Option[DSANode])
 
   def invoke(params: DSAMap) = _action foreach (_.handler(ActionContext(this, params)))
 
-  private val _sids = collection.mutable.Map.empty[Int, ActorRef]
-  def subscribe(sid: Int, ref: ActorRef) = _sids += sid -> ref
+  private val _sids = collection.mutable.Map.empty[Int, ActorRef[DSANode]]
+  def subscribe(sid: Int, ref: ActorRef[DSANode]) = _sids += sid -> ref
   def unsubscribe(sid: Int) = _sids -= sid
 
-  private val _rids = collection.mutable.Map.empty[Int, ActorRef]
-  def list(rid: Int, ref: ActorRef) = _rids += rid -> ref
+  private val _rids = collection.mutable.Map.empty[Int, ActorRef[DSANode]]
+  def list(rid: Int, ref: ActorRef[DSANode]) = _rids += rid -> ref
   def unlist(rid: Int) = _rids -= rid
 
   /**
    * Handles custom messages, that are not part of the Typed API.
    */
-  def onReceive(message: Any, sender: ActorRef) = message match {
+  def onReceive(message: Any, sender: akka.actor.ActorRef) = message match {
 
     case e @ RequestEnvelope(requests) =>
       log.info(s"$ownId: received $e")
@@ -179,7 +177,7 @@ class DSANodeImpl(val parent: Option[DSANode])
   /**
    * Handles DSA requests by processing them and sending the response to itself.
    */
-  def handleRequest(sender: ActorRef): PartialFunction[DSARequest, Iterable[DSAResponse]] = {
+  def handleRequest(sender: akka.actor.ActorRef): PartialFunction[DSARequest, Iterable[DSAResponse]] = {
 
     /* set */
 
@@ -296,5 +294,5 @@ object DSANode {
   /**
    * Creates a new [[DSANodeImpl]] props instance.
    */
-  def props(parent: Option[DSANode]) = TypedProps(classOf[DSANode], new DSANodeImpl(parent))
+  def behavior(parent: Option[DSANode], context: akka.actor.ActorContext) = new DSANodeImpl(parent, context)
 }

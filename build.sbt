@@ -1,7 +1,7 @@
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
-val AKKA_VERSION = "2.5.8"
+val AKKA_VERSION = "2.5.11"
 val JSON_VERSION = "2.6.8"
 
 // settings
@@ -64,6 +64,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-actor-typed"        % AKKA_VERSION,
   "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
   "org.bouncycastle"         % "bcprov-jdk15on"          % "1.51",
   "com.github.romix.akka"   %% "akka-kryo-serialization" % "0.5.1",
