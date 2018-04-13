@@ -26,7 +26,7 @@ case $key in
 esac
 done
 
-DOCKER_CMD='docker-compose up --force-recreate'
+DOCKER_CMD='sudo docker-compose up --force-recreate'
 
 echo "search project version in $SBT_PATH/build.sbt" 
 
