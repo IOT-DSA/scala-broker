@@ -54,4 +54,5 @@ if [ "$REBUILD" = true ] ; then
 fi
 cd ${THIS_DIR}
 echo "starting docker containers"
+eval “$(docker-machine env default)
 bash -c ${DOCKER_CMD}
