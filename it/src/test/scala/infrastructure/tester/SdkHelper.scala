@@ -112,7 +112,7 @@ trait SdkHelper {
        |		},
        |		"log":{
        |			"type":"enum",
-       |			"default":"info"
+       |			"default":"debug"
        |		},
        |		"handler_class":{
        |			"type":"string",

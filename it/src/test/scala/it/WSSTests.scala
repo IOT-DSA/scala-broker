@@ -11,6 +11,6 @@ class WSSTests extends FlatSpec with BasicCases {
   LogManager.setBridge(new LoggingBridge)
 
   "it test" should "run" in {
-    addNodeGetListNodes("https", 9443)
+    addNodeGetListNodes("wss", 9443)
   }
 }
