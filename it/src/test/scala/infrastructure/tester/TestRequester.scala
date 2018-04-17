@@ -23,9 +23,9 @@ trait TestRequester extends SdkHelper {
 
   val defaultRequesterName = "scala-test-requester"
 
-  def withRequester(host: String = "localhost", port: Int = 9000, name: String = defaultRequesterName)(action: TestRequesterHandler => Unit): Unit = {
+  def withRequester(proto: String = "http", host: String = "localhost", port: Int = 9000, name: String = defaultRequesterName)(action: TestRequesterHandler => Unit): Unit = {
     implicit val requester = new TestRequesterHandler
-    val requesterDSLinkProvider = createDsLink(host, port, name)
+    val requesterDSLinkProvider = createDsLink(proto, host, port, name)
 
     connectDSLink(requester, requesterDSLinkProvider)(action)
   }
