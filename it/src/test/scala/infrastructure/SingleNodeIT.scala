@@ -22,6 +22,8 @@ trait SingleNodeIT extends IT { self: Suite =>
     )
     .withEnv(s"JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n")
     .withReadyChecker(DockerReadyChecker.LogLineContains("p.c.s.AkkaHttpServer - Listening for HTTP on /0.0.0.0:9000"))
+//    .withReadyChecker(DockerReadyChecker.LogLineContains("p.c.s.AkkaHttpServer - Listening for HTTP on /0.0.0.0:9443"))
+
 
   abstract override def dockerContainers: List[DockerContainer] =
     singleNodeContainer :: super.dockerContainers
