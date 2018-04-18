@@ -112,8 +112,8 @@ lazy val itDependencies = Seq(
   "com.whisk" %% "docker-testkit-impl-spotify" % "0.9.5" % "test",
   "com.spotify" % "docker-client" % "8.10.0" % "test",
   "org.iot-dsa" % "dslink" % "0.18.3" % "test",
-  "io.projectreactor" % "reactor-core" % "3.1.6.RELEASE",
-  "io.projectreactor" %% "reactor-scala-extensions" % "0.3.4"
+  "io.projectreactor" % "reactor-core" % "3.1.6.RELEASE" % "test",
+  "io.projectreactor" %% "reactor-scala-extensions" % "0.3.4" % "test"
 
 )
 
