@@ -2,18 +2,18 @@ package models.akka
 
 import akka.actor._
 import akka.cluster.singleton._
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.api.DSANode
-import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
-import models.rpc.DSAValue.{ StringValue, array, obj }
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.api.{DSANodeImpl, NodeActorBehavior}
+import models.rpc.{DSAError, DSARequest, DSAResponse, ListRequest}
+import models.rpc.DSAValue.{StringValue, array, obj}
 
 /**
  * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
  */
 class RootNodeActor extends Actor with ActorLogging {
-  import context.dispatcher
   import models.Settings.Nodes._
   import models.rpc.StreamState._
+  import akka.actor.typed.scaladsl.adapter._
 
   // create children
   private val dataNode = createDataNode
@@ -49,6 +49,7 @@ class RootNodeActor extends Actor with ActorLogging {
   private val rootNodes = {
     val config = rows(is("dsa/broker"), "$downstream" -> Downstream)
     val children = List(defsNode, dataNode, usersNode, sysNode) map { node =>
+      // cannot get the attributes, node is ActorRef[]
       array(node.name, obj(is(node.profile)))
     }
     val stream = rows("upstream" -> obj(IsNode), "downstream" -> obj(IsNode))
@@ -60,10 +61,11 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /data node.
    */
   private def createDataNode = {
-    import akka.actor.typed.scaladsl.adapter._
-    val dataNode = DSANode.behavior(None, context) // val dataNode: ActorRef[DSANode] = context.spawn(DSANode.behavior(None, context), Data)
-    //val dataNode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
-    dataNode.profile = "broker/dataRoot"
+    val dsaNodeImpl: DSANodeImpl = new DSANodeImpl(None, context)
+    dsaNodeImpl.profile = "broker/dataRoot"
+
+    val dataNode: akka.actor.typed.ActorRef[RequestEnvelope] = context.spawn(new NodeActorBehavior(dsaNodeImpl).get(context.self), Data)
+    // use adapter approach
     StandardActions.bindDataRootActions(dataNode)
     dataNode
   }
@@ -72,9 +74,9 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /defs node hierarchy.
    */
   private def createDefsNode = {
-    val defsNode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
-    defsNode.profile = "node"
-    defsNode.addChild("profile").foreach { node =>
+    val dsaNodeImpl: DSANodeImpl = new DSANodeImpl(None, context)
+    dsaNodeImpl.profile = "node"
+    dsaNodeImpl.addChild("profile").foreach { node =>
       node.profile = "static"
       node.addChild("node")
       node.addChild("static")
@@ -95,25 +97,28 @@ class RootNodeActor extends Actor with ActorLogging {
         }
       }
     }
-    defsNode
+
+    context.spawn(new NodeActorBehavior(dsaNodeImpl).get(context.self), Defs)
   }
 
   /**
    * Creates a /users node.
    */
   private def createUsersNode = {
-    val usersNode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
-    usersNode.profile = "node"
-    usersNode
+    val dsaNodeImpl: DSANodeImpl = new DSANodeImpl(None, context)
+    dsaNodeImpl.profile = "node"
+
+    context.spawn(new NodeActorBehavior(dsaNodeImpl).get(context.self), Users)
   }
 
   /**
    * Creates a /sys node.
    */
   private def createSysNode = {
-    val sysNode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
-    sysNode.profile = "node"
-    sysNode
+    val dsaNodeImpl: DSANodeImpl = new DSANodeImpl(None, context)
+    dsaNodeImpl.profile = "node"
+
+    context.spawn(new NodeActorBehavior(dsaNodeImpl).get(context.self), Sys)
   }
 }
 

@@ -7,17 +7,17 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import DSAValueType.{DSADynamic, DSAValueType}
 import akka.event.Logging
-import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import models.{RequestEnvelope, ResponseEnvelope}
 import models.rpc._
-import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, longToNumericValue, obj}
+import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, obj}
 import akka.actor.typed.scaladsl._
-import akka.actor.typed.{ActorContext, ActorRef, Behavior, Props, Terminated, scaladsl}
+import akka.actor.typed.{ActorRef, Behavior}
 
 /**
  * A structural unit in Node API.
  */
 trait DSANode {
-  def parent: Option[DSANode]
+  def parent: Option[ActorRef[RequestEnvelope]]
   def name: String
   def path: String
 
@@ -43,9 +43,9 @@ trait DSANode {
   def addAttributes(cfg: (String, DSAVal)*): Unit
   def removeAttribute(name: String): Unit
 
-  def children: Future[Map[String, DSANode]]
-  def child(name: String): Future[Option[DSANode]]
-  def addChild(name: String): Future[DSANode]
+  def children: Future[Map[String, ActorRef[RequestEnvelope]]]
+  def child(name: String): Future[Option[ActorRef[RequestEnvelope]]]
+  def addChild(name: String): Future[ActorRef[RequestEnvelope]]
   def removeChild(name: String): Unit
 
   def action: Option[DSAAction]
@@ -53,18 +53,19 @@ trait DSANode {
 
   def invoke(params: DSAMap): Unit
 
-  def subscribe(sid: Int, ref: ActorRef[DSANode]): Unit
+  def subscribe(sid: Int, ref: ActorRef[ResponseEnvelope]): Unit
   def unsubscribe(sid: Int): Unit
 
-  def list(rid: Int, ref: ActorRef[DSANode]): Unit
+  def list(rid: Int, ref: ActorRef[ResponseEnvelope]): Unit
   def unlist(rid: Int): Unit
 }
 
 /**
  * DSA Node actor-based implementation.
  */
-class DSANodeImpl(val parent: Option[DSANode], val context: akka.actor.ActorContext)
-    extends DSANode with Behaviors.MutableBehavior[DSANode] {
+class DSANodeImpl(val parent: Option[ActorRef[RequestEnvelope]], val context: akka.actor.ActorContext)
+    extends DSANode {
+  import akka.actor.typed.scaladsl.adapter._
 
   protected val log = Logging(context.system, getClass)
   val name = context.self.path.name
@@ -123,18 +124,17 @@ class DSANodeImpl(val parent: Option[DSANode], val context: akka.actor.ActorCont
     notifyListActors(obj("name" -> name, "change" -> "remove"))
   }
 
-  private val _children = collection.mutable.Map.empty[String, DSANode]
+  private val _children = collection.mutable.Map.empty[String, ActorRef[RequestEnvelope]]
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
-    val child: DSANode = DSANode.behavior(None, context)
+    val child: ActorRef[RequestEnvelope] = context.spawn(new NodeActorBehavior(this).get(context.self), name)
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
     notifyListActors(array(name, obj("$is" -> "node")))
     Future.successful(child)
   }
   def removeChild(name: String) = {
-    // Should map contains ActorRef[DSANode] ?
     _children remove name foreach context.stop
     log.debug(s"$ownId: removed child '$name'")
     notifyListActors(obj("name" -> name, "change" -> "remove"))
@@ -153,114 +153,19 @@ class DSANodeImpl(val parent: Option[DSANode], val context: akka.actor.ActorCont
 
   def invoke(params: DSAMap) = _action foreach (_.handler(ActionContext(this, params)))
 
-  private val _sids = collection.mutable.Map.empty[Int, ActorRef[DSANode]]
-  def subscribe(sid: Int, ref: ActorRef[DSANode]) = _sids += sid -> ref
+  private val _sids = collection.mutable.Map.empty[Int, ActorRef[ResponseEnvelope]]
+  def subscribe(sid: Int, ref: ActorRef[ResponseEnvelope]) = _sids += sid -> ref
   def unsubscribe(sid: Int) = _sids -= sid
 
-  private val _rids = collection.mutable.Map.empty[Int, ActorRef[DSANode]]
-  def list(rid: Int, ref: ActorRef[DSANode]) = _rids += rid -> ref
+  private val _rids = collection.mutable.Map.empty[Int, ActorRef[ResponseEnvelope]]
+  def list(rid: Int, ref: ActorRef[ResponseEnvelope]) = _rids += rid -> ref
   def unlist(rid: Int) = _rids -= rid
-
-  /**
-   * Handles custom messages, that are not part of the Typed API.
-   */
-  def onReceive(message: Any, sender: akka.actor.ActorRef) = message match {
-
-    case e @ RequestEnvelope(requests) =>
-      log.info(s"$ownId: received $e")
-      val responses = requests flatMap handleRequest(sender)
-      sender ! ResponseEnvelope(responses)
-
-    case msg @ _ => log.error("Unknown message: " + msg)
-  }
-
-  /**
-   * Handles DSA requests by processing them and sending the response to itself.
-   */
-  def handleRequest(sender: akka.actor.ActorRef): PartialFunction[DSARequest, Iterable[DSAResponse]] = {
-
-    /* set */
-
-    case SetRequest(rid, "", newValue, _) =>
-      value = newValue
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    case SetRequest(rid, name, newValue, _) if name.startsWith("$") =>
-      addConfigs(name -> newValue)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    case SetRequest(rid, name, newValue, _) if name.startsWith("@") =>
-      addAttributes(name -> newValue)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* remove */
-
-    case RemoveRequest(rid, name) if name.startsWith("$") =>
-      removeConfig(name)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    case RemoveRequest(rid, name) if name.startsWith("@") =>
-      removeAttribute(name)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* invoke */
-
-    case InvokeRequest(rid, _, params, _) =>
-      invoke(params)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* subscribe */
-
-    case SubscribeRequest(rid, paths) =>
-      assert(paths.size == 1, "Only a single path is allowed in Subscribe")
-      subscribe(paths.head.sid, sender)
-      val head = DSAResponse(rid, Some(StreamState.Closed))
-      val tail = if (_value != null) {
-        val update = obj("sid" -> paths.head.sid, "value" -> _value, "ts" -> now)
-        DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil
-      } else Nil
-      head :: tail
-
-    /* unsubscribe */
-
-    case UnsubscribeRequest(rid, sids) =>
-      assert(sids.size == 1, "Only a single sid is allowed in Unsubscribe")
-      unsubscribe(sids.head)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* list */
-
-    // TODO this needs to be rewritten to remove blocking
-    case ListRequest(rid, _) =>
-      list(rid, sender)
-      val cfgUpdates = array("$is", _configs("$is")) +: toUpdateRows(_configs - "$is")
-      val attrUpdates = toUpdateRows(_attributes)
-      val childUpdates = Await.result(Future.sequence(_children map {
-        case (name, node) => node.configs map (cfgs => name -> cfgs)
-      }), Duration.Inf) map {
-        case (name, cfgs) => array(name, cfgs)
-      }
-      val updates = cfgUpdates ++ attrUpdates ++ childUpdates
-      DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil
-
-    /* close */
-
-    case CloseRequest(rid) =>
-      unlist(rid)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-  }
-
-  // event handlers
-
-  def preStart() = log.info(s"DSANode[$path] initialized")
-
-  def postStop() = log.info(s"DSANode[$path] stopped")
 
   /**
    * Sends DSAResponse instances to actors listening to SUBSCRIBE updates.
    */
   private def notifySubscribeActors(value: DSAVal) = {
-    val ts = now
+    val ts = Util.now
     _sids foreach {
       case (sid, ref) =>
         val update = obj("sid" -> sid, "value" -> value, "ts" -> ts)
@@ -275,24 +180,108 @@ class DSANodeImpl(val parent: Option[DSANode], val context: akka.actor.ActorCont
   private def notifyListActors(updates: DSAVal*) = _rids foreach {
     case (rid, ref) => ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
   }
-
-  /**
-   * Formats the current date/time as ISO.
-   */
-  private def now = DateTime.now.toString(ISODateTimeFormat.dateTime)
-
-  /**
-   * Converts data to a collection of DSAResponse-compatible update rows.
-   */
-  private def toUpdateRows(data: collection.Map[String, DSAVal]) = data map (cfg => array(cfg._1, cfg._2)) toSeq
 }
 
-/**
- * Factory for [[DSANodeImpl]] instances.
- */
-object DSANode {
+class NodeActorBehavior(dsaData: DSANode) {
+
+  def get(sender: ActorRef[ResponseEnvelope]): Behavior[RequestEnvelope] =
+    Behaviors.immutable[RequestEnvelope] { (context, message) =>
+      message match {
+        case e @ RequestEnvelope(requests) =>
+          context.log.info(s"[${dsaData.path}]: received $e")
+          val responses = requests flatMap handleRequest(sender)
+          sender ! ResponseEnvelope(responses)
+          Behavior.same
+      }
+    }
+
   /**
-   * Creates a new [[DSANodeImpl]] props instance.
-   */
-  def behavior(parent: Option[DSANode], context: akka.actor.ActorContext) = new DSANodeImpl(parent, context)
+    * Handles DSA requests by processing them and sending the response to itself.
+    */
+  private def handleRequest(sender: ActorRef[ResponseEnvelope]): PartialFunction[DSARequest, Iterable[DSAResponse]] = {
+
+    /* set */
+
+    case SetRequest(rid, "", newValue, _) =>
+      dsaData.value = newValue
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+
+    case SetRequest(rid, name, newValue, _) if name.startsWith("$") =>
+      dsaData.addConfigs(name -> newValue)
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+
+    case SetRequest(rid, name, newValue, _) if name.startsWith("@") =>
+      dsaData.addAttributes(name -> newValue)
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+
+    /* remove */
+
+    case RemoveRequest(rid, name) if name.startsWith("$") =>
+      dsaData.removeConfig(name)
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+
+    case RemoveRequest(rid, name) if name.startsWith("@") =>
+      dsaData.removeAttribute(name)
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+
+    /* invoke */
+
+    case InvokeRequest(rid, _, params, _) =>
+      dsaData.invoke(params)
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+
+    /* subscribe */
+
+    case SubscribeRequest(rid, paths) =>
+      assert(paths.size == 1, "Only a single path is allowed in Subscribe")
+      dsaData.subscribe(paths.head.sid, sender)
+      val head = DSAResponse(rid, Some(StreamState.Closed))
+      val tail = if (dsaData.value != null) {
+        val update = obj("sid" -> paths.head.sid, "value" -> dsaData.value, "ts" -> Util.now)
+        DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil
+      } else Nil
+      head :: tail
+
+    /* unsubscribe */
+
+    case UnsubscribeRequest(rid, sids) =>
+      assert(sids.size == 1, "Only a single sid is allowed in Unsubscribe")
+      dsaData.unsubscribe(sids.head)
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+
+    /* list */
+
+    // TODO this needs to be rewritten to remove blocking
+    case ListRequest(rid, _) =>
+      dsaData.list(rid, sender)
+      // Probably should be moved to DSANodeImpl
+      val cfgUpdates = array("$is", _configs("$is")) +: Util.toUpdateRows(_configs - "$is")
+      val attrUpdates = Util.toUpdateRows(_attributes)
+      val childUpdates = Await.result(Future.sequence(_children map {
+        case (name, node) => node.configs map (cfgs => name -> cfgs)
+      }), Duration.Inf) map {
+        case (name, cfgs) => array(name, cfgs)
+      }
+      val updates = cfgUpdates ++ attrUpdates ++ childUpdates
+      DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil
+
+    /* close */
+
+    case CloseRequest(rid) =>
+      dsaData.unlist(rid)
+      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+  }
+}
+
+object Util {
+
+  /**
+    * Formats the current date/time as ISO.
+    */
+  def now = DateTime.now.toString(ISODateTimeFormat.dateTime)
+
+  /**
+    * Converts data to a collection of DSAResponse-compatible update rows.
+    */
+  def toUpdateRows(data: collection.Map[String, DSAVal]) = data map (cfg => array(cfg._1, cfg._2)) toSeq
 }
