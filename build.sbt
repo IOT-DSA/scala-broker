@@ -36,6 +36,8 @@ EclipseKeys.withJavadoc := true
 
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
+resolvers += "velvia maven" at "http://dl.bintray.com/velvia/maven"
+
 scalacOptions ++= Seq(
   "-feature",
   "-unchecked",
@@ -91,7 +93,8 @@ lazy val commonDependencies = Seq(
   "ch.qos.logback"           % "logback-classic"         % "1.2.3",
   "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
   "io.netty"                 % "netty-handler"           % "4.0.41.Final" force(),
-  "org.msgpack"             %% "msgpack-scala"            % "0.8.13"
+  "org.msgpack"             %% "msgpack-scala"            % "0.8.13",
+  "org.velvia"              %% "msgpack4s"                % "0.6.0"
 )
 
 // akka and play test dependencies
