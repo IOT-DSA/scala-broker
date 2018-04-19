@@ -90,7 +90,8 @@ lazy val commonDependencies = Seq(
   "com.maxmind.geoip2"       % "geoip2"                  % "2.10.0",
   "ch.qos.logback"           % "logback-classic"         % "1.2.3",
   "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
-  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force()
+  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force(),
+  "org.msgpack"             %% "msgpack-scala"            % "0.8.13"
 )
 
 // akka and play test dependencies
