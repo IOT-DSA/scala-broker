@@ -8,6 +8,7 @@ do
 key="$1"
 
 REBUILD="false"
+DETACHED="false"
 
 case $key in
     --sbt)
@@ -20,7 +21,7 @@ case $key in
     shift # past argument
     shift # past value
     ;;
-	-d|detached)
+	-d|--detached)
 	DETACHED="$2"
 	shift # past argument
     shift # past value
@@ -56,8 +57,6 @@ if [ "$REBUILD" = true ] ; then
 
 	echo "rebuilding sbt project"
 	sbt clean package docker:publishLocal
-fi
-
 fi
 
 if [ "$DETACHED" = true ] ; then
