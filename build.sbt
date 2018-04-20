@@ -3,9 +3,8 @@ import Testing.itTest
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
-val AKKA_VERSION = "2.5.8"
+val AKKA_VERSION = "2.5.12"
 val JSON_VERSION = "2.6.8"
-
 
 // settings
 name := "scala-broker"
@@ -82,6 +81,7 @@ lazy val commonDependencies = Seq(
   "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-actor-typed"        % AKKA_VERSION,
   "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
   "org.bouncycastle"         % "bcprov-jdk15on"          % "1.51",
   "com.github.romix.akka"   %% "akka-kryo-serialization" % "0.5.1",
@@ -114,9 +114,4 @@ lazy val itDependencies = Seq(
   "org.iot-dsa" % "dslink" % "0.18.3" % "test",
   "io.projectreactor" % "reactor-core" % "3.1.6.RELEASE",
   "io.projectreactor" %% "reactor-scala-extensions" % "0.3.4"
-
 )
-
-
-
-
