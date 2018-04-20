@@ -20,6 +20,11 @@ case $key in
     shift # past argument
     shift # past value
     ;;
+	-d|detached)
+	DETACHED="$2"
+	shift # past argument
+    shift # past value
+    ;;
     *)    # unknown option
     shift # past argument
     ;;
@@ -52,6 +57,13 @@ if [ "$REBUILD" = true ] ; then
 	echo "rebuilding sbt project"
 	sbt clean package docker:publishLocal
 fi
+
+fi
+
+if [ "$DETACHED" = true ] ; then
+	DOCKER_CMD="$DOCKER_CMD -d"
+fi
+
 cd ${THIS_DIR}
 echo "starting docker containers"
 bash -c ${DOCKER_CMD}
