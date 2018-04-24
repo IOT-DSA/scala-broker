@@ -22,7 +22,7 @@ trait RequesterAndResponder extends TestRequester with TestResponder{
                                 requesterName:String = "scala-test-requester"
                                )(action: (TestResponderHandler,
     TestRequesterHandler)=>Unit) = {
-    withResponder(host, port, responderName){responder =>
+    withResponder(host, port, responderName){ responder =>
       withRequester(host, port, requesterName){ requester =>
         action(responder, requester)
       }

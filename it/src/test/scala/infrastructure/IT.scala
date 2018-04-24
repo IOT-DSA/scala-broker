@@ -8,6 +8,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.Await
+
 /**
   *
   * base trait for IT
@@ -41,8 +43,25 @@ trait IT extends ScalaFutures
   override protected def afterAll(): Unit = {
     super.afterAll()
     beforeStop()
+    var attempt = 0
+    val maxAttempts = 5
+    while(!stopAll() || attempt < maxAttempts ){
+      log.info("trying to stop containers")
+      attempt = attempt + 1
+    }
     stopAllQuietly()
     afterStop()
+  }
+
+  def stopAll(): Boolean = {
+    try {
+      Await.ready(containerManager.stopRmAll(), StopContainersTimeout)
+      true
+    } catch {
+      case e: Throwable =>
+        log.error(e.getMessage, e)
+        false
+    }
   }
 
   def beforeStart() = log.debug("Starting project containers")

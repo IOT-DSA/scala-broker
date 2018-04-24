@@ -21,7 +21,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
-  private val targetsBySid = collection.mutable.Map.empty[Int, String]
+  private val targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
 
   private var lastRid: Int = 0
 
@@ -34,9 +34,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       processRequests(requests)
       requests.lastOption foreach (req => lastRid = req.rid)
     case e @ ResponseEnvelope(responses) =>
+
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
-      sendToEndpoint(e)
+
+      segregateSubscriptions(responses).map2(
+        handleSubscriptions _,
+        other => sendToEndpoint(ResponseEnvelope(other))
+      )
   }
 
   /**
@@ -45,8 +50,22 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   def stopRequester() = {
     batchAndRoute(targetsByRid map { case (rid, target) => target -> CloseRequest(rid) })
     batchAndRoute(targetsBySid.zipWithIndex map {
-      case ((sid, target), index) => target -> UnsubscribeRequest(lastRid + index + 1, sid)
+      case ((sid, PathAndQos(target, _)), index) => target -> UnsubscribeRequest(lastRid + index + 1, sid)
     })
+  }
+
+  private def handleSubscriptions(subscriptions:Seq[DSAResponse]) = subscriptions.map(resp => {
+    resp.updates
+  })
+
+  private def segregateSubscriptions(items:Seq[DSAResponse]):SubscriptionsAndOther = {
+    val data = items.partition(isSubscription)
+    SubscriptionsAndOther(data._1, data._2)
+  }
+
+  private def isSubscription(response:DSAResponse):Boolean = response match {
+    case subs @ DSAResponse(0, _, _, _, _) => true
+    case _ => false
   }
 
   /**
@@ -125,7 +144,10 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
    */
   private def cacheRequestTarget(request: DSARequest, target: String) = request match {
     case r @ (_: ListRequest | _: InvokeRequest) => targetsByRid.put(r.rid, target)
-    case r: SubscribeRequest                     => targetsBySid.put(r.path.sid, target)
+    case r: SubscribeRequest                     => targetsBySid.put(
+      r.path.sid,
+      PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default))
+    )
     case _                                       => // do nothing
   }
 
@@ -152,7 +174,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   private def resolveTarget(request: DSARequest) = {
 
     val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
-      case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get
+      case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get.path
     }
 
     val resolveCloseTarget: PartialFunction[DSARequest, String] = {
@@ -160,5 +182,39 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     }
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)
+  }
+}
+
+case class SubscriptionsAndOther(subscriptions:Seq[DSAResponse], other:Seq[DSAResponse]){
+
+  def map2(f1:Seq[DSAResponse] => Unit, f2:Seq[DSAResponse] => Unit) = {
+    f1(subscriptions)
+    f2(other)
+  }
+
+}
+
+case class PathAndQos(path:String, qos:QoS.Level)
+
+object QoS {
+  sealed abstract class Level(val index:Int){
+    def <(other:Level) = index < other.index
+    def >(other:Level) = index > other.index
+    def >=(other:Level) = index >= other.index
+    def <=(other:Level) = index <= other.index
+  }
+
+  case object Default extends Level(0)
+  case object Queued extends Level(1)
+  case object Durable extends Level(2)
+  case object DurableAndPersist extends Level(3)
+
+
+  def apply(level:Int): QoS.Level = level match {
+    case 0 => Default
+    case 1 => Queued
+    case 2 => Durable
+    case 3 => DurableAndPersist
+    case  _ => throw new RuntimeException("unsupported QoS level")
   }
 }

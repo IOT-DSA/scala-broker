@@ -1,9 +1,10 @@
 package models.akka
 
 import org.joda.time.DateTime
-
-import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
+import models.ResponseEnvelope
+import models.rpc.DSAResponse
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -128,10 +129,12 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
   /**
    * Sends a message to the endpoint, if connected.
    */
-  protected def sendToEndpoint(msg: Any): Unit = endpoint foreach (_ ! msg)
+  protected def sendToEndpoint(msg: Any): Unit =  endpoint foreach (_ ! msg)
+
 
   /**
    * Sends a message to the registry.
    */
   protected def sendToRegistry(msg: Any): Unit = registry ! msg
+
 }
