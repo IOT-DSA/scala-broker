@@ -13,3 +13,5 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-ghpages" % "0.5.4")
 addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")
 
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.0")
+
+addSbtPlugin("com.github.mwz" % "sbt-sonar" % "1.3.0")
