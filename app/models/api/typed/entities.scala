@@ -1,7 +1,7 @@
 package models.api.typed
 
 import akka.actor.typed.ActorRef
-import models.rpc.DSAValue.{ DSAMap, DSAVal }
+import models.rpc.DSAValue.{DSAMap, DSAVal}
 
 /**
  * The internal state of DSA node.
@@ -11,6 +11,10 @@ final case class DSANodeState(parent:      Option[NodeRef],
                               displayName: String,
                               value:       DSAVal,
                               attributes:  DSAMap)
+
+object DSANodeState {
+  val empty = DSANodeState(None, "", "", Nil, Map.empty)
+}
 
 /**
  * A request that will be followed by a reply

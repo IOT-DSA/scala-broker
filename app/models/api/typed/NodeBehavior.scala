@@ -2,59 +2,119 @@ package models.api.typed
 
 import DSACommand._
 import MgmtCommand._
-import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import akka.actor.typed.{ActorSystem, Behavior}
+import akka.persistence.typed.scaladsl.PersistentBehaviors
+import akka.persistence.typed.scaladsl.Effect
 
 /**
  * Describes DSA node behavior.
  */
 object NodeBehavior {
 
-  type BHV[T] = PartialFunction[(ActorContext[T], T), Behavior[T]]
+//  type BHV[T] = PartialFunction[(ActorContext[T], T), Behavior[T]]
+  type BHV[T, E, H] = PersistentBehaviors.CommandHandler[T, E, H]
+
+//  private def commandHandler: BHV[NodeCommand, MgmtEvent, DSANodeState] = PersistentBehaviors.CommandHandler.byState {
+//    case state =>
+//      print("State from byState: " + state)
+//      mgmtCommandHandler()
+//  }
 
   /**
-   * Handles management commands.
-   */
-  def mgmtHandler(state: DSANodeState): BHV[NodeCommand] = {
-    case (_, GetState(ref)) =>
+    * Handles management commands.
+    */
+  private def mgmtCommandHandler: BHV[NodeCommand, MgmtEvent, DSANodeState] = {
+    case (ctx, state, GetState(ref)) =>
       ref ! state
-      Behaviors.same
-    case (_, SetDisplayName(name)) =>
-      node(state.copy(displayName = name))
-    case (_, SetValue(value)) =>
-      node(state.copy(value = value))
-    case (_, SetAttributes(attributes)) =>
-      node(state.copy(attributes = attributes))
-    case (_, PutAttribute(name, value)) =>
-      node(state.copy(attributes = state.attributes + (name -> value)))
-    case (_, RemoveAttribute(name)) =>
-      node(state.copy(attributes = state.attributes - name))
-    case (ctx, GetChildren(ref)) =>
+      Effect.none
+    case (_, _, SetDisplayName(name)) =>
+      Effect.persist(DisplayNameChanged(name))
+    case (_, _, SetValue(value)) =>
+      Effect.persist(ValueChanged(value))
+    case (_, _, SetAttributes(attributes)) =>
+      Effect.persist(AttributesChanged(attributes))
+    case (_, _, PutAttribute(name, value)) =>
+      Effect.persist(AttributeAdded(name, value))
+    case (_, _, RemoveAttribute(name)) =>
+      // should we persist removed event here ?
+      Effect.persist(AttributeRemoved(name))
+    case (ctx, _, GetChildren(ref)) =>
       ref ! ctx.children.map(_.upcast[NodeCommand])
-      Behaviors.same
-    case (ctx, AddChild(childState, ref)) =>
+      Effect.none
+    case (ctx, _, AddChild(childState, ref)) =>
       val child = ctx.spawn(node(childState), childState.name)
       ref ! child
-      Behaviors.same
-    case (ctx, RemoveChild(name)) =>
+      // do persist this child state, so-so solution anyway
+      child ! PersistState()
+      Effect.none
+    case (ctx, _, RemoveChild(name)) =>
+      // should we persist removed event here ?
       ctx.child(name).foreach(_.upcast[NodeCommand] ! Stop)
-      Behaviors.same
-    case (_, Stop) =>
-      Behaviors.stopped
+      Effect.none
+    case (_, _, PersistState()) =>
+      Effect.persist(StatePersisted())
+    case (_, _, Stop) =>
+      println("STOPPED")
+      Effect.stop
   }
+
+  private def mgmtEventHandler(state: DSANodeState, event: MgmtEvent): DSANodeState =
+    event match {
+      case DisplayNameChanged(name) =>
+        val newState = state.copy(displayName = name)
+        println("EVENT DisplayNameChanged: " + state + " --> " + newState)
+        newState
+      case ValueChanged(value) =>
+        val newState = state.copy(value = value)
+        println("EVENT ValueChanged: " + state + " --> " + newState)
+        newState
+      case AttributesChanged(attributes) =>
+        val newState = state.copy(attributes = attributes)
+        println("EVENT AttributesChanged: " + state + " --> " + newState)
+        newState
+      case AttributeAdded(name, value) =>
+        val newState = state.copy(attributes = state.attributes + (name -> value))
+        println("EVENT AttributeAdded: " + state + " --> " + newState)
+        newState
+      case AttributeRemoved(name) =>
+        val newState = state.copy(attributes = state.attributes - name)
+        println("EVENT AttributeRemoved: " + state + " --> " + newState)
+        newState
+      case StatePersisted() =>
+        val newState = state
+        println("EVENT StatePersisted: " + state + " --> " + newState)
+        newState
+
+//      case ChildRemoved(name) =>
+//        state
+    }
 
   /**
    * Handles DSA commands.
    */
-  def dsaHandler(state: DSANodeState): BHV[NodeCommand] = {
-    case (ctx, ProcessRequests(env)) =>
-      Behaviors.same
+  private def dsaCommandHandler: BHV[NodeCommand, MgmtEvent, DSANodeState] = {
+    case (ctx, state, ProcessRequests(env)) =>
+      println("WARNING: not supported yet")
+      Effect.unhandled
+  }
+
+  private def commandHandler: BHV[NodeCommand, MgmtEvent, DSANodeState] = {
+    case (ctx, state, command: MgmtCommand) => mgmtCommandHandler(ctx, state, command)
+    case (ctx, state, command: DSACommand) => dsaCommandHandler(ctx, state, command)
   }
 
   /**
    * Builds node behavior.
    */
-  def node(state: DSANodeState): Behavior[NodeCommand] = Behaviors.receivePartial {
-    mgmtHandler(state) orElse dsaHandler(state)
-  }
+  def node(state: DSANodeState = DSANodeState.empty): Behavior[NodeCommand] =
+    PersistentBehaviors.receive[NodeCommand, MgmtEvent, DSANodeState](
+      // works when displayName is unique only
+      persistenceId = "node-id-10-" + state.displayName,
+      initialState = state,
+      commandHandler = commandHandler,
+      eventHandler = mgmtEventHandler
+    ).onRecoveryCompleted { (ctx, state) =>
+      println("CALL --> onRecoveryCompleted, state: " + state)
+    }
+//      .snapshotEvery(1)
 }

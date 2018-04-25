@@ -14,43 +14,49 @@ import akka.util.Timeout
  */
 object TestActors extends App {
 
-  val rootState = DSANodeState(None, "root", null, 0, Map.empty)
-  val system = ActorSystem(node(rootState), "DSATree")
+  val system = ActorSystem(node(), "DSATree")
 
   implicit val timeout: Timeout = 3.seconds
   implicit val scheduler = system.scheduler
   import system.executionContext
   val ignore = system.deadLetters
 
-  system ! SetDisplayName("Root Node")
+  system ! SetDisplayName("RootNode111")
   system ! SetValue(5)
-  system ! PutAttribute("abc", 123)
-  system ! AddChild(DSANodeState(Some(system), "aaa", null, 0, Map.empty), ignore)
+//  system ! PutAttribute("abc", 123)
+  system ! SetAttributes(Map("atr1" -> 777, "atr2" -> 666))
+  system ! AddChild(DSANodeState(Some(system), "aaa", "Aaa", 10, Map.empty), ignore)
   system ! AddChild(DSANodeState(Some(system), "bbb", "Bbb", 1, Map("a" -> 1)), ignore)
-  system ! AddChild(DSANodeState(Some(system), "ccc", null, "x", Map.empty), ignore)
+  system ! AddChild(DSANodeState(Some(system), "ccc", "Ccc", "x", Map.empty), ignore)
+
+  Thread.sleep(1000)
 
   for {
-    state <- system ? (GetState(_))
-    children <- system ? (GetChildren(_))
-    first <- children.head ? (GetState(_))
-    second <- children.tail.head ? (GetState(_))
-    third <- children.tail.tail.head ? (GetState(_))
+    state <- system ? (GetState)
+    children <- system ? (GetChildren)
+    first <- children.head ? (GetState)
+    second <- children.tail.head ? (GetState)
+    third <- children.tail.tail.head ? (GetState)
   } {
     println("state: " + state)
+    println("children: " + children)
     println("first: " + first)
     println("second: " + second)
     println("third: " + third)
   }
   Thread.sleep(500)
 
-  system ! RemoveChild("bbb")
+//  system ! RemoveChild("bbb")
+//  system ! RemoveAttribute("atr1")
   Thread.sleep(1000)
 
-  for {
-    children <- system ? (GetChildren(_))
-  } {
-    println("children: " + children)
-  }
+//  for {
+//    state <- system ? (GetState)
+//    children <- system ? (GetChildren)
+//  } {
+//    println("state: " + state)
+//    println("children: " + children)
+//  }
 
   Thread.sleep(1000)
 
