@@ -30,21 +30,21 @@ class SubscriptionChannel(
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
 
-    val store = new HashMap[Sid, mutable.Queue[DSAResponse]]
+    val store = new HashMap[Sid, mutable.Queue[ResponseSidAndQoS]]
     val iter = store.iterator
     var downstreamWaiting = false
 
     def queue(key:Sid) = store.get(key).map(_.size).getOrElse(0)
     def shouldDislodge(key:Sid) = queue(key) < maxCapacity
-    def pushToStore(key:Sid, value:DSAResponse, qos:QoS.Level) = qos match {
-      case QoS.Default => store.put(key, mutable.Queue(value))
-      case _ => {
-        val queue = store.get(key) map { q =>
-          if(shouldDislodge(key)) q.dequeue()
+    def pushToStore(value: ResponseSidAndQoS) = value match {
+      case item @ ResponseSidAndQoS(_, _, QoS.Default) => store.put(value.sid, mutable.Queue(value))
+      case item @ ResponseSidAndQoS(_, _, _) => {
+        val queue = store.get(item.sid) map { q =>
+          if(shouldDislodge(item.sid)) q.dequeue()
           q += value
         } getOrElse(mutable.Queue(value))
 
-        store.put(key, queue)
+        store.put(item.sid, queue)
       }
     }
 
@@ -57,7 +57,7 @@ class SubscriptionChannel(
     setHandler(in, new InHandler {
       override def onPush(): Unit = {
         val elem = grab(in)
-        pushToStore(elem.sid, elem.response, elem.qos)
+        pushToStore(elem)
         if(downstreamWaiting){
           downstreamWaiting = false
           pushNext
@@ -68,14 +68,16 @@ class SubscriptionChannel(
       override def onUpstreamFinish(): Unit = {
         if (store.nonEmpty) {
           // emit the rest if possible
-          emitMultiple(out, store.map{kv => ResponseEnvelope(kv._2)} toIterator)
+          emitMultiple(out, store.map{item => ResponseEnvelope(item._2.map(_.response))} toIterator)
         }
         completeStage()
       }
     })
 
     def pushNext = {
-      var next = iter.next()
+
+      //side effect
+      var next = iter.map()
       while (next._2.isEmpty){
         store.remove(next._1)
         next = iter.next()
