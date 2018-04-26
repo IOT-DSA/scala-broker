@@ -2,6 +2,7 @@ package models.api.typed
 
 import DSACommand._
 import MgmtCommand._
+import akka.Done
 import akka.actor.typed.{ActorSystem, Behavior}
 import akka.persistence.typed.scaladsl.PersistentBehaviors
 import akka.persistence.typed.scaladsl.Effect
@@ -45,14 +46,14 @@ object NodeBehavior {
       val child = ctx.spawn(node(childState), childState.name)
       ref ! child
       // do persist this child state, so-so solution anyway
-      child ! PersistState()
+      child ! PersistState(childState)
       Effect.none
     case (ctx, _, RemoveChild(name)) =>
       // should we persist removed event here ?
       ctx.child(name).foreach(_.upcast[NodeCommand] ! Stop)
       Effect.none
-    case (_, _, PersistState()) =>
-      Effect.persist(StatePersisted())
+    case (_, _, PersistState(st)) =>
+      Effect.persist(StatePersisted(st))
     case (_, _, Stop) =>
       println("STOPPED")
       Effect.stop
@@ -80,8 +81,8 @@ object NodeBehavior {
         val newState = state.copy(attributes = state.attributes - name)
         println("EVENT AttributeRemoved: " + state + " --> " + newState)
         newState
-      case StatePersisted() =>
-        val newState = state
+      case StatePersisted(st) =>
+        val newState = st
         println("EVENT StatePersisted: " + state + " --> " + newState)
         newState
 
@@ -109,7 +110,7 @@ object NodeBehavior {
   def node(state: DSANodeState = DSANodeState.empty): Behavior[NodeCommand] =
     PersistentBehaviors.receive[NodeCommand, MgmtEvent, DSANodeState](
       // works when displayName is unique only
-      persistenceId = "node-id-10-" + state.displayName,
+      persistenceId = "node-id-1-" + state.displayName,
       initialState = state,
       commandHandler = commandHandler,
       eventHandler = mgmtEventHandler

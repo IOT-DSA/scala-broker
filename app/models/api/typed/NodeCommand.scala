@@ -30,7 +30,7 @@ object MgmtCommand {
   final case class PutAttribute(name: String, value: DSAVal) extends Cmd
   final case class RemoveAttribute(name: String) extends Cmd
 
-  final case class PersistState() extends Cmd
+  final case class PersistState(state: DSANodeState) extends Cmd
 
   final case class GetChildren(replyTo: ActorRef[NodeRefs]) extends CmdR[NodeRefs]
   final case class AddChild(state: DSANodeState, replyTo: ActorRef[NodeRef]) extends CmdR[NodeRef]
@@ -45,7 +45,7 @@ final case class ValueChanged(value: DSAVal) extends MgmtEvent
 final case class AttributesChanged(attributes: DSAMap) extends MgmtEvent
 final case class AttributeAdded(name: String, value: DSAVal) extends MgmtEvent
 final case class AttributeRemoved(name: String) extends MgmtEvent
-final case class StatePersisted() extends MgmtEvent
+final case class StatePersisted(state: DSANodeState) extends MgmtEvent
 //final case class ChildRemoved(name: String) extends MgmtEvent
 
 
