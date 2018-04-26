@@ -24,15 +24,17 @@ object MgmtCommand {
   sealed trait CmdOR[T] extends MgmtCommand with MaybeReplyable[T]
 
   final case class GetState(replyTo: ActorRef[DSANodeState]) extends CmdR[DSANodeState]
-  final case class SetDisplayName(name: String) extends Cmd
+  final case class SetDisplayName(name: Option[String]) extends Cmd
   final case class SetValue(value: DSAVal) extends Cmd
   final case class SetAttributes(attributes: DSAMap) extends Cmd
   final case class PutAttribute(name: String, value: DSAVal) extends Cmd
   final case class RemoveAttribute(name: String) extends Cmd
+  final case object ClearAttributes extends Cmd
 
   final case class GetChildren(replyTo: ActorRef[NodeRefs]) extends CmdR[NodeRefs]
-  final case class AddChild(state: DSANodeState, replyTo: ActorRef[NodeRef]) extends CmdR[NodeRef]
+  final case class AddChild(name: String, state: InitState, replyTo: ActorRef[NodeRef]) extends CmdR[NodeRef]
   final case class RemoveChild(name: String) extends Cmd
+  final case object RemoveChildren extends Cmd
 
   final case object Stop extends Cmd
 }

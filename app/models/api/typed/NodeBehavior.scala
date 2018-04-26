@@ -1,8 +1,8 @@
 package models.api.typed
 
-import DSACommand._
+import DSACommand.ProcessRequests
 import MgmtCommand._
-import akka.actor.typed.Behavior
+import akka.actor.typed.{ ActorSystem, Behavior }
 import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 
 /**
@@ -15,9 +15,9 @@ object NodeBehavior {
   /**
    * Handles management commands.
    */
-  def mgmtHandler(state: DSANodeState): BHV[NodeCommand] = {
-    case (_, GetState(ref)) =>
-      ref ! state
+  def mgmtHandler(state: NodeStateInternal): BHV[NodeCommand] = {
+    case (ctx, GetState(ref)) =>
+      ref ! state.toPublic(ctx.self.path.name)
       Behaviors.same
     case (_, SetDisplayName(name)) =>
       node(state.copy(displayName = name))
@@ -29,15 +29,20 @@ object NodeBehavior {
       node(state.copy(attributes = state.attributes + (name -> value)))
     case (_, RemoveAttribute(name)) =>
       node(state.copy(attributes = state.attributes - name))
+    case (_, ClearAttributes) =>
+      node(state.copy(attributes = Map.empty))
     case (ctx, GetChildren(ref)) =>
       ref ! ctx.children.map(_.upcast[NodeCommand])
       Behaviors.same
-    case (ctx, AddChild(childState, ref)) =>
-      val child = ctx.spawn(node(childState), childState.name)
+    case (ctx, AddChild(name, initState, ref)) =>
+      val child = ctx.spawn(node(initState.toInternal(Some(ctx.self))), name)
       ref ! child
       Behaviors.same
     case (ctx, RemoveChild(name)) =>
       ctx.child(name).foreach(_.upcast[NodeCommand] ! Stop)
+      Behaviors.same
+    case (ctx, RemoveChildren) =>
+      ctx.children.foreach(_.upcast[NodeCommand] ! Stop)
       Behaviors.same
     case (_, Stop) =>
       Behaviors.stopped
@@ -46,7 +51,7 @@ object NodeBehavior {
   /**
    * Handles DSA commands.
    */
-  def dsaHandler(state: DSANodeState): BHV[NodeCommand] = {
+  def dsaHandler(state: NodeStateInternal): BHV[NodeCommand] = {
     case (ctx, ProcessRequests(env)) =>
       Behaviors.same
   }
@@ -54,7 +59,12 @@ object NodeBehavior {
   /**
    * Builds node behavior.
    */
-  def node(state: DSANodeState): Behavior[NodeCommand] = Behaviors.receivePartial {
+  def node(state: NodeStateInternal): Behavior[NodeCommand] = Behaviors.receivePartial {
     mgmtHandler(state) orElse dsaHandler(state)
   }
+
+  /**
+   * Creates a new actor system realizing the `NodeBehavior`.
+   */
+  def createActorSystem(name: String, state: InitState) = ActorSystem(node(state.toInternal(None)), name)
 }
