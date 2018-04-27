@@ -15,11 +15,21 @@ scalaVersion := SCALA_VERSION
 
 // base play-akka project
 lazy val root = (project in file("."))
+  .dependsOn(msgpack)
   .enablePlugins(PlayScala)
   .settings(
     scalaVersion := SCALA_VERSION,
     libraryDependencies ++= commonDependencies.union(playTestDependencies)
-)
+  )
+  .aggregate(msgpack)
+  .dependsOn(msgpack)
+
+// project for temporary lib msgpack4s
+lazy val msgpack = project.in(file("tools/msgpack4s"))
+    .settings(
+      scalaVersion := SCALA_VERSION,
+      libraryDependencies ++= msgpackDependencies
+    )
 
 // project for integrational tests
 lazy val it = project.in(file("it"))
@@ -94,7 +104,8 @@ lazy val commonDependencies = Seq(
   "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
   "io.netty"                 % "netty-handler"           % "4.0.41.Final" force(),
   "org.msgpack"             %% "msgpack-scala"            % "0.8.13",
-  "org.velvia"              %% "msgpack4s"                % "0.6.0"
+//  "org.velvia"              %% "msgpack4s"                % "0.6.0",
+  "org.json4s"              %% "json4s-native"            % "3.5.0"
 )
 
 // akka and play test dependencies
@@ -121,6 +132,14 @@ lazy val itDependencies = Seq(
 
 )
 
+lazy val msgpackDependencies = Seq(
+  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
+  "org.mockito" % "mockito-all" % "1.9.0" % "test",
+  "com.rojoma" %% "rojoma-json-v3" % "3.7.0",
+  "org.json4s" %% "json4s-native" % "3.5.0",
+  "org.apache.commons" % "commons-io" % "1.3.2",
+  "com.typesafe.play" %% "play-json" % "2.6.0-M1"
+)
 
 
 
