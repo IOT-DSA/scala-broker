@@ -16,10 +16,10 @@ trait TestResponder extends SdkHelper {
 
   val defaultResponderName = "scala-test-responder"
 
-  def withResponder(host: String = "localhost", port: Int = 9000, name: String = defaultResponderName)(action: TestResponderHandler => Unit): Unit = {
+  def withResponder(proto: String = "http", host: String = "localhost", port: Int = 9000, name: String = defaultResponderName)(action: TestResponderHandler => Unit): Unit = {
 
     implicit val responder = new TestResponderHandler
-    val responderDSLinkProvider = createDsLink(host, port, name)
+    val responderDSLinkProvider = createDsLink(proto, host, port, name)
 
     connectDSLink(responder, responderDSLinkProvider)(action)
   }
