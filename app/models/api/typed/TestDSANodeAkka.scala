@@ -1,4 +1,4 @@
-package models.api.typed
+/*package models.api.typed
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
@@ -11,14 +11,13 @@ import akka.util.Timeout
  * Tests Akka-based DSANode implementation.
  */
 object TestDSANodeAkka extends App {
-  val rootState = DSANodeState(None, "root", null, 0, Map.empty)
-  val system = ActorSystem(node(rootState), "DSATree")
+  val system = ActorSystem(node(name="root"), "DSATree")
 
   implicit val timeout: Timeout = 3.seconds
   implicit val scheduler = system.scheduler
   import system.executionContext
 
-  val root = new DSANodeAkkaImpl(system)
+  val root = new DSANodeAkkaImpl(system.path)
   root.displayName = "Root node"
   root.addAttributes("a" -> 1, "b" -> 2)
   root.value = 555
@@ -43,4 +42,4 @@ object TestDSANodeAkka extends App {
 
   Thread.sleep(2000)
   Await.ready(system.terminate, 10 seconds)
-}
+}*/

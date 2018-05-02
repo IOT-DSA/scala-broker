@@ -14,7 +14,7 @@ import akka.util.Timeout
  */
 object TestActors extends App {
 
-  val system = ActorSystem(node(), "DSATree")
+  val system = ActorSystem(node(name="root"), "DSATree")
 
   implicit val timeout: Timeout = 3.seconds
   implicit val scheduler = system.scheduler
@@ -25,15 +25,19 @@ object TestActors extends App {
   system ! SetValue(5)
 //  system ! PutAttribute("abc", 123)
   system ! SetAttributes(Map("atr1" -> 777, "atr2" -> 666))
-  system ! AddChild(DSANodeState(Some(system), "aaa", "Aaa", 10, Map.empty), ignore)
-  system ! AddChild(DSANodeState(Some(system), "bbb", "Bbb", 1, Map("a" -> 1)), ignore)
-  system ! AddChild(DSANodeState(Some(system), "ccc", "Ccc", "x", Map.empty), ignore)
+  system ! AddChild(DSANodeState(Some(system.path), "aaa", "Aaa", 10, Map.empty, List.empty), ignore)
+  system ! AddChild(DSANodeState(Some(system.path), "bbb", "Bbb", 1, Map("a" -> 1), List.empty), ignore)
+  system ! AddChild(DSANodeState(Some(system.path), "ccc", "Ccc", "x", Map.empty, List.empty), ignore)
+
+//  for (entityId <- entityIds)
+//    system ! RecoverBy(entityId)
 
   Thread.sleep(1000)
 
   for {
     state <- system ? (GetState)
     children <- system ? (GetChildren)
+
     first <- children.head ? (GetState)
     second <- children.tail.head ? (GetState)
     third <- children.tail.tail.head ? (GetState)
@@ -46,17 +50,17 @@ object TestActors extends App {
   }
   Thread.sleep(500)
 
-//  system ! RemoveChild("bbb")
-//  system ! RemoveAttribute("atr1")
+  system ! RemoveChild("bbb")
+  system ! RemoveAttribute("atr1")
   Thread.sleep(1000)
 
-//  for {
-//    state <- system ? (GetState)
-//    children <- system ? (GetChildren)
-//  } {
-//    println("state: " + state)
-//    println("children: " + children)
-//  }
+  for {
+    state <- system ? (GetState)
+    children <- system ? (GetChildren)
+  } {
+    println("state: " + state)
+    println("children: " + children)
+  }
 
   Thread.sleep(1000)
 

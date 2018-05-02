@@ -1,12 +1,11 @@
-package models.api.typed
+/*package models.api.typed
 
-import scala.concurrent.{ Await, ExecutionContext, Future }
-
+import scala.concurrent.{Await, ExecutionContext, Future}
 import MgmtCommand._
-import akka.actor.Scheduler
+import akka.actor.{ActorPath, Scheduler}
 import akka.actor.typed.scaladsl.AskPattern.Askable
 import akka.util.Timeout
-import models.rpc.DSAValue.{ DSAMap, DSAVal, longToNumericValue }
+import models.rpc.DSAValue.{DSAMap, DSAVal, longToNumericValue}
 
 /**
  * Base class for Akka-based DSA node implementations.
@@ -15,7 +14,7 @@ abstract class DSANodeAsyncAkkaBase(ref: NodeRef)(implicit timeout: Timeout,
                                                   scheduler: Scheduler, ec: ExecutionContext) {
 
   def nameImpl: Future[String] = state.map(_.name)
-  def parentImpl: Future[Option[NodeRef]] = state.map(_.parent)
+  def parentImpl: Future[Option[ActorPath]] = state.map(_.parent)
 
   def displayNameImpl: Future[String] = state.map(_.displayName)
   def displayNameImpl_=(s: String): Unit = ref ! SetDisplayName(s)
@@ -38,14 +37,14 @@ abstract class DSANodeAsyncAkkaBase(ref: NodeRef)(implicit timeout: Timeout,
       }.toMap
     }
   }
-  
+
   def addChildImpl(name: String): Future[NodeRef] = {
-    val state = DSANodeState(Some(ref), name, null, 0, Map.empty)
+    val state = DSANodeState(Some(ref.path), name, null, 0, Map.empty, List.empty)
     ref ? (AddChild(state, _))
   }
-  
+
   def removeChildImpl(name: String): Unit = ref ! RemoveChild(name)
-  
+
   protected def state = ref ? (GetState(_))
 }
 
@@ -70,7 +69,7 @@ class DSANodeAsyncAkkaImpl(ref: NodeRef)(implicit timeout: Timeout,
   def addAttributes(cfg: (String, DSAVal)*): Unit = addAttributesImpl(cfg: _*)
   def removeAttribute(name: String): Unit = removeAttributeImpl(name)
 
-  def children: Future[Map[String, DSANodeAsync]] = 
+  def children: Future[Map[String, DSANodeAsync]] =
     childrenImpl.map(_.mapValues(new DSANodeAsyncAkkaImpl(_)))
 
   def addChild(name: String): Future[DSANodeAsync] =
@@ -105,4 +104,4 @@ class DSANodeAkkaImpl(ref: NodeRef)(implicit timeout: Timeout,
   def children: Map[String, DSANode] = childrenImpl.map(_.mapValues(new DSANodeAkkaImpl(_)))
   def addChild(name: String): DSANode = addChildImpl(name).map(new DSANodeAkkaImpl(_))
   def removeChild(name: String): Unit = removeChildImpl(name)
-}
+}*/

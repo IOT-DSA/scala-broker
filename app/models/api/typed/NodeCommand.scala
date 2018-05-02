@@ -2,13 +2,13 @@ package models.api.typed
 
 import akka.actor.typed.ActorRef
 import models.RequestEnvelope
-import models.rpc.DSAValue.{ DSAMap, DSAVal }
+import models.rpc.DSAValue.{DSAMap, DSAVal}
 
 /**
  * Command that can be sent to a typed actor representing a DSA node. It combines
  * management commands that target the node state and DSA-compliant messages.
  */
-sealed trait NodeCommand extends Serializable
+sealed trait NodeCommand
 
 /**
  * Commands that change the node state or affect its children.
@@ -30,7 +30,7 @@ object MgmtCommand {
   final case class PutAttribute(name: String, value: DSAVal) extends Cmd
   final case class RemoveAttribute(name: String) extends Cmd
 
-  final case class PersistState(state: DSANodeState) extends Cmd
+  final case class SetState(state: DSANodeState) extends Cmd
 
   final case class GetChildren(replyTo: ActorRef[NodeRefs]) extends CmdR[NodeRefs]
   final case class AddChild(state: DSANodeState, replyTo: ActorRef[NodeRef]) extends CmdR[NodeRef]
@@ -39,14 +39,15 @@ object MgmtCommand {
   final case object Stop extends Cmd
 }
 
-sealed trait MgmtEvent extends Serializable
+sealed trait MgmtEvent
 final case class DisplayNameChanged(name: String) extends MgmtEvent
 final case class ValueChanged(value: DSAVal) extends MgmtEvent
 final case class AttributesChanged(attributes: DSAMap) extends MgmtEvent
 final case class AttributeAdded(name: String, value: DSAVal) extends MgmtEvent
 final case class AttributeRemoved(name: String) extends MgmtEvent
-final case class StatePersisted(state: DSANodeState) extends MgmtEvent
-//final case class ChildRemoved(name: String) extends MgmtEvent
+final case class StateChanged(state: DSANodeState) extends MgmtEvent
+final case class ChildAdded(name: String) extends MgmtEvent
+final case class ChildRemoved(name: String) extends MgmtEvent
 
 
 /**
