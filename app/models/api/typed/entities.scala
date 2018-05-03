@@ -7,15 +7,14 @@ import models.rpc.DSAValue.{DSAMap, DSAVal}
 /**
  * The internal state of DSA node.
  */
-final case class DSANodeState(parent:      Option[ActorPath],
-                              name:        String,
-                              displayName: String,
-                              value:       DSAVal,
-                              attributes:  DSAMap,
-                              children:    List[String])
+final case class DSANodeState private (parent:              Option[ActorPath],
+                                       displayName:         String,
+                                       value:               DSAVal,
+                                       attributes:          DSAMap,
+                                       childPersistenceIds: Set[String])
 
 object DSANodeState {
-  val empty = DSANodeState(None, "", "", Nil, Map.empty, List.empty)
+  val empty = DSANodeState(None, "", Nil, Map.empty, Set.empty)
 }
 
 /**
