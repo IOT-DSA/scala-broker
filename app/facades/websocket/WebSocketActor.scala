@@ -1,14 +1,12 @@
 package facades.websocket
 
 import org.joda.time.DateTime
-
-import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
-import akka.dispatch.{ BoundedMessageQueueSemantics, RequiresMessageQueue }
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
+import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ ConnectionInfo, IntCounter, RichRoutee }
+import models.{RequestEnvelope, ResponseEnvelope, SubscriptionResponseEnvelope, formatMessage}
+import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
-import models.formatMessage
 import models.metrics.EventDaos
 import models.rpc._
 
@@ -81,6 +79,8 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
     case e @ ResponseEnvelope(responses) =>
       log.debug(s"{}: received {}", ownId, e)
       sendResponses(responses: _*)
+
+    case s:SubscriptionResponseEnvelope => _
   }
 
   /**

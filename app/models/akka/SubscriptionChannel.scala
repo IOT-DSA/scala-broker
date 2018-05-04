@@ -3,28 +3,26 @@ package models.akka
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler, StageLogging}
-import models.ResponseEnvelope
+import models.{ResponseEnvelope, SubscriptionResponseEnvelope}
 import models.rpc.DSAResponse
 
 import collection.mutable.HashMap
 import scala.collection.mutable
 
-case class ResponseSidAndQoS(response: DSAResponse, sid: Int, qos: QoS.Level)
 
-
-class SubscriptionChannel(val maxCapacity: Int = 30,
-                          actorSystem: ActorSystem,
-                          materializer: Materializer) extends GraphStage[FlowShape[ResponseSidAndQoS, ResponseEnvelope]] {
+class SubscriptionChannel(val maxCapacity: Int = 30)
+                         (implicit actorSystem: ActorSystem, materializer: Materializer)
+  extends GraphStage[FlowShape[SubscriptionResponseEnvelope, ResponseEnvelope]] {
 
   type Sid = Int
 
-  val in = Inlet[ResponseSidAndQoS]("Subscriptions.in")
+  val in = Inlet[SubscriptionResponseEnvelope]("Subscriptions.in")
   val out = Outlet[ResponseEnvelope]("Subscriptions.out")
   implicit val as = actorSystem
   implicit val m = materializer
-  val store = new HashMap[Sid, mutable.Queue[ResponseSidAndQoS]]
+  val store = new HashMap[Sid, mutable.Queue[SubscriptionResponseEnvelope]]
 
-  override def shape: FlowShape[ResponseSidAndQoS, ResponseEnvelope] = FlowShape.of(in, out)
+  override def shape: FlowShape[SubscriptionResponseEnvelope, ResponseEnvelope] = FlowShape.of(in, out)
 
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
@@ -34,12 +32,12 @@ class SubscriptionChannel(val maxCapacity: Int = 30,
     // in case of data overflow
     def shouldDislodge(key: Sid) = queueSize(key) >= maxCapacity
 
-    def storeIt(value: ResponseSidAndQoS) = value match {
-      case item@ResponseSidAndQoS(_, _, QoS.Default) => {
+    def storeIt(value: SubscriptionResponseEnvelope) = value match {
+      case item@SubscriptionResponseEnvelope(_, _, QoS.Default) => {
         store.put(value.sid, mutable.Queue(value))
         log.debug("QoS == 0. Replacing with new queue")
       }
-      case item@ResponseSidAndQoS(_, _, _) => {
+      case item@SubscriptionResponseEnvelope(_, _, _) => {
         val queue = store.get(item.sid) map { q =>
           if (shouldDislodge(item.sid)) q.dequeue()
           q += value

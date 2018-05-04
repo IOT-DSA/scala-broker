@@ -42,7 +42,6 @@ class SubscriptionChannelSpec extends WordSpecLike
             totalSize should be > 5
             totalSize should be < 200
         }
-
       }
 
       "deliver all messages for QoS == 0 if speed equals" in {
@@ -104,11 +103,5 @@ class SubscriptionChannelSpec extends WordSpecLike
         assertion(source, flow, sink)
 
       }
-
     }
-
-
-
-
-
 }
