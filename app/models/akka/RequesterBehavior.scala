@@ -68,6 +68,13 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     case _ => false
   }
 
+  private def withQosAndSid(response:DSAResponse):ResponseSidAndQoS = {
+    val maybeSid = response.updates.map(dsaVal => extractSid(dsaVal))
+    val qos = maybeSid flatMap {sid => targetsBySid.get(sid).map(_.qos)} getOrElse(QoS.Default)
+    val sid = maybeSid.getOrElse(-1) //Shouldn't happen in normal world, but still
+    ResponseSidAndQoS(response, sid, qos)
+  }
+
   /**
    * Processes and routes requests.
    */

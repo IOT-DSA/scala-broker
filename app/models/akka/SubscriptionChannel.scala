@@ -2,21 +2,19 @@ package models.akka
 
 import akka.actor.ActorSystem
 import akka.stream._
-import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
+import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler, StageLogging}
 import models.ResponseEnvelope
 import models.rpc.DSAResponse
 
-import collection.mutable.{HashMap, MultiMap}
+import collection.mutable.HashMap
 import scala.collection.mutable
 
-case class ResponseSidAndQoS(response:DSAResponse, sid:Int, qos:QoS.Level)
+case class ResponseSidAndQoS(response: DSAResponse, sid: Int, qos: QoS.Level)
 
 
-class SubscriptionChannel(
-                           val safeCapacity:Int = 5,
-                           val maxCapacity:Int = 30,
-                           actorSystem:  ActorSystem,
-                           materializer: Materializer) extends GraphStage[FlowShape[ResponseSidAndQoS, ResponseEnvelope]]{
+class SubscriptionChannel(val maxCapacity: Int = 30,
+                          actorSystem: ActorSystem,
+                          materializer: Materializer) extends GraphStage[FlowShape[ResponseSidAndQoS, ResponseEnvelope]] {
 
   type Sid = Int
 
@@ -24,27 +22,31 @@ class SubscriptionChannel(
   val out = Outlet[ResponseEnvelope]("Subscriptions.out")
   implicit val as = actorSystem
   implicit val m = materializer
+  val store = new HashMap[Sid, mutable.Queue[ResponseSidAndQoS]]
 
   override def shape: FlowShape[ResponseSidAndQoS, ResponseEnvelope] = FlowShape.of(in, out)
 
 
-  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
+  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
 
-    val store = new HashMap[Sid, mutable.Queue[ResponseSidAndQoS]]
-    val iter = store.iterator
-    var downstreamWaiting = false
+    def queueSize(key: Sid) = store.get(key).map(_.size).getOrElse(0)
 
-    def queue(key:Sid) = store.get(key).map(_.size).getOrElse(0)
-    def shouldDislodge(key:Sid) = queue(key) < maxCapacity
-    def pushToStore(value: ResponseSidAndQoS) = value match {
-      case item @ ResponseSidAndQoS(_, _, QoS.Default) => store.put(value.sid, mutable.Queue(value))
-      case item @ ResponseSidAndQoS(_, _, _) => {
+    // in case of data overflow
+    def shouldDislodge(key: Sid) = queueSize(key) >= maxCapacity
+
+    def storeIt(value: ResponseSidAndQoS) = value match {
+      case item@ResponseSidAndQoS(_, _, QoS.Default) => {
+        store.put(value.sid, mutable.Queue(value))
+        log.debug("QoS == 0. Replacing with new queue")
+      }
+      case item@ResponseSidAndQoS(_, _, _) => {
         val queue = store.get(item.sid) map { q =>
-          if(shouldDislodge(item.sid)) q.dequeue()
+          if (shouldDislodge(item.sid)) q.dequeue()
           q += value
-        } getOrElse(mutable.Queue(value))
+        } getOrElse (mutable.Queue(value))
 
         store.put(item.sid, queue)
+        log.debug("QoS > 0. Adding new value to queue")
       }
     }
 
@@ -56,49 +58,55 @@ class SubscriptionChannel(
 
     setHandler(in, new InHandler {
       override def onPush(): Unit = {
+
+        log.debug(s"on push: ${in}")
         val elem = grab(in)
-        pushToStore(elem)
-        if(downstreamWaiting){
-          downstreamWaiting = false
+
+        storeIt(elem)
+        log.debug(s"storing $elem")
+
+        if(isAvailable(out)){
+          log.debug(s"out is available. Pushing $elem")
           pushNext
           pull(in)
+        } else {
+          log.debug(s"out is unavailable.")
         }
+
       }
 
       override def onUpstreamFinish(): Unit = {
         if (store.nonEmpty) {
           // emit the rest if possible
-          emitMultiple(out, store.map{item => ResponseEnvelope(item._2.map(_.response))} toIterator)
+          emitMultiple(out, store.map { item => ResponseEnvelope(item._2.map(_.response)) } toIterator)
         }
         completeStage()
       }
     })
 
     def pushNext = {
-
       //side effect
-      var next = iter.map()
-      while (next._2.isEmpty){
-        store.remove(next._1)
-        next = iter.next()
+      val next = store.headOption
+
+      next foreach { case (sid, queue) =>
+        if (!queue.isEmpty) {
+          push(out, ResponseEnvelope(queue.map(_.response)))
+        }
+        store.remove(sid)
       }
-      push(out, ResponseEnvelope(next._2))
-      if(next._2.isEmpty) store.remove(next._1)
     }
 
     setHandler(out, new OutHandler {
       override def onPull(): Unit = {
-        if(store.isEmpty){
-          downstreamWaiting = true
-        } else {
-          pushNext
+//        if (store.nonEmpty) pushNext
+        if (isClosed(in)) {
+          if (store.isEmpty) completeStage()
+        } else if (!hasBeenPulled(in)) {
+          pull(in)
         }
 
-        if(!hasBeenPulled(in)) pull(in)
       }
     })
   }
-
-
 
 }
