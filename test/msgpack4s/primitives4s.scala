@@ -51,7 +51,9 @@ class Msgpack4sTests extends PlaySpec {
 
       val p: Array[Byte] = msgpack.pack(js)
 
-      val u = msgpack.unpack[JsValue](p)
+      val transJs = msgpack.unpack[JsValue](p)
+
+      transJs mustBe js
     }
 
     "convert json4s value" in {
@@ -63,7 +65,8 @@ class Msgpack4sTests extends PlaySpec {
 
       val js: JValue = parse("""{"amount":40.1,"currency":"USD","label":"10.00"}""")
       var p: Array[Byte] = msgpack.pack(js)
-      val u = msgpack.unpack[JValue](p)
+      val transJs = msgpack.unpack[JValue](p)
+      transJs mustBe js
     }
 
   }
