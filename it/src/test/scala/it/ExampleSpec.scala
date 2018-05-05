@@ -73,7 +73,7 @@ class ExampleSpec extends FlatSpec
       Then("we should get new value from subscription")
       val subs = subscription
         .filter(_.getValue.getString == "changed")
-        .blockFirst(3 seconds)
+        .blockFirst(30 seconds)
 
       subs.get.getValue.getString shouldBe "changed"
       subs.get.getPath shouldBe "/downstream/responder1/new_string"

@@ -4,8 +4,7 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, OverflowStrategy, ThrottleMode}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import models.ResponseEnvelope
-import models.rpc.DSAResponse
+import models.rpc.{DSAMessage, DSAResponse, ResponseMessage, SubscriptionNotificationMessage}
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -36,7 +35,10 @@ class SubscriptionChannelSpec extends WordSpecLike
                 .toMat(sink)(Keep.right)
 
             val result = Await.result(runnableGraph.run(), 10 seconds)
-            val totalSize = result.flatMap(_.responses).size
+            val totalSize = result.flatMap {
+              case m:ResponseMessage => m.responses
+              case _ => List()
+            }.size
 
             Then("some messages should be delivered (last state for every sid for every pull)")
             totalSize should be > 5
@@ -58,7 +60,10 @@ class SubscriptionChannelSpec extends WordSpecLike
                 .toMat(sink)(Keep.right)
 
             val result = Await.result(runnableGraph.run(), 10 seconds)
-            val totalSize = result.flatMap(_.responses).size
+            val totalSize = result.flatMap {
+              case m:ResponseMessage => m.responses
+              case _ => List()
+            }.size
 
             Then("All messages should be delivered")
             totalSize shouldBe 200
@@ -80,7 +85,10 @@ class SubscriptionChannelSpec extends WordSpecLike
                 .toMat(sink)(Keep.right)
 
             val result = Await.result(runnableGraph.run(), 3 seconds)
-            val totalSize = result.flatMap(_.responses).size
+            val totalSize = result.flatMap {
+              case m:ResponseMessage => m.responses
+              case _ => List()
+            }.size
 
             Then("All messages should be delivered")
             totalSize shouldBe 200
@@ -88,17 +96,17 @@ class SubscriptionChannelSpec extends WordSpecLike
       }
 
       def withFlow(iterations: Int, sids:Int, qosLevel:QoS.Level)(assertion: (
-        Source[ResponseSidAndQoS, NotUsed],
-        Flow[ResponseSidAndQoS, ResponseEnvelope, NotUsed],
-        Sink[ResponseEnvelope, Future[Seq[ResponseEnvelope]]]
+        Source[SubscriptionNotificationMessage, NotUsed],
+        Flow[SubscriptionNotificationMessage, DSAMessage, NotUsed],
+        Sink[DSAMessage, Future[Seq[DSAMessage]]]
       ) => Unit) = {
 
-        val ch = new SubscriptionChannel(iterations, as, am)
+        val ch = new SubscriptionChannel(iterations)
         val flow = Flow.fromGraph(ch)
-        val list = (0 to iterations - 1) map {i => ResponseSidAndQoS(DSAResponse(i, None, None, None, None), i % sids, qosLevel)}
+        val list = (0 to iterations - 1) map {i => SubscriptionNotificationMessage(0, None, List(DSAResponse(i, None, None, None, None)), i % sids, qosLevel)}
         val source = Source(list)
 
-        val sink = Sink.seq[ResponseEnvelope]
+        val sink = Sink.seq[DSAMessage]
 
         assertion(source, flow, sink)
 

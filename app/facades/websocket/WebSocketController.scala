@@ -4,32 +4,31 @@ import java.net.URL
 
 import scala.concurrent.Future
 import scala.util.Random
-
 import org.bouncycastle.jcajce.provider.digest.SHA256
 import org.joda.time.DateTime
-
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{ Message, TextMessage, WebSocketRequest }
+import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
-import akka.stream.{ Materializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
+import akka.stream.{Materializer, OverflowStrategy, SourceShape}
+import akka.stream.scaladsl.{Flow, GraphDSL, Keep, Merge, Partition, Sink, Source}
 import controllers.BasicController
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
+
 import models.Settings
-import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee }
-import models.akka.Messages.{ GetOrCreateDSLink, RemoveDSLink }
-import models.handshake.{ LocalKeys, RemoteKey }
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, SubscriptionChannel}
+import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
+import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
-import models.rpc.DSAMessage
+import models.rpc.{DSAMessage, SubscriptionNotificationMessage}
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import play.api.mvc.{ ControllerComponents, Request, RequestHeader, Result, WebSocket }
+import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 
 /**
@@ -174,8 +173,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                            overflow:    OverflowStrategy) = {
     import akka.actor.Status._
 
-    val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
-      .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
+    val (toSocket, publisher) = Source.actorRef[DSAMessage](0, overflow)
+      .toMat(Sink.asPublisher(false))(Keep.both)
+      .run()(materializer)
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
@@ -197,9 +197,38 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
         }
       }))
 
-      Flow.fromSinkAndSource[DSAMessage, DSAMessage](
-        Sink.actorRef(fromSocket, Success(())),
-        Source.fromPublisher(publisher))
+      val in = Source.fromPublisher[DSAMessage](publisher)
+
+      val messageSource = Source.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val partitioner = b.add(Partition[DSAMessage](2, _ match {
+          case m: SubscriptionNotificationMessage => 0
+          case _ => 1
+        }))
+
+        val merge = b.add(Merge[DSAMessage](2))
+
+        val onlyDSAMessages = Flow[DSAMessage].buffer(bufferSize, overflow)
+
+        val onlySubscriptions = Flow[DSAMessage]
+          .map(_ match {
+          case m: SubscriptionNotificationMessage => Some(m)
+          case _ => None
+        }).filter(!_.isEmpty)
+          .map(_.get)
+          .via(Flow.fromGraph(new SubscriptionChannel(30)))
+
+
+        in ~> partitioner ~> onlySubscriptions ~> merge
+              partitioner ~> onlyDSAMessages   ~> merge
+
+        SourceShape(merge.out)
+      })
+
+      val messageSink = Sink.actorRef(fromSocket, Success(()))
+
+      Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, messageSource)
     }
   }
 

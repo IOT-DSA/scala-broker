@@ -1,10 +1,8 @@
 package models.akka
 
 import scala.util.control.NonFatal
-
 import org.joda.time.DateTime
-
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{RequestEnvelope, ResponseEnvelope, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 import models.metrics.EventDaos
@@ -39,7 +37,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       cleanupStoredTargets(responses)
 
       segregateSubscriptions(responses).map2(
-        handleSubscriptions _,
+        subs => handleSubscriptions(subs),
         other => sendToEndpoint(ResponseEnvelope(other))
       )
   }
@@ -54,9 +52,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     })
   }
 
-  private def handleSubscriptions(subscriptions:Seq[DSAResponse]) = subscriptions.map(resp => {
-    resp.updates
-  })
+  private def handleSubscriptions(subscriptions:Seq[DSAResponse]) = subscriptions foreach {
+    r => withQosAndSid(r) foreach {
+      sendToEndpoint(_)
+    }
+  }
+
 
   private def segregateSubscriptions(items:Seq[DSAResponse]):SubscriptionsAndOther = {
     val data = items.partition(isSubscription)
@@ -68,11 +69,16 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     case _ => false
   }
 
-  private def withQosAndSid(response:DSAResponse):ResponseSidAndQoS = {
-    val maybeSid = response.updates.map(dsaVal => extractSid(dsaVal))
-    val qos = maybeSid flatMap {sid => targetsBySid.get(sid).map(_.qos)} getOrElse(QoS.Default)
-    val sid = maybeSid.getOrElse(-1) //Shouldn't happen in normal world, but still
-    ResponseSidAndQoS(response, sid, qos)
+  private def withQosAndSid(response:DSAResponse):Seq[SubscriptionResponseEnvelope] = {
+    response.updates.map{
+      updates =>
+        updates.map{
+          update =>
+            val sid = extractSid(update)
+            val qos = targetsBySid.get(sid).map(_.qos) getOrElse(QoS.Default)
+            SubscriptionResponseEnvelope(response, sid, qos)
+        }
+    } getOrElse(List())
   }
 
   /**

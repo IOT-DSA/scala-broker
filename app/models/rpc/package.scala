@@ -2,6 +2,7 @@ package models
 
 import java.util.Base64
 
+import models.akka.QoS
 import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -146,6 +147,11 @@ package object rpc {
   implicit val StreamStateReads = enumReads(StreamState)
   implicit val DSAResponseFormat: Format[DSAResponse] = Json.format[DSAResponse]
 
+  implicit val QoSFormat: Format[models.akka.QoS.Level] = new Format[QoS.Level] {
+    override def reads(json: JsValue): JsResult[QoS.Level] = JsSuccess(QoS(json.as[Int]))
+    override def writes(o: QoS.Level): JsValue = JsNumber(o.index)
+  }
+
   /**
    * DSAMessage <-> JSON
    */
@@ -167,6 +173,15 @@ package object rpc {
       (__ \ 'ack).formatNullable[Int] ~
       (__ \ 'responses).format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
 
+    val SubscriptionNotificationMessageFormat:Format[SubscriptionNotificationMessage] = (
+      (__ \ 'msg).format[Int] ~
+      (__ \ 'ack).formatNullable[Int] ~
+      (__ \ 'responses).format[List[DSAResponse]] ~
+      (__ \ 'sid).format[Int] ~
+      (__ \ 'qos).format[models.akka.QoS.Level]
+      )(SubscriptionNotificationMessage, unlift(SubscriptionNotificationMessage.unapply))
+
+
     def writes(msg: DSAMessage) = msg match {
       case EmptyMessage       => Json.obj()
       case m: AllowedMessage  => AllowedMessageFormat.writes(m)
@@ -174,6 +189,7 @@ package object rpc {
       case m: PongMessage     => PongMessageFormat.writes(m)
       case m: RequestMessage  => RequestMessageFormat.writes(m)
       case m: ResponseMessage => ResponseMessageFormat.writes(m)
+      case m: SubscriptionNotificationMessage => SubscriptionNotificationMessageFormat.writes(m)
     }
 
     def reads(json: JsValue) = json match {
@@ -183,6 +199,7 @@ package object rpc {
       case JsObject(fields) if fields.contains("responses") => ResponseMessageFormat.reads(json)
       case JsObject(fields) if fields.contains("msg") => PingMessageFormat.reads(json)
       case JsObject(fields) if fields.contains("ack") => PongMessageFormat.reads(json)
+      case JsObject(fields) if fields.contains("sid") => SubscriptionNotificationMessageFormat.reads(json)
       case _ => JsError("Unrecognized message: " + json)
     }
   }
