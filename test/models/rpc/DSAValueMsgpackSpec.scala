@@ -3,50 +3,69 @@ package models.rpc
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
+import akka.util.ByteString
 import org.scalatestplus.play.PlaySpec
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
+import akka.stream.scaladsl._
+
+
 class DSAValueMsgpackSpec extends PlaySpec {
-//  import models.rpc.MessageFlowTransformer.jsonMessageFlowTransformer
+
+  implicit val system = ActorSystem()
+  implicit val materializer = ActorMaterializer()
+
+  "Unit tests examples for akka sreaming" should {
+    "run stream test from docs" in {
+
+      val flowUnderTest = Flow[Int].takeWhile(_ < 5)
+
+      val future = Source(1 to 10).via(flowUnderTest).runWith(Sink.fold(Seq.empty[Int])(_ :+ _))
+      val result = Await.result(future, 3.seconds)
+      assert(result == (1 to 4))
+    }
+  }
 
   "Msgpack transformer" should {
-    "convert play js value to/from http payload" in {
+    "convert play JsValue to/from http payload (binary data)" in {
 
-      import akka.stream.scaladsl._
       import play.api.libs.json._
       import play.api.http.websocket._
 
-//      val jsonTransformer = models.rpc.MessageFlowTransformer.jsonMessageFlowTransformer
+      import org.velvia.msgpack
+      import org.velvia.msgpack.PlayJsonCodecs.JsValueCodec
+
       val msgTransformer = models.rpc.MessageFlowTransformer2.msgpackMessageFlowTransformer
 
-      implicit val system = ActorSystem()
-      implicit val materializer = ActorMaterializer()
+      val logicFlow: Flow[JsValue, JsValue, _] = Flow[JsValue].map(x => {
+        println("Busines logic: income JsValue is: " + x)
+        println("Busines logic: return the same value as got")
+        x
+      })
 
-     //val source1 = Source(1 to 3)
-      val list2 = List(JsNumber(1), JsNumber(2))
-      val source1 = Source(list2)
+      val jsValue1 = Json.parse("""{"amount":40.1,"currency":"USD","label":"10.00"}""")
+      val jsValue2 = Json.parse("""{"amount":40.2,"currency":"RUR","label":"11.00"}""")
 
-      val flow2: Flow[JsValue, JsValue, _] = Flow[JsValue].map(x => { println("AAAA"); x })
+      val inDsLinkMessage = BinaryMessage(ByteString(msgpack.pack(jsValue1)))
+      val inDsLinkMessage2 = BinaryMessage(ByteString(msgpack.pack(jsValue2)))
 
-      val source2 = source1 via flow2
+      val sourcePayload = Source(List(inDsLinkMessage, inDsLinkMessage2))
 
-      val resultFlow = msgTransformer.transform(flow2)
+      val printingFlow: Flow[Message, Message, _] = Flow[Message].map(x => {
+        println("The message: " + x)
+        x
+      })
 
-      val source3 = Source(List(TextMessage("Json message 1")))
+      // Do not delete following line
+//      val sink3 = Sink.foreach[Message](s => msgpack.unpack(s.asInstanceOf[BinaryMessage].data.toArray))
 
-      val resultSrc = source3 via resultFlow
+      val sink = Sink.seq[Message]
 
-      val sink4 = Sink.foreach[TextMessage](println(_))
-
-      val messageSink = Sink.foreach[Message](println(_))
-
-      //first option
-      source3.to(sink4).run()
-
-      // second
-      resultSrc.to(messageSink).run()
-
-
-      println("That's all")
+      val future = (sourcePayload via printingFlow via msgTransformer.transform(logicFlow)).runWith(sink)
+      val result = Await.result(future, 3.seconds)
+      assert(result == Seq(inDsLinkMessage, inDsLinkMessage2))
     }
   }
 }
