@@ -1,16 +1,19 @@
 package models.akka
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.stream._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler, StageLogging}
-import models.ResponseEnvelope
-import models.rpc.{DSAMessage, DSAResponse, ResponseMessage, SubscriptionNotificationMessage}
+import models.rpc.{DSAMessage, ResponseMessage, SubscriptionNotificationMessage}
+import akka.pattern.ask
+import akka.util.Timeout
+import models.akka.Messages._
 
-import collection.mutable.HashMap
+import scala.concurrent.duration._
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
 
 
-class SubscriptionChannel(val maxCapacity: Int = 30)
+class SubscriptionChannel(val store: ActorRef)
                          (implicit actorSystem: ActorSystem, materializer: Materializer)
   extends GraphStage[FlowShape[SubscriptionNotificationMessage, DSAMessage]] {
 
@@ -20,33 +23,16 @@ class SubscriptionChannel(val maxCapacity: Int = 30)
   val out = Outlet[DSAMessage]("Subscriptions.out")
   implicit val as = actorSystem
   implicit val m = materializer
-  val store = new HashMap[Sid, mutable.Queue[SubscriptionNotificationMessage]]
+  implicit val ctx = ExecutionContext.global
+
+  implicit val timeout = Timeout(3 seconds)
 
   override def shape: FlowShape[SubscriptionNotificationMessage, DSAMessage] = FlowShape.of(in, out)
 
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
 
-    def queueSize(key: Sid) = store.get(key).map(_.size).getOrElse(0)
-
-    // in case of data overflow
-    def shouldDislodge(key: Sid) = queueSize(key) >= maxCapacity
-
-    def storeIt(value: SubscriptionNotificationMessage) = value match {
-      case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) => {
-        store.put(value.sid, mutable.Queue(value))
-        log.debug("QoS == 0. Replacing with new queue")
-      }
-      case item @ SubscriptionNotificationMessage(_, _, _, _, _) => {
-        val queue = store.get(item.sid) map { q =>
-          if (shouldDislodge(item.sid)) q.dequeue()
-          q += value
-        } getOrElse (mutable.Queue(value))
-
-        store.put(item.sid, queue)
-        log.debug("QoS > 0. Adding new value to queue")
-      }
-    }
+    def storeIt(message: SubscriptionNotificationMessage) = store ! PutNotification(message)
 
     override def preStart(): Unit = {
       // a detached stage needs to start upstream demand
@@ -58,13 +44,13 @@ class SubscriptionChannel(val maxCapacity: Int = 30)
       override def onPush(): Unit = {
 
         log.debug(s"on push: ${in}")
-        val elem = grab(in)
+        val message = grab(in)
 
-        storeIt(elem)
-        log.debug(s"storing $elem")
+        storeIt(message)
+        log.debug(s"storing $message")
 
         if(isAvailable(out)){
-          log.debug(s"out is available. Pushing $elem")
+          log.debug(s"out is available. Pushing $message")
           pushNext
           pull(in)
         } else {
@@ -73,13 +59,6 @@ class SubscriptionChannel(val maxCapacity: Int = 30)
 
       }
 
-      override def onUpstreamFinish(): Unit = {
-        if (store.nonEmpty) {
-          val leftItems = store.mapValues(toResponseMsg(_)).values.filter(_.isDefined).map(_.get)
-          emitMultiple(out, leftItems.iterator)
-        }
-        completeStage()
-      }
     })
 
     private def toResponseMsg(in:Seq[SubscriptionNotificationMessage]):Option[ResponseMessage] = {
@@ -90,23 +69,22 @@ class SubscriptionChannel(val maxCapacity: Int = 30)
     }
 
     def pushNext = {
-      //side effect
-      val next = store.headOption
-
-      next foreach { case (sid, queue) =>
-        toResponseMsg(queue) foreach { push(out, _) }
-        store.remove(sid)
+      (store ? GetAndRemoveNext).mapTo[Option[(Int, mutable.Queue[SubscriptionNotificationMessage])]].foreach {
+        _.foreach {
+          case (sid, queue) => toResponseMsg(queue) foreach {m => push(out, m) }
+        }
       }
     }
 
     setHandler(out, new OutHandler {
       override def onPull(): Unit = {
         if (isClosed(in)) {
-          if (store.isEmpty) completeStage()
+          (store ? IsEmpty).mapTo[Boolean] foreach {
+            isEmpty => if(isEmpty) completeStage()
+          }
         } else if (!hasBeenPulled(in)) {
           pull(in)
         }
-
       }
     })
   }

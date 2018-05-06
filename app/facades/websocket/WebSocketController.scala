@@ -19,8 +19,8 @@ import controllers.BasicController
 import javax.inject.{Inject, Singleton}
 
 import models.Settings
-import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, SubscriptionChannel}
-import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, SubscriptionChannel}
+import models.akka.Messages.{GetDSLinkStateKeeper, GetOrCreateDSLink, RemoveDSLink}
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
 import models.rpc.{DSAMessage, SubscriptionNotificationMessage}
@@ -179,56 +179,66 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
-    fRoutee map { routee =>
-      val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
-        WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
+    fRoutee flatMap   { routee =>
 
-      val fromSocket = actorSystem.actorOf(Props(new Actor {
-        val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+      val stateKeeper = (routee ? GetDSLinkStateKeeper).mapTo[ActorRef]
 
-        def receive = {
-          case Success(_) | Failure(_) => wsActor ! PoisonPill
-          case Terminated(_)           => context.stop(self)
-          case other                   => wsActor ! other
-        }
+      stateKeeper map { stateKeeper =>
 
-        override def supervisorStrategy = OneForOneStrategy() {
-          case _ => SupervisorStrategy.Stop
-        }
-      }))
+        val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
+          WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
-      val in = Source.fromPublisher[DSAMessage](publisher)
+        val fromSocket = actorSystem.actorOf(Props(new Actor {
+          val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
 
-      val messageSource = Source.fromGraph(GraphDSL.create() { implicit b =>
-        import GraphDSL.Implicits._
+          def receive = {
+            case Success(_) | Failure(_) => wsActor ! PoisonPill
+            case Terminated(_)           => context.stop(self)
+            case other                   => wsActor ! other
+          }
 
-        val partitioner = b.add(Partition[DSAMessage](2, _ match {
-          case m: SubscriptionNotificationMessage => 0
-          case _ => 1
+          override def supervisorStrategy = OneForOneStrategy() {
+            case _ => SupervisorStrategy.Stop
+          }
         }))
 
-        val merge = b.add(Merge[DSAMessage](2))
+        val in = Source.fromPublisher[DSAMessage](publisher)
 
-        val onlyDSAMessages = Flow[DSAMessage].buffer(bufferSize, overflow)
+        val messageSource = Source.fromGraph(GraphDSL.create() { implicit b =>
+          import GraphDSL.Implicits._
 
-        val onlySubscriptions = Flow[DSAMessage]
-          .map(_ match {
-          case m: SubscriptionNotificationMessage => Some(m)
-          case _ => None
-        }).filter(!_.isEmpty)
-          .map(_.get)
-          .via(Flow.fromGraph(new SubscriptionChannel(30)))
+          val partitioner = b.add(Partition[DSAMessage](2, _ match {
+            case m: SubscriptionNotificationMessage => 0
+            case _ => 1
+          }))
+
+          val merge = b.add(Merge[DSAMessage](2))
+
+          val onlyDSAMessages = Flow[DSAMessage].buffer(bufferSize, overflow)
+
+          val subscriptionChannel = Flow.fromGraph(new SubscriptionChannel(stateKeeper))
+
+          val onlySubscriptions = Flow[DSAMessage]
+            .map(_ match {
+              case m: SubscriptionNotificationMessage => Some(m)
+              case _ => None
+            }).filter(!_.isEmpty)
+            .map(_.get)
+            .via(subscriptionChannel)
+            .map(v => v)
 
 
-        in ~> partitioner ~> onlySubscriptions ~> merge
-              partitioner ~> onlyDSAMessages   ~> merge
+          in ~> partitioner ~> onlySubscriptions ~> merge
+          partitioner ~> onlyDSAMessages   ~> merge
 
-        SourceShape(merge.out)
-      })
+          SourceShape(merge.out)
+        })
 
-      val messageSink = Sink.actorRef(fromSocket, Success(()))
+        val messageSink = Sink.actorRef(fromSocket, Success(()))
 
-      Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, messageSource)
+        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, messageSource)
+
+      }
     }
   }
 

@@ -1,10 +1,10 @@
 package models.akka
 
 import org.joda.time.DateTime
-
-import akka.actor.{ ActorPath, ActorRef, Address }
+import akka.actor.{ActorPath, ActorRef, Address}
 import akka.cluster.ClusterEvent
 import models.akka.DSLinkMode.DSLinkMode
+import models.rpc.SubscriptionNotificationMessage
 
 /**
  * Common messages passed between the broker actors.
@@ -128,4 +128,12 @@ object Messages {
    * Sent to Downstream actor to remove disconnected DSLinks.
    */
   case object RemoveDisconnectedDSLinks
+
+  case class GetDSLinkStateKeeper()
+  case class PutNotification(message:SubscriptionNotificationMessage)
+  case class GetAndRemoveNext()
+  case class Disconnected()
+  case class Connected()
+  case class KillStateIfNotConnected()
+  case class IsEmpty()
 }
