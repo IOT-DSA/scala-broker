@@ -84,7 +84,7 @@ class SubscriptionChannelSpec extends WordSpecLike
                 .throttle(1, 20.millisecond, 1, ThrottleMode.shaping)
                 .toMat(sink)(Keep.right)
 
-            val result = Await.result(runnableGraph.run(), 3 seconds)
+            val result = Await.result(runnableGraph.run(), 5 seconds)
             val totalSize = result.flatMap {
               case m:ResponseMessage => m.responses
               case _ => List()
@@ -101,7 +101,9 @@ class SubscriptionChannelSpec extends WordSpecLike
         Sink[DSAMessage, Future[Seq[DSAMessage]]]
       ) => Unit) = {
 
-        val ch = new SubscriptionChannel(iterations)
+        val stateKeeper = as.actorOf(StateKeeper.props(30, 30))
+
+        val ch = new SubscriptionChannel(stateKeeper)
         val flow = Flow.fromGraph(ch)
         val list = (0 to iterations - 1) map {i => SubscriptionNotificationMessage(0, None, List(DSAResponse(i, None, None, None, None)), i % sids, qosLevel)}
         val source = Source(list)

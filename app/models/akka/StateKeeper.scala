@@ -5,22 +5,36 @@ import models.akka.Messages._
 import models.rpc.SubscriptionNotificationMessage
 
 import scala.collection.mutable
-import scala.collection.mutable.HashMap
 import scala.concurrent.duration._
+import scala.util.Random
 
 class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends Actor with ActorLogging {
 
-  var subscriptionsQueue = new HashMap[Int, mutable.Queue[SubscriptionNotificationMessage]]
+  var subscriptionsQueue = Map[Int, mutable.Queue[SubscriptionNotificationMessage]]()
   var connected = false
+
+  val rnd=new Random
 
   implicit val ctx = scala.concurrent.ExecutionContext.global
 
   override def receive: Receive = {
-    case PutNotification(message) => putMessage(message)
+    case PutNotification(message) =>
+      log.debug(s"put $message")
+      sender ! putMessage(message)
     case GetAndRemoveNext => getAndRemoveNext
-    case Disconnected => onDisconnect
-    case Connected => onConnected
-    case IsEmpty => sender ! subscriptionsQueue.isEmpty
+    case Disconnected =>
+      onDisconnect
+      log.debug(s"stateKeeper ${self.path} disconnected")
+    case Connected =>
+      onConnected
+      log.debug(s"stateKeeper ${self.path} connected")
+    case IsEmpty =>
+      log.debug(s"state is empty:${subscriptionsQueue.isEmpty}")
+      sender ! subscriptionsQueue.isEmpty
+    case GetAllMessages =>
+      sender ! subscriptionsQueue
+
+
   }
 
   def onConnected = {
@@ -30,7 +44,7 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
 
   def killMyself = {
     if(!connected) {
-      subscriptionsQueue = new HashMap[Int, mutable.Queue[SubscriptionNotificationMessage]]
+      subscriptionsQueue =  Map[Int, mutable.Queue[SubscriptionNotificationMessage]]()
       log.info(s"SubscriptionsStateKeeper state has been cleared ${self.path}")
     }
   }
@@ -43,8 +57,9 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
 
   def putMessage(message:SubscriptionNotificationMessage) = message match {
     case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) => {
-      subscriptionsQueue.put(item.sid, mutable.Queue(message))
+      subscriptionsQueue = subscriptionsQueue + (item.sid -> mutable.Queue(message))
       log.debug("QoS == 0. Replacing with new queue")
+      item.sid
     }
     case item @ SubscriptionNotificationMessage(_, _, _, _, _) => {
       val queue = subscriptionsQueue.get(item.sid) map { q =>
@@ -52,20 +67,23 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
         q += message
       } getOrElse (mutable.Queue(message))
 
-      subscriptionsQueue.put(item.sid, queue)
+      subscriptionsQueue = subscriptionsQueue + (item.sid -> queue)
       log.debug("QoS > 0. Adding new value to queue")
+      item.sid
     }
   }
 
   def getAndRemoveNext = {
-    //side effect
-    val next = subscriptionsQueue.headOption
-
-    sender ! next
-
-    next foreach { case (sid, queue) =>
-      subscriptionsQueue.remove(sid)
+    val nextSid = subscriptionsQueue.keySet.toVector(rnd.nextInt(subscriptionsQueue.keySet.size))
+    val next = subscriptionsQueue.get(nextSid)
+    next foreach { _ =>
+      subscriptionsQueue = subscriptionsQueue - nextSid
     }
+    log.debug(s"send and remove $next")
+    next.foreach{queue =>
+      val ids = queue.flatMap(_.responses.map(_.rid))
+    }
+    sender ! next
   }
 
   // in case of data overflow

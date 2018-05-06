@@ -225,7 +225,6 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
             }).filter(!_.isEmpty)
             .map(_.get)
             .via(subscriptionChannel)
-            .map(v => v)
 
 
           in ~> partitioner ~> onlySubscriptions ~> merge

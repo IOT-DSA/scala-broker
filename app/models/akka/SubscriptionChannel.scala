@@ -10,7 +10,7 @@ import models.akka.Messages._
 
 import scala.concurrent.duration._
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, ExecutionContext}
 
 
 class SubscriptionChannel(val store: ActorRef)
@@ -32,7 +32,7 @@ class SubscriptionChannel(val store: ActorRef)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
 
-    def storeIt(message: SubscriptionNotificationMessage) = store ! PutNotification(message)
+    def storeIt(message: SubscriptionNotificationMessage) = Await.result(store ? PutNotification(message), 1 second)
 
     override def preStart(): Unit = {
       // a detached stage needs to start upstream demand
@@ -59,6 +59,16 @@ class SubscriptionChannel(val store: ActorRef)
 
       }
 
+      override def onUpstreamFinish(): Unit = {
+        val futureTail = (store ? GetAllMessages).mapTo[Map[Int, mutable.Queue[SubscriptionNotificationMessage]]]
+        val tail = Await.result(futureTail, 1 second)
+        if (tail.nonEmpty) {
+          val leftItems = tail.mapValues(toResponseMsg(_)).values.filter(_.isDefined).map(_.get)
+          emitMultiple(out, leftItems.iterator)
+        }
+        completeStage()
+      }
+
     })
 
     private def toResponseMsg(in:Seq[SubscriptionNotificationMessage]):Option[ResponseMessage] = {
@@ -69,10 +79,10 @@ class SubscriptionChannel(val store: ActorRef)
     }
 
     def pushNext = {
-      (store ? GetAndRemoveNext).mapTo[Option[(Int, mutable.Queue[SubscriptionNotificationMessage])]].foreach {
-        _.foreach {
-          case (sid, queue) => toResponseMsg(queue) foreach {m => push(out, m) }
-        }
+      val futureMessage = (store ? GetAndRemoveNext).mapTo[Option[mutable.Queue[SubscriptionNotificationMessage]]]
+
+      Await.result(futureMessage, 1 second) foreach {
+        queue => toResponseMsg(queue) foreach {m => push(out, m)}
       }
     }
 

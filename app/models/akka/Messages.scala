@@ -136,4 +136,5 @@ object Messages {
   case class Connected()
   case class KillStateIfNotConnected()
   case class IsEmpty()
+  case class GetAllMessages()
 }
