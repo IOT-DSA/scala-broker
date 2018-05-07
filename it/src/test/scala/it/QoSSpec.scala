@@ -61,8 +61,6 @@ class QoSSpec extends FlatSpec
 
             TimeUnit.SECONDS.sleep(3)
 
-            val f = 123
-
         }
     }
 

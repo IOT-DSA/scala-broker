@@ -10,6 +10,7 @@ trait RequesterAndResponder extends TestRequester with TestResponder{
 
   /**
     * starts both - requester and responder
+    * @param proto broker protocol: http (default) or https
     * @param host broker host
     * @param port broker port
     * @param responderName responder id (for path)
@@ -23,8 +24,8 @@ trait RequesterAndResponder extends TestRequester with TestResponder{
                                 requesterName:String = "scala-test-requester"
                                )(action: (TestResponderHandler,
     TestRequesterHandler)=>Unit) = {
-    withResponder(host, port, responderName){responder =>
-      withRequester(host, port, requesterName){ requester =>
+    withResponder(proto, host, port, responderName){responder =>
+      withRequester(proto, host, port, requesterName){ requester =>
         action(responder, requester)
       }
     }
