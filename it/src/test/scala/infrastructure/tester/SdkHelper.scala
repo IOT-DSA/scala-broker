@@ -66,15 +66,16 @@ trait SdkHelper {
 
   /**
     * create new DSLink with all configs using provided DSLinkHandler
+    * @param proto broker protocol: http or https
     * @param host broker host
     * @param port broker port
     * @param name DSLink name (id)
     * @param handler DSLinkHandler instance
     * @return DSLinkProvider
     */
-  def createDsLink(host: String, port: Int, name:String)(implicit handler: DSLinkHandler): DSLinkProvider = {
+  def createDsLink(proto: String, host: String, port: Int, name:String)(implicit handler: DSLinkHandler): DSLinkProvider = {
     val dslinkJson = copyDslinkJson(name)
-    val args = Array(s"-b http://$host:$port/conn", s"-d ${dslinkJson.getPath}")
+    val args = Array(s"-b $proto://$host:$port/conn", s"-d ${dslinkJson.getPath}")
     val generated = DSLinkFactory.generate(args, handler)
     generated.start()
     generated
@@ -127,7 +128,7 @@ trait SdkHelper {
        |		},
        |		"log":{
        |			"type":"enum",
-       |			"default":"info"
+       |			"default":"debug"
        |		},
        |		"handler_class":{
        |			"type":"string",
