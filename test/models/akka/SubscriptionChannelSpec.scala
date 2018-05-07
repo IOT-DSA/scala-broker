@@ -101,7 +101,7 @@ class SubscriptionChannelSpec extends WordSpecLike
         Sink[DSAMessage, Future[Seq[DSAMessage]]]
       ) => Unit) = {
 
-        val stateKeeper = as.actorOf(StateKeeper.props(30, 30))
+        val stateKeeper = as.actorOf(StateKeeper.props(100, 30))
 
         val ch = new SubscriptionChannel(stateKeeper)
         val flow = Flow.fromGraph(ch)

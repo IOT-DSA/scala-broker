@@ -129,7 +129,7 @@ object Messages {
    */
   case object RemoveDisconnectedDSLinks
 
-  case class GetDSLinkStateKeeper()
+  case class GetSubscriptionSource()
   case class PutNotification(message:SubscriptionNotificationMessage)
   case class GetAndRemoveNext()
   case class Disconnected()

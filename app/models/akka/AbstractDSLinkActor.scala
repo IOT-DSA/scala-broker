@@ -1,8 +1,9 @@
 package models.akka
 
 import org.joda.time.DateTime
-import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
+import akka.stream.Materializer
 import models.{ResponseEnvelope, Settings}
 import models.rpc.DSAResponse
 
@@ -26,6 +27,8 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
 
   protected val linkName = self.path.name
   protected val ownId = s"DSLink[$linkName]"
+
+  implicit val system = context.system
 
   val stateKeeper = context.actorOf(StateKeeper.props(
     reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
@@ -79,7 +82,6 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
       log.warning(s"$ownId: already connected to Endpoint, dropping previous association")
       disconnectFromEndpoint(true)
       connectToEndpoint(ref, ci)
-    case GetDSLinkStateKeeper => sender ! stateKeeper
   }
 
   /**
@@ -94,10 +96,12 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
     case DisconnectEndpoint(_) =>
       log.warning(s"$ownId: not connected to Endpoint, ignoring DISCONNECT")
-    case GetDSLinkStateKeeper => sender ! stateKeeper
-    case _ =>
-      log.debug(s"$ownId: stashing the incoming message")
-      stash()
+  }
+
+  def toStash: Receive = {
+        case _ =>
+          log.debug(s"$ownId: stashing the incoming message")
+          stash()
   }
 
   /**

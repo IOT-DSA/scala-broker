@@ -79,16 +79,6 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
     case e @ ResponseEnvelope(responses) =>
       log.debug(s"{}: received {}", ownId, e)
       sendResponses(responses: _*)
-    case e: SubscriptionResponseEnvelope =>
-      log.debug(s"$ownId: received $e")
-      sendSubscriptionNotification(e)
-
-  }
-
-  private def sendSubscriptionNotification(e:SubscriptionResponseEnvelope) = {
-    val msg = SubscriptionNotificationMessage(localMsgId.inc, None, List(e.response), e.sid, e.qos)
-    sendToSocket(msg)
-   // responseEventDao.saveResponseMessageEvent(DateTime.now, false, linkName, ci.linkAddress, msg)
   }
 
   /**

@@ -34,11 +34,6 @@ class SubscriptionChannel(val store: ActorRef)
 
     def storeIt(message: SubscriptionNotificationMessage) = Await.result(store ? PutNotification(message), 1 second)
 
-    override def preStart(): Unit = {
-      // a detached stage needs to start upstream demand
-      // itself as it is not triggered by downstream demand
-      pull(in)
-    }
 
     setHandler(in, new InHandler {
       override def onPush(): Unit = {
@@ -56,7 +51,6 @@ class SubscriptionChannel(val store: ActorRef)
         } else {
           log.debug(s"out is unavailable.")
         }
-
       }
 
       override def onUpstreamFinish(): Unit = {
@@ -82,17 +76,17 @@ class SubscriptionChannel(val store: ActorRef)
       val futureMessage = (store ? GetAndRemoveNext).mapTo[Option[mutable.Queue[SubscriptionNotificationMessage]]]
 
       Await.result(futureMessage, 1 second) foreach {
-        queue => toResponseMsg(queue) foreach {m => push(out, m)}
+        queue => toResponseMsg(queue) foreach {m =>
+          log.debug(s"pushing $m")
+          push(out, m)
+        }
       }
     }
 
     setHandler(out, new OutHandler {
       override def onPull(): Unit = {
-        if (isClosed(in)) {
-          (store ? IsEmpty).mapTo[Boolean] foreach {
-            isEmpty => if(isEmpty) completeStage()
-          }
-        } else if (!hasBeenPulled(in)) {
+        log.debug("on pull")
+         if (!hasBeenPulled(in)) {
           pull(in)
         }
       }

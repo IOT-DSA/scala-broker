@@ -13,7 +13,7 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
   var subscriptionsQueue = Map[Int, mutable.Queue[SubscriptionNotificationMessage]]()
   var connected = false
 
-  val rnd=new Random
+  var iter = subscriptionsQueue.iterator
 
   implicit val ctx = scala.concurrent.ExecutionContext.global
 
@@ -33,8 +33,6 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
       sender ! subscriptionsQueue.isEmpty
     case GetAllMessages =>
       sender ! subscriptionsQueue
-
-
   }
 
   def onConnected = {
@@ -52,6 +50,11 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
   def onDisconnect = {
     log.info(s"SubscriptionsStateKeeper ${self.path} disconnected. Will try to clear state in ${reconnectionTime} seconds")
     connected = false
+    subscriptionsQueue = subscriptionsQueue.filter{ case(key, value) => {
+      if(value.isEmpty) false
+      if(value.head.qos < QoS.Durable) false
+      true
+    }}
     context.system.scheduler.scheduleOnce(reconnectionTime seconds, self, KillStateIfNotConnected)
   }
 
@@ -74,16 +77,25 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
   }
 
   def getAndRemoveNext = {
-    val nextSid = subscriptionsQueue.keySet.toVector(rnd.nextInt(subscriptionsQueue.keySet.size))
-    val next = subscriptionsQueue.get(nextSid)
-    next foreach { _ =>
-      subscriptionsQueue = subscriptionsQueue - nextSid
+
+    var next:Option[(Int, mutable.Queue[SubscriptionNotificationMessage])] =
+
+    if(iter.hasNext){
+      Some(iter.next())
+    } else {
+      iter = subscriptionsQueue.iterator
+      if(iter.hasNext) Some(iter.next())
+      else None
+    }
+
+    next foreach { case (sid, queue) =>
+      subscriptionsQueue = subscriptionsQueue - sid
     }
     log.debug(s"send and remove $next")
-    next.foreach{queue =>
+    next.foreach{case (sid, queue) =>
       val ids = queue.flatMap(_.responses.map(_.rid))
     }
-    sender ! next
+    sender ! next.map(_._2)
   }
 
   // in case of data overflow

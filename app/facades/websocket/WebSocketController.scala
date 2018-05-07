@@ -20,11 +20,12 @@ import javax.inject.{Inject, Singleton}
 
 import models.Settings
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, SubscriptionChannel}
-import models.akka.Messages.{GetDSLinkStateKeeper, GetOrCreateDSLink, RemoveDSLink}
+import models.akka.Messages.{GetOrCreateDSLink, GetSubscriptionSource, RemoveDSLink}
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
 import models.rpc.{DSAMessage, SubscriptionNotificationMessage}
 import models.util.UrlBase64
+import org.reactivestreams.Publisher
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
@@ -173,17 +174,19 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                            overflow:    OverflowStrategy) = {
     import akka.actor.Status._
 
-    val (toSocket, publisher) = Source.actorRef[DSAMessage](0, overflow)
+    var (toSocket, publisher) = Source.actorRef[DSAMessage](1, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()(materializer)
+
+    val sink = Sink.actorRef(toSocket, Success(()))
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
     fRoutee flatMap   { routee =>
 
-      val stateKeeper = (routee ? GetDSLinkStateKeeper).mapTo[ActorRef]
+      val subscriptions = (routee ? GetSubscriptionSource).mapTo[Publisher[DSAMessage]]
 
-      stateKeeper map { stateKeeper =>
+      subscriptions map { subs =>
 
         val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
           WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
@@ -207,35 +210,24 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
         val messageSource = Source.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
 
-          val partitioner = b.add(Partition[DSAMessage](2, _ match {
-            case m: SubscriptionNotificationMessage => 0
-            case _ => 1
-          }))
-
           val merge = b.add(Merge[DSAMessage](2))
 
           val onlyDSAMessages = Flow[DSAMessage].buffer(bufferSize, overflow)
 
-          val subscriptionChannel = Flow.fromGraph(new SubscriptionChannel(stateKeeper))
+          val subscriptionChannel = Source.fromPublisher(subs)
 
-          val onlySubscriptions = Flow[DSAMessage]
-            .map(_ match {
-              case m: SubscriptionNotificationMessage => Some(m)
-              case _ => None
-            }).filter(!_.isEmpty)
-            .map(_.get)
-            .via(subscriptionChannel)
-
-
-          in ~> partitioner ~> onlySubscriptions ~> merge
-          partitioner ~> onlyDSAMessages   ~> merge
+          in ~> onlyDSAMessages ~> merge
+          subscriptionChannel   ~> merge
 
           SourceShape(merge.out)
         })
 
-        val messageSink = Sink.actorRef(fromSocket, Success(()))
+        val p = messageSource.toMat(Sink.asPublisher(false))(Keep.right).run()
 
-        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, messageSource)
+        val messageSink = Sink.actorRef(fromSocket, Success(()))
+        val src = Source.fromPublisher(p)
+
+        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
 
       }
     }
