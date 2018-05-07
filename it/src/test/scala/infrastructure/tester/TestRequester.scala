@@ -3,7 +3,7 @@ package infrastructure.tester
 import java.util.function.Consumer
 
 import infrastructure.IT
-import org.dsa.iot.dslink.{DSLink, DSLinkProvider}
+import org.dsa.iot.dslink.DSLink
 import org.dsa.iot.dslink.link.Requester
 import org.dsa.iot.dslink.methods.StreamState
 import org.dsa.iot.dslink.methods.requests.{InvokeRequest, ListRequest, SetRequest}
@@ -23,19 +23,11 @@ trait TestRequester extends SdkHelper {
 
   val defaultRequesterName = "scala-test-requester"
 
-  def withRequester(host: String = "localhost", port: Int = 9000, name: String = defaultRequesterName)(action: (TestRequesterHandler) => Unit): Unit = {
+  def withRequester(proto: String = "http", host: String = "localhost", port: Int = 9000, name: String = defaultRequesterName)(action: TestRequesterHandler => Unit): Unit = {
     implicit val requester = new TestRequesterHandler
-    implicit val requesterDSLinkProvider = createDsLink(host, port, name)
+    val requesterDSLinkProvider = createDsLink(proto, host, port, name)
 
     connectDSLink(requester, requesterDSLinkProvider)(action)
-  }
-
-  def disconnect[T <: BaseDSLinkHandler](connection:DSLinkProvider): Unit ={
-    connection.stop()
-  }
-
-  def connect[T <: BaseDSLinkHandler](connection:DSLinkProvider): Unit ={
-    connection.start()
   }
 
 }
@@ -155,7 +147,7 @@ class TestRequesterHandler extends BaseDSLinkHandler {
     promise.future
   }
 
-  def requester(): Requester = {
+  private def requester(): Requester = {
     link.getRequester
   }
 

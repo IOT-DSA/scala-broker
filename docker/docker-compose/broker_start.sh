@@ -8,6 +8,7 @@ do
 key="$1"
 
 REBUILD="false"
+DETACHED="false"
 
 case $key in
     --sbt)
@@ -18,6 +19,11 @@ case $key in
     -r|--rebuild)
     REBUILD="$2"
     shift # past argument
+    shift # past value
+    ;;
+	-d|--detached)
+	DETACHED="$2"
+	shift # past argument
     shift # past value
     ;;
     *)    # unknown option
@@ -52,6 +58,11 @@ if [ "$REBUILD" = true ] ; then
 	echo "rebuilding sbt project"
 	sbt clean package docker:publishLocal
 fi
+
+if [ "$DETACHED" = true ] ; then
+	DOCKER_CMD="$DOCKER_CMD -d"
+fi
+
 cd ${THIS_DIR}
 echo "starting docker containers"
 bash -c ${DOCKER_CMD}

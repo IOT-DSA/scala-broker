@@ -15,11 +15,21 @@ scalaVersion := SCALA_VERSION
 
 // base play-akka project
 lazy val root = (project in file("."))
+  .dependsOn(msgpack)
   .enablePlugins(PlayScala)
   .settings(
     scalaVersion := SCALA_VERSION,
     libraryDependencies ++= commonDependencies.union(playTestDependencies)
-)
+  )
+  .aggregate(msgpack)
+  .dependsOn(msgpack)
+
+// project for temporary lib msgpack4s
+lazy val msgpack = project.in(file("tools/msgpack4s"))
+    .settings(
+      scalaVersion := SCALA_VERSION,
+      libraryDependencies ++= msgpackDependencies
+    )
 
 // project for integrational tests
 lazy val it = project.in(file("it"))
@@ -36,6 +46,8 @@ EclipseKeys.withJavadoc := true
 
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
+resolvers += "velvia maven" at "http://dl.bintray.com/velvia/maven"
+
 scalacOptions ++= Seq(
   "-feature",
   "-unchecked",
@@ -90,7 +102,10 @@ lazy val commonDependencies = Seq(
   "com.maxmind.geoip2"       % "geoip2"                  % "2.10.0",
   "ch.qos.logback"           % "logback-classic"         % "1.2.3",
   "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
-  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force()
+  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force(),
+  "org.msgpack"             %% "msgpack-scala"            % "0.8.13",
+//  "org.velvia"              %% "msgpack4s"                % "0.6.0",
+  "org.json4s"              %% "json4s-native"            % "3.5.0"
 )
 
 // akka and play test dependencies
@@ -112,11 +127,19 @@ lazy val itDependencies = Seq(
   "com.whisk" %% "docker-testkit-impl-spotify" % "0.9.5" % "test",
   "com.spotify" % "docker-client" % "8.10.0" % "test",
   "org.iot-dsa" % "dslink" % "0.18.3" % "test",
-  "io.projectreactor" % "reactor-core" % "3.1.6.RELEASE",
-  "io.projectreactor" %% "reactor-scala-extensions" % "0.3.4"
+  "io.projectreactor" % "reactor-core" % "3.1.6.RELEASE" % "test",
+  "io.projectreactor" %% "reactor-scala-extensions" % "0.3.4" % "test"
 
 )
 
+lazy val msgpackDependencies = Seq(
+  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
+  "org.mockito" % "mockito-all" % "1.9.0" % "test",
+  "com.rojoma" %% "rojoma-json-v3" % "3.7.0",
+  "org.json4s" %% "json4s-native" % "3.5.0",
+  "org.apache.commons" % "commons-io" % "1.3.2",
+  "com.typesafe.play" %% "play-json" % "2.6.0-M1"
+)
 
 
 

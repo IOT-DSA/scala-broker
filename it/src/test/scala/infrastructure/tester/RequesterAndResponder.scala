@@ -16,13 +16,14 @@ trait RequesterAndResponder extends TestRequester with TestResponder{
     * @param requesterName requester id (for path)
     * @param action some actions with connected requester and responder
     */
-  def withRequesterAndResponder(host:String = "localhost",
+  def withRequesterAndResponder(proto:String = "http",
+                                host:String = "localhost",
                                 port:Int = 9000,
                                 responderName:String = "scala-test-responder",
                                 requesterName:String = "scala-test-requester"
                                )(action: (TestResponderHandler,
     TestRequesterHandler)=>Unit) = {
-    withResponder(host, port, responderName){ responder =>
+    withResponder(host, port, responderName){responder =>
       withRequester(host, port, requesterName){ requester =>
         action(responder, requester)
       }
