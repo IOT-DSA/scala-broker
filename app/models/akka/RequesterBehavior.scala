@@ -1,6 +1,6 @@
 package models.akka
 
-import akka.actor.ActorRef
+import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import models.akka.Messages.{GetSubscriptionSource, PutNotification}
@@ -33,7 +33,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
   val channel = Flow.fromGraph(new SubscriptionChannel(stateKeeper))
 
-  var toSocket: ActorRef = _
+  var toSocket: SourceQueueWithComplete[SubscriptionNotificationMessage] = _
   var subscriptionsPublisher: Publisher[DSAMessage] = _
 
   /**
@@ -56,6 +56,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     case GetSubscriptionSource => sender ! getSubscriptionSource
   }
 
+  // requester mixin for disconnected behavior
   val requesterDisconnected: Receive = {
     case GetSubscriptionSource => sender ! getSubscriptionSource
     case e @ ResponseEnvelope(responses) =>
@@ -75,9 +76,11 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       )
   }
 
+  /**
+    * @return stream subscriptions stream publisher
+    */
   private def getSubscriptionSource = {
-    val (toSocketVal, publisher) = Source.actorRef[SubscriptionNotificationMessage](1, OverflowStrategy.dropTail)
-      //TODO msg field is a problem
+    val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
       .via(channel)
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()
@@ -104,8 +107,10 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       val toSend = SubscriptionNotificationMessage(-1, None, List(message.response), message.sid, message.qos)
 
       if(connected){
-        toSocket ! toSend
+        // in connected state pushing to stream with backpressure logic
+        toSocket offer toSend
       } else if(message.qos >= QoS.Durable){
+        //in disconnected - just send to state actor
         stateKeeper ! PutNotification(toSend)
       }
     }

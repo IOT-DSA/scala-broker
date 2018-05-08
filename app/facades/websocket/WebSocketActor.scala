@@ -27,8 +27,6 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
   protected val linkName = ci.linkName
   protected val ownId = s"WSActor[$linkName]"
 
-  private val localMsgId = new IntCounter(1)
-
   private val startTime = DateTime.now
 
   /**
@@ -85,7 +83,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
    * Sends the response message to the client.
    */
   private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty) {
-    val msg = ResponseMessage(localMsgId.inc, None, responses.toList)
+    val msg = ResponseMessage(0, None, responses.toList)
     sendToSocket(msg)
     responseEventDao.saveResponseMessageEvent(DateTime.now, false, linkName, ci.linkAddress, msg)
   }
@@ -94,7 +92,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
    * Sends the request message back to the client.
    */
   private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty) {
-    val msg = RequestMessage(localMsgId.inc, None, requests.toList)
+    val msg = RequestMessage(0, None, requests.toList)
     sendToSocket(msg)
     requestEventDao.saveRequestMessageEvent(DateTime.now, false, linkName, ci.linkAddress, msg)
   }
@@ -107,7 +105,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
   /**
    * Sends an ACK back to the client.
    */
-  private def sendAck(remoteMsgId: Int) = sendToSocket(PingMessage(localMsgId.inc, Some(remoteMsgId)))
+  private def sendAck(remoteMsgId: Int) = sendToSocket(PingMessage(0, Some(remoteMsgId)))
 
   /**
    * Sends a DSAMessage to a WebSocket connection.

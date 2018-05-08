@@ -1,6 +1,7 @@
 package facades.websocket
 
 import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -23,7 +24,7 @@ import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, Sub
 import models.akka.Messages.{GetOrCreateDSLink, GetSubscriptionSource, RemoveDSLink}
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
-import models.rpc.{DSAMessage, SubscriptionNotificationMessage}
+import models.rpc.{DSAMessage, PingMessage, RequestMessage, ResponseMessage, SubscriptionNotificationMessage}
 import models.util.UrlBase64
 import org.reactivestreams.Publisher
 import play.api.cache.SyncCacheApi
@@ -213,19 +214,34 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           val merge = b.add(Merge[DSAMessage](2))
 
           val onlyDSAMessages = Flow[DSAMessage].buffer(bufferSize, overflow)
-
           val subscriptionChannel = Source.fromPublisher(subs)
 
+          //path for non subscription responses (from websocketactor etc)
           in ~> onlyDSAMessages ~> merge
+          //path for subscription responses with qos
           subscriptionChannel   ~> merge
 
           SourceShape(merge.out)
         })
 
-        val p = messageSource.toMat(Sink.asPublisher(false))(Keep.right).run()
+        val counter = new AtomicInteger(0)
+
+        //moved from WebSocketActor since subscriptions notifications goes from other source
+        val msgConter = Flow[DSAMessage] map { message =>
+          message match {
+            case request:RequestMessage => request.copy(msg = counter.getAndIncrement())
+            case resp:ResponseMessage => resp.copy(msg = counter.getAndIncrement())
+            case ping:PingMessage => ping.copy(msg = counter.getAndIncrement())
+            case any:DSAMessage => any
+          }
+        }
+
+        val messagePub = messageSource
+          .via(msgConter)
+          .toMat(Sink.asPublisher(false))(Keep.right).run()
 
         val messageSink = Sink.actorRef(fromSocket, Success(()))
-        val src = Source.fromPublisher(p)
+        val src = Source.fromPublisher(messagePub)
 
         Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
 

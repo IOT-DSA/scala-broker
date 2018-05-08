@@ -6,8 +6,14 @@ import models.rpc.SubscriptionNotificationMessage
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.util.Random
 
+/**
+  * actor for storing dslink - specific state as
+  * subscriptions, qos queue etc
+  *
+  * @param maxCapacity max queue size per sid
+  * @param reconnectionTime timeout for storage drop
+  */
 class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends Actor with ActorLogging {
 
   var subscriptionsQueue = Map[Int, mutable.Queue[SubscriptionNotificationMessage]]()
@@ -28,9 +34,6 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
     case Connected =>
       onConnected
       log.debug(s"stateKeeper ${self.path} connected")
-    case IsEmpty =>
-      log.debug(s"state is empty:${subscriptionsQueue.isEmpty}")
-      sender ! subscriptionsQueue.isEmpty
     case GetAllMessages =>
       sender ! subscriptionsQueue
   }

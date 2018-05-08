@@ -25,18 +25,6 @@ trait BaseDSLinkHandler extends DSLinkHandler {
   protected var link:DSLink = _
   protected val nodes: ConcurrentMap[String, Node] = new ConcurrentHashMap()
 
-
-  def disconnect() = {
-    getProvider.stop()
-    log.info(s"disconnecting ${getClass.getName}...")
-  }
-
-
-  def reconnect() = {
-    getProvider.start()
-    log.info(s"reconnecting ${getClass.getName}...")
-  }
-
   /**
     * returns link children nodes data
     * @return Map[String, Node] where key is node id (name)

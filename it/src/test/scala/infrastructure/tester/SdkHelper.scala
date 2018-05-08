@@ -31,7 +31,7 @@ trait SdkHelper {
     * @param action
     * @tparam T
     */
-  protected def connectDSLink[T <: BaseDSLinkHandler](dsLink:T, dsLinkProvider:DSLinkProvider)(action: T  => Unit): Unit = {
+  protected def connectDSLink[T <: BaseDSLinkHandler](dsLink:T, dsLinkProvider:DSLinkProvider)(action: T => Unit): Unit = {
     var attempt = 0;
     while (!dsLink.isConnected && attempt < maxRetries) {
       log.info(s"trying to connect ${dsLink.getClass} instance to broker")
@@ -44,22 +44,6 @@ trait SdkHelper {
     } finally {
       dsLink.stop()
       dsLinkProvider.stop()
-    }
-  }
-
-
-  /**
-    * Generic dslink connection method with connection closing and retries
-    * @param dsLink
-    * @param dsLinkProvider
-    * @tparam T
-    */
-  protected def connectLink[T <: BaseDSLinkHandler](dsLink:T, dsLinkProvider:DSLinkProvider): Unit = {
-    var attempt = 0;
-    while (!dsLink.isConnected && attempt < maxRetries) {
-      log.info(s"trying to connect ${dsLink.getClass} instance to broker")
-      TimeUnit.SECONDS.sleep(1)
-      attempt = attempt + 1
     }
   }
 

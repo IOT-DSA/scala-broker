@@ -3,9 +3,7 @@ package models.akka
 import org.joda.time.DateTime
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
-import akka.stream.Materializer
-import models.{ResponseEnvelope, Settings}
-import models.rpc.DSAResponse
+import models.Settings
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -30,6 +28,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
 
   implicit val system = context.system
 
+  //state actore to store different dslink state with persistance etc
   val stateKeeper = context.actorOf(StateKeeper.props(
     reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
     maxCapacity = Settings.Subscriptions.queueCapacity

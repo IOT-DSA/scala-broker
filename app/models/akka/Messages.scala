@@ -1,8 +1,7 @@
 package models.akka
 
 import org.joda.time.DateTime
-import akka.actor.{ActorPath, ActorRef, Address}
-import akka.cluster.ClusterEvent
+import akka.actor.{ActorRef, Address}
 import models.akka.DSLinkMode.DSLinkMode
 import models.rpc.SubscriptionNotificationMessage
 
@@ -129,12 +128,39 @@ object Messages {
    */
   case object RemoveDisconnectedDSLinks
 
+  /**
+    * Sent to StateKeeper to get subscription stream publisher
+    */
   case class GetSubscriptionSource()
+
+  /**
+    * Sent to StateKeeper to add subscription message
+    * @param message
+    */
   case class PutNotification(message:SubscriptionNotificationMessage)
+
+  /**
+    * Sent to StateKeeper to fetch and remove message queue by sid
+    */
   case class GetAndRemoveNext()
+
+  /**
+    * Sent to StateKeeper (dslink disconnected)
+    */
   case class Disconnected()
+
+  /**
+    * Sent to StateKeeper (dslink connected)
+    */
   case class Connected()
+
+  /**
+    * Sent to StateKeeper to clean state if it wasn't reconnected
+    */
   case class KillStateIfNotConnected()
-  case class IsEmpty()
+
+  /**
+    * fetch all messages from stateKeeper subscriptions storage
+    */
   case class GetAllMessages()
 }
