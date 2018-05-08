@@ -35,6 +35,7 @@ object Settings {
       "salt" -> cfg.getString("salt"),
       "version" -> cfg.getString("version"),
       "updateInterval" -> cfg.getInt("updateInterval"),
+//      "format" -> "json"
       "format" -> JsArray(Seq(cfg.getStringList("format").toArray():_*).map {
                                             s => JsString(s.asInstanceOf[String])
                                           }

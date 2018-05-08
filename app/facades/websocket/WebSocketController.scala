@@ -25,12 +25,12 @@ import models.metrics.EventDaos
 import models.rpc.DSAMessage
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
-import play.api.libs.json.{JsString, Json}
+import play.api.libs.json._
 import play.api.libs.ws.WSClient
-import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
+import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
-import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
-import play.api.mvc.WebSocket.MessageFlowTransformer
+//import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
+//import play.api.mvc.WebSocket.MessageFlowTransformer
 
 /**
  * Establishes WebSocket DSLink connections
@@ -57,9 +57,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   implicit private val connReqFormat = Json.format[ConnectionRequest]
 
   private val jsonTransformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
-  private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
+//  private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
 
-  private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = { "json" }
+  private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
+    val mergedFormats = clientFormats intersect serverFormats
+    if (mergedFormats.contains("msgpack")) "msgpack" else "json"
+  }
 
   /**
    * Connects to another broker upstream.
@@ -153,7 +156,26 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   /**
    * Establishes a WebSocket connection.
    */
-  def dslinkWSConnect = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
+  def func2(request: RequestHeader) = {
+    val transformer = jsonTransformer
+
+    WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
+      import Settings.WebSocket._
+
+      log.debug(s"WS request received: $request")
+      val dsId = getDsId(request)
+      val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+      log.debug(s"Session info retrieved for $dsId: $sessionInfo")
+
+      sessionInfo map { si =>
+        createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
+      } getOrElse
+        Future.successful(Left[Result, DSAFlow](Forbidden))
+
+    }(transformer)
+  }
+
+  val func = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
     import Settings.WebSocket._
 
     log.debug(s"WS request received: $request")
@@ -168,22 +190,24 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
   }(jsonTransformer)
 
-  private def acceptOrResult(f: RequestHeader => Future[Either[Result, Flow[DSAMessage, DSAMessage, _]]])(implicit transformer: MessageFlowTransformer[DSAMessage, DSAMessage]): WebSocket = {
-    WebSocket { request =>
-      f(request).map(_.right.map(getTransformer(request).transform))
-    }
-  }
+  def dslinkWSConnect = func
 
-  private def getTransformer(request : RequestHeader) = {
-    val dsId = getDsId(request)
-    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+//  private def acceptOrResult(f: RequestHeader => Future[Either[Result, Flow[DSAMessage, DSAMessage, _]]])(implicit transformer: MessageFlowTransformer[DSAMessage, DSAMessage]): WebSocket = {
+//    WebSocket { request =>
+//      f(request).map(_.right.map(getTransformer(request).transform))
+//    }
+//  }
 
-    val format = sessionInfo.fold("json")(si => {
-      chooseFormat(si.ci.formats, (Settings.ServerConfiguration \ "format").as[List[String]])
-    })
-
-    jsonTransformer
-  }
+//  private def getTransformer(request : RequestHeader) = {
+//    val dsId = getDsId(request)
+//    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+//
+//    val format = sessionInfo.fold("json")(si => {
+//      chooseFormat(si.ci.formats, (Settings.ServerConfiguration \ "format").as[List[String]])
+//    })
+//
+//    jsonTransformer
+//  }
 
   /**
    * Creates a new WebSocket flow bound to a newly created WSActor.
@@ -234,13 +258,16 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val cr = request.body
+//    val resultFormat = "json"
+    val r  = Settings.ServerConfiguration.apply("format").as[Seq[String]]
     val resultFormat = chooseFormat(
-      request.body.formats.getOrElse(List("Json"))
-      , Settings.ServerConfiguration.\("format").as[List[String]]
+      request.body.formats.getOrElse(List("json"))
+      , List(r :_*)
     )
+
     new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
       cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
-      request.remoteAddress, request.host, resultFormat)
+      request.remoteAddress, request.host, resultFormat = resultFormat)
   }
 
   /**
