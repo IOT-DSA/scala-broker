@@ -25,7 +25,7 @@ import models.metrics.EventDaos
 import models.rpc.DSAMessage
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
-import play.api.libs.json.Json
+import play.api.libs.json.{JsString, Json}
 import play.api.libs.ws.WSClient
 import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
@@ -137,7 +137,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val ci = buildConnectionInfo(request)
     val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
-    val json = Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
+    val json = (Settings.ServerConfiguration. + ("path" -> Json.toJson(linkPath))) ++ Json.obj("format" -> ci.resultFormat)
 
     val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
 
@@ -234,9 +234,13 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val cr = request.body
+    val resultFormat = chooseFormat(
+      request.body.formats.getOrElse(List("Json"))
+      , Settings.ServerConfiguration.\("format").as[List[String]]
+    )
     new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
       cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
-      request.remoteAddress, request.host)
+      request.remoteAddress, request.host, resultFormat)
   }
 
   /**
