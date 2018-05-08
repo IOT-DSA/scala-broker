@@ -232,6 +232,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
             case request:RequestMessage => request.copy(msg = counter.getAndIncrement())
             case resp:ResponseMessage => resp.copy(msg = counter.getAndIncrement())
             case ping:PingMessage => ping.copy(msg = counter.getAndIncrement())
+            case msg:SubscriptionNotificationMessage => msg.copy(msg = counter.getAndIncrement())
             case any:DSAMessage => any
           }
         }
