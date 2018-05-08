@@ -1,12 +1,17 @@
 package facades.websocket
 
+import com.typesafe.config.ConfigFactory
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
-
-import play.api.libs.json.JsValue.jsValueToJsLookup
-import play.api.libs.json.Json
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import models.Settings.rootConfig
+import play.api.libs.json.JsString
+//import play.api.libs.json.JsValue.jsValueToJsLookup
+import play.api.libs.json.{JsArray, JsValue, Json}
+import scala.collection.JavaConverters.asScalaSetConverter
+import play.api.libs.json.Json.toJsFieldJsValueWrapper
+
 
 /**
  * Tests WebSocket connection controller.
@@ -30,5 +35,18 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       (json \ "wsUri").toOption.value mustBe Json.toJson("/ws")
       (json \ "path").toOption.value mustBe Json.toJson("/downstream/Shell")
     }
+  }
+
+  "Server configuration" should {
+    val rootConfig = ConfigFactory.load
+    val BrokerName = rootConfig.getString("broker.name")
+    val cfg = rootConfig.getConfig("broker.server-config")
+
+    val l : java.util.List[String] = cfg.getStringList("format")
+    val l1 = Seq(l.toArray():_*)
+    val l2 = l1.map(s => JsString(s.asInstanceOf[String]))
+    val l3 = JsArray(l2)
+
+    println(l3)
   }
 }

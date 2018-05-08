@@ -4,33 +4,33 @@ import java.net.URL
 
 import scala.concurrent.Future
 import scala.util.Random
-
 import org.bouncycastle.jcajce.provider.digest.SHA256
 import org.joda.time.DateTime
-
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{ Message, TextMessage, WebSocketRequest }
+import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
-import akka.stream.{ Materializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
+import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import controllers.BasicController
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
 import models.Settings
-import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee }
-import models.akka.Messages.{ GetOrCreateDSLink, RemoveDSLink }
-import models.handshake.{ LocalKeys, RemoteKey }
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
+import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
+import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
 import models.rpc.DSAMessage
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import play.api.mvc.{ ControllerComponents, Request, RequestHeader, Result, WebSocket }
+import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
+import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
+import play.api.mvc.WebSocket.MessageFlowTransformer
 
 /**
  * Establishes WebSocket DSLink connections
@@ -56,7 +56,10 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
   implicit private val connReqFormat = Json.format[ConnectionRequest]
 
-  private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
+  private val jsonTransformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
+  private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
+
+  private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = { "json" }
 
   /**
    * Connects to another broker upstream.
@@ -163,7 +166,24 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     } getOrElse
       Future.successful(Left[Result, DSAFlow](Forbidden))
 
-  }(transformer)
+  }(jsonTransformer)
+
+  private def acceptOrResult(f: RequestHeader => Future[Either[Result, Flow[DSAMessage, DSAMessage, _]]])(implicit transformer: MessageFlowTransformer[DSAMessage, DSAMessage]): WebSocket = {
+    WebSocket { request =>
+      f(request).map(_.right.map(getTransformer(request).transform))
+    }
+  }
+
+  private def getTransformer(request : RequestHeader) = {
+    val dsId = getDsId(request)
+    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+
+    val format = sessionInfo.fold("json")(si => {
+      chooseFormat(si.ci.formats, (Settings.ServerConfiguration \ "format").as[List[String]])
+    })
+
+    jsonTransformer
+  }
 
   /**
    * Creates a new WebSocket flow bound to a newly created WSActor.
