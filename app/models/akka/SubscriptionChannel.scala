@@ -32,7 +32,7 @@ class SubscriptionChannel(val store: ActorRef)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
 
-    def storeIt(message: SubscriptionNotificationMessage) = Await.result(store ? PutNotification(message), 1 second)
+    def storeIt(message: SubscriptionNotificationMessage) = (store ? PutNotification(message)).mapTo[Int]
 
 
     setHandler(in, new InHandler {
@@ -41,16 +41,19 @@ class SubscriptionChannel(val store: ActorRef)
         log.debug(s"on push: ${in}")
         val message = grab(in)
 
-        storeIt(message)
-        log.debug(s"storing $message")
+        val callback = getAsyncCallback[Int]{
+          _=>
+            log.debug(s"storing $message")
 
-        if(isAvailable(out)){
-          log.debug(s"out is available. Pushing $message")
-          pushNext
-          pull(in)
-        } else {
-          log.debug(s"out is unavailable.")
+            if(isAvailable(out)){
+              pushNext
+            } else {
+              log.debug(s"out is unavailable.")
+            }
         }
+
+        storeIt(message) foreach callback.invoke
+
       }
 
       override def onUpstreamFinish(): Unit = {
@@ -73,13 +76,21 @@ class SubscriptionChannel(val store: ActorRef)
     }
 
     def pushNext = {
+      // to avoid locking using 'getAsyncCallback' https://doc.akka.io/docs/akka/2.5/stream/stream-customize.html#using-asynchronous-side-channels
       val futureMessage = (store ? GetAndRemoveNext).mapTo[Option[mutable.Queue[SubscriptionNotificationMessage]]]
 
-      Await.result(futureMessage, 1 second) foreach {
-        queue => toResponseMsg(queue) foreach {m =>
-          log.debug(s"pushing $m")
-          push(out, m)
+      val callback = getAsyncCallback[Option[mutable.Queue[SubscriptionNotificationMessage]]] {
+        _ foreach {
+          toResponseMsg(_).foreach { m =>
+            log.debug(s"push(out, $m)")
+            push(out, m)
+            pull(in)
+          }
         }
+      }
+
+      futureMessage foreach {
+        callback.invoke(_)
       }
     }
 
