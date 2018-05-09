@@ -37,20 +37,12 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
 
   override def persistenceId = linkName
 
-  private def updateState(event: DSLinkState) = {
-    endpoint = event.endpoint
-    connInfo = event.connInfo
-    lastConnected = event.lastConnected.collect { case x => new DateTime(x) }
-    lastDisconnected = event.lastDisconnected.collect { case x => new DateTime(x) }
-    log.debug(s"$ownId: state has become [endpoint: $endpoint] [connInfo: $connInfo] [lastConnected: $lastConnected] [lastDisconnected: $lastDisconnected]")
-  }
-
   /**
    * Called on link start up: notifies the registry and logs the dslink status.
    */
   override def preStart() = {
     sendToRegistry(RegisterDSLink(linkName, connInfo.mode, false))
-    log.info(s"$ownId: initialized, not connected to Endpoint")
+    log.info("{}: initialized, not connected to Endpoint", ownId)
   }
 
   /**
@@ -58,7 +50,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
    */
   override def postStop() = {
     sendToRegistry(UnregisterDSLink(self.path.name))
-    log.info(s"$ownId: stopped")
+    log.info("{}: stopped", ownId)
   }
 
   /**
@@ -66,11 +58,19 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
     */
   override def receiveRecover: Receive = {
     case event: DSLinkState =>
-      log.debug(s"$ownId: trying to recover $event")
+      log.debug("{}: trying to recover {}", ownId, event)
       updateState(event)
 //    case Snapshot(_, snapshot: DSLinkState) => state = snapshot
     case _ =>
-      log.warning(s"$ownId: not supported event")
+      log.warning("{}: not supported event", ownId)
+  }
+
+  private def updateState(event: DSLinkState) = {
+    endpoint = event.endpoint
+    connInfo = event.connInfo
+    lastConnected = event.lastConnected.map { new DateTime(_) }
+    lastDisconnected = event.lastDisconnected.map { new DateTime(_) }
+    log.debug(s"$ownId: state has become [endpoint: {}] [connInfo: {}] [lastConnected: {}] [lastDisconnected: {}]", endpoint, connInfo, lastConnected, lastDisconnected)
   }
 
   /**
@@ -83,16 +83,16 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
    */
   def connected: Receive = {
     case DisconnectEndpoint(kill) =>
-      log.info(s"$ownId: disconnected from Endpoint")
+      log.info("{}: disconnected from Endpoint", ownId)
       disconnectFromEndpoint(kill)
     case Terminated(wsActor) =>
-      log.info(s"$ownId: Endpoint terminated, disconnecting")
+      log.info("{}: Endpoint terminated, disconnecting", ownId)
       disconnectFromEndpoint(false)
     case GetLinkInfo =>
-      log.debug(s"$ownId: LinkInfo requested, dispatching")
+      log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
     case ConnectEndpoint(ref, ci) =>
-      log.warning(s"$ownId: already connected to Endpoint, dropping previous association")
+      log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
       disconnectFromEndpoint(true)
       connectToEndpoint(ref, ci)
   }
@@ -102,15 +102,15 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
    */
   private def disconnected: Receive = {
     case ConnectEndpoint(ref, ci) =>
-      log.info(s"$ownId: connected to Endpoint")
+      log.info("{}: connected to Endpoint", ownId)
       connectToEndpoint(ref, ci)
     case GetLinkInfo =>
-      log.debug(s"$ownId: LinkInfo requested, dispatching")
+      log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
     case DisconnectEndpoint(_) =>
-      log.warning(s"$ownId: not connected to Endpoint, ignoring DISCONNECT")
+      log.warning("{}: not connected to Endpoint, ignoring DISCONNECT", ownId)
     case _ =>
-      log.debug(s"$ownId: stashing the incoming message")
+      log.debug("{}: stashing the incoming message", ownId)
       stash()
   }
 
@@ -118,14 +118,14 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
    * Associates this DSLink with an endpoint.
    */
   private def connectToEndpoint(ref: ActorRef, ci: ConnectionInfo) = {
-    log.debug(s"$ownId: connectToEndpoint called, [ref: $ref] [connection: $ci]")
+    log.debug("{}: connectToEndpoint called, [ref: {}] [connection: {}]", ownId, ref, ci)
     assert(ci.isRequester || ci.isResponder, "DSLink must be Requester, Responder or Dual")
 
-    persist(DSLinkState(Some(context.watch(ref)), ci, Some(DateTime.now.toDate), lastDisconnected.collect { case x => x.toDate } )) { event =>
+    persist(DSLinkState(Some(context.watch(ref)), ci, Some(DateTime.now.toDate), lastDisconnected.map { _.toDate } )) { event =>
       updateState(event)
       sendToRegistry(DSLinkStateChanged(linkName, ci.mode, true))
 
-      log.debug(s"$ownId: unstashing all stored messages")
+      log.debug("{}: unstashing all stored messages", ownId)
       unstashAll()
       context.become(connected)
     }
@@ -135,14 +135,14 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
    * Dissociates this DSLink from the endpoint.
    */
   private def disconnectFromEndpoint(kill: Boolean) = {
-    log.debug(s"$ownId: disconnectFromEndpoint called, [kill: $kill]")
+    log.debug("{}: disconnectFromEndpoint called, [kill: {}]", ownId, kill)
 
     endpoint foreach { ref =>
       context unwatch ref
       if (kill) ref ! PoisonPill
     }
 
-    persist(DSLinkState(None, connInfo, lastConnected.collect { case x => x.toDate }, Some(DateTime.now.toDate))) { event =>
+    persist(DSLinkState(None, connInfo, lastConnected.map { _.toDate }, Some(DateTime.now.toDate))) { event =>
       updateState(event)
       sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
       context.become(disconnected)
