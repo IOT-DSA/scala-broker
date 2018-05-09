@@ -3,7 +3,7 @@ import Testing.itTest
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
-val AKKA_VERSION = "2.5.8"
+val AKKA_VERSION = "2.5.12"
 val JSON_VERSION = "2.6.8"
 
 
@@ -75,22 +75,24 @@ lazy val commonDependencies = Seq(
   ehcache,
   jdbc,
   ws,
-  "com.typesafe.play"       %% "play-json"               % JSON_VERSION,
-  "com.typesafe.play"       %% "play-json-joda"          % JSON_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster"            % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-metrics"    % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
-  "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
-  "org.bouncycastle"         % "bcprov-jdk15on"          % "1.51",
-  "com.github.romix.akka"   %% "akka-kryo-serialization" % "0.5.1",
-  "com.h2database"           % "h2"                      % "1.4.193",
-  "com.typesafe.play"       %% "anorm"                   % "2.5.3",
-  "com.maxmind.geoip2"       % "geoip2"                  % "2.10.0",
-  "ch.qos.logback"           % "logback-classic"         % "1.2.3",
-  "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
-  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force()
+  "com.typesafe.play"           %% "play-json"               % JSON_VERSION,
+  "com.typesafe.play"           %% "play-json-joda"          % JSON_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster"            % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster-metrics"    % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster-tools"      % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster-sharding"   % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-slf4j"              % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-persistence"        % AKKA_VERSION,
+  "org.fusesource.leveldbjni"    % "leveldbjni-all"          % "1.8",
+  "com.paulgoldbaum"            %% "scala-influxdb-client"   % "0.5.2",
+  "org.bouncycastle"             % "bcprov-jdk15on"          % "1.51",
+  "com.github.romix.akka"       %% "akka-kryo-serialization" % "0.5.1",
+  "com.h2database"               % "h2"                      % "1.4.193",
+  "com.typesafe.play"           %% "anorm"                   % "2.5.3",
+  "com.maxmind.geoip2"           % "geoip2"                  % "2.10.0",
+  "ch.qos.logback"               % "logback-classic"         % "1.2.3",
+  "io.netty"                     % "netty-codec-http"        % "4.0.41.Final" force(),
+  "io.netty"                     % "netty-handler"           % "4.0.41.Final" force()
 )
 
 // akka and play test dependencies
