@@ -29,7 +29,7 @@ import play.api.libs.json._
 import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
-//import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
+import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
 //import play.api.mvc.WebSocket.MessageFlowTransformer
 
 /**
@@ -57,7 +57,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   implicit private val connReqFormat = Json.format[ConnectionRequest]
 
   private val jsonTransformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
-//  private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
+  private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
+
+  val transformers = Map(
+      "json"->jsonTransformer
+    , "msgpack"-> msgpackTransformer
+  )
 
   private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
     val mergedFormats = clientFormats intersect serverFormats
@@ -156,58 +161,33 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   /**
    * Establishes a WebSocket connection.
    */
-  def func2(request: RequestHeader) = {
-    val transformer = jsonTransformer
-
-    WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
-      import Settings.WebSocket._
-
-      log.debug(s"WS request received: $request")
-      val dsId = getDsId(request)
-      val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
-      log.debug(s"Session info retrieved for $dsId: $sessionInfo")
-
-      sessionInfo map { si =>
-        createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
-      } getOrElse
-        Future.successful(Left[Result, DSAFlow](Forbidden))
-
-    }(transformer)
-  }
-
-  val func = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
+  def dslinkWSConnect = acceptOrResult { sessionInfo =>
     import Settings.WebSocket._
-
-    log.debug(s"WS request received: $request")
-    val dsId = getDsId(request)
-    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
-    log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
     sessionInfo map { si =>
       createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
     } getOrElse
       Future.successful(Left[Result, DSAFlow](Forbidden))
+  }
 
-  }(jsonTransformer)
+  private def acceptOrResult(f: Option[DSLinkSessionInfo] => Future[Either[Result, Flow[DSAMessage, DSAMessage, _]]]): WebSocket = {
+    WebSocket { request =>
+      log.debug(s"WS request received: $request")
+      val dsId = getDsId(request)
+      val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+      log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
-  def dslinkWSConnect = func
+      f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
+    }
+  }
 
-//  private def acceptOrResult(f: RequestHeader => Future[Either[Result, Flow[DSAMessage, DSAMessage, _]]])(implicit transformer: MessageFlowTransformer[DSAMessage, DSAMessage]): WebSocket = {
-//    WebSocket { request =>
-//      f(request).map(_.right.map(getTransformer(request).transform))
-//    }
-//  }
+  private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {
+    val format = sessionInfo.fold("json")(si => {
+      chooseFormat(si.ci.formats, (Settings.ServerConfiguration \ "format").as[List[String]])
+    })
 
-//  private def getTransformer(request : RequestHeader) = {
-//    val dsId = getDsId(request)
-//    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
-//
-//    val format = sessionInfo.fold("json")(si => {
-//      chooseFormat(si.ci.formats, (Settings.ServerConfiguration \ "format").as[List[String]])
-//    })
-//
-//    jsonTransformer
-//  }
+    transformers.applyOrElse(format, (_ : String) => jsonTransformer)
+  }
 
   /**
    * Creates a new WebSocket flow bound to a newly created WSActor.
