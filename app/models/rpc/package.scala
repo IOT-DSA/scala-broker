@@ -12,6 +12,11 @@ import play.api.libs.json._
 package object rpc {
   import DSAValue._
 
+  object DSAMessageSerrializationFormat {
+    val JSON = "json"
+    val MSGPACK = "msgpack"
+  }
+
   val BinaryPrefix = "\u001Bbytes:"
 
   /**
@@ -149,7 +154,7 @@ package object rpc {
   /**
    * DSAMessage <-> JSON
    */
-  implicit val DSAMessageFormat: Format[DSAMessage] = new Format[DSAMessage] {
+  implicit val DSAMessageType: Format[DSAMessage] = new Format[DSAMessage] {
 
     val AllowedMessageFormat = Json.format[AllowedMessage]
 

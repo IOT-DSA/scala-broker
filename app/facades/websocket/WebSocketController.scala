@@ -30,6 +30,7 @@ import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
+import org.velvia.MsgPack
 //import play.api.mvc.WebSocket.MessageFlowTransformer
 
 /**
@@ -49,6 +50,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   type DSAFlow = Flow[DSAMessage, DSAMessage, _]
 
   import eventDaos._
+  import models.rpc.DSAMessageSerrializationFormat._
 
   implicit private val as = actorSystem
 
@@ -60,13 +62,13 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
 
   val transformers = Map(
-      "json"->jsonTransformer
-    , "msgpack"-> msgpackTransformer
+      JSON->jsonTransformer
+    , MSGPACK-> msgpackTransformer
   )
 
   private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
     val mergedFormats = clientFormats intersect serverFormats
-    if (mergedFormats.contains("msgpack")) "msgpack" else "json"
+    if (mergedFormats.contains(JSON)) MSGPACK else JSON
   }
 
   /**
@@ -78,7 +80,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val publicKey = keys.encodedPublicKey
     val dsId = Settings.BrokerName + "-" + keys.encodedHashedPublicKey
 
-    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2", Some(List("json")), true)
+    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2", Some(List(JSON, MSGPACK)), true)
     val frsp = wsc.url(url)
       .withQueryStringParameters("dsId" -> dsId)
       .post(Json.toJson(cr))
@@ -89,9 +91,10 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val tempKey = (serverConfig \ "tempKey").as[String]
       val wsUri = (serverConfig \ "wsUri").as[String]
       val salt = (serverConfig \ "salt").as[String].getBytes("UTF-8")
+      val format = (serverConfig \ "format").as[String]
 
       val auth = buildAuth(tempKey, salt)
-      val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=json"
+      val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=$format"
 
       uplinkWSConnect(wsUrl, name, dsId)
     }
@@ -238,10 +241,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val cr = request.body
-//    val resultFormat = "json"
-    val r  = Settings.ServerConfiguration.apply("format").as[Seq[String]]
+    val r  = Settings.ServerConfiguration("format").as[Seq[String]]
     val resultFormat = chooseFormat(
-      request.body.formats.getOrElse(List("json"))
+      request.body.formats.getOrElse(List(JSON))
       , List(r :_*)
     )
 
@@ -253,7 +255,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   /**
    * Builds the authorization hash to be sent to the remote broker.
    */
-  private def buildAuth(tempKey: String, salt: Array[Byte]) = {
+  def buildAuth(tempKey: String, salt: Array[Byte]) = {
     val remoteKey = RemoteKey.generate(keys, tempKey)
     val sharedSecret = remoteKey.sharedSecret
     // TODO make more scala-like

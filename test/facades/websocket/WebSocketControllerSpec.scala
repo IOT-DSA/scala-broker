@@ -41,13 +41,18 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
 //    }
 
     "WebSocketController /ws" should {
+      import models.rpc.DSAMessageSerrializationFormat._
 
-      val connReq = ConnectionRequest("", true, true, None, "", Option(List("json", "msgpack")), true)
-      val reqUri = "/ws?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg&auth=123&format=msgpack"
-      val request = FakeRequest("GET", reqUri)
+      val connReq = ConnectionRequest("", true, true, None, "", Option(List(JSON, MSGPACK)), true)
+      val tempKey = (models.Settings.ServerConfiguration \ "tempKey").as[String]
+      val salt = (models.Settings.ServerConfiguration \ "salt").as[String].getBytes("UTF-8")
 
       "render the ws connection response from the application" in {
         val controller = app.injector.instanceOf[WebSocketController]
+        val auth = controller.buildAuth(tempKey, salt)
+        val reqUri = s"/ws?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg&auth=$auth&format=msgpack"
+        val request = FakeRequest("GET", reqUri)
+
         val conn = controller.dslinkWSConnect(request)
 
         //        status(conn) mustBe OK
