@@ -28,8 +28,8 @@ object PlayJsonCodecs {
   }
 
   implicit object JsNumberCodec extends Codec[JsNumber] {
-    def pack(out: DataOutputStream, item: JsNumber): Unit = { BigDecimalCodec.pack(out, item.value.underlying) }
-    val unpackFuncMap = BigDecimalCodec.unpackFuncMap.mapValues(_.andThen(b ⇒ JsNumber(BigDecimal(b))))
+    def pack(out: DataOutputStream, item: JsNumber): Unit = { DoubleCodec.pack(out, item.value.doubleValue()) }
+    val unpackFuncMap = DoubleCodec.unpackFuncMap.mapValues(_.andThen(b ⇒ JsNumber(BigDecimal(b))))
   }
 
   implicit object JsArrayCodec extends Codec[JsArray] {
