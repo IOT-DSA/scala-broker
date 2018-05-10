@@ -95,7 +95,32 @@ class SubscriptionChannelSpec extends WordSpecLike
         }
       }
 
-      def withFlow(iterations: Int, sids:Int, qosLevel:QoS.Level)(assertion: (
+      "deliver all messages if speed is equals and QoS == 3 if consumer is slow" in {
+
+        withFlow(200, 5, QoS.DurableAndPersist){
+          (source, flow, sink) =>
+
+            When("consumer is slow")
+            And("qos == 3")
+            val runnableGraph =
+              source
+                .buffer(300, OverflowStrategy.backpressure)
+                .via(flow)
+                .throttle(1, 20.millisecond, 1, ThrottleMode.shaping)
+                .toMat(sink)(Keep.right)
+
+            val result = Await.result(runnableGraph.run(), 5 seconds)
+            val totalSize = result.flatMap {
+              case m:ResponseMessage => m.responses
+              case _ => List()
+            }.toSet.size
+
+            Then("All messages should be delivered")
+            totalSize shouldBe 200
+        }
+      }
+
+      def withFlow(iterations: Int, sids:Int, qosLevel:Int)(assertion: (
         Source[SubscriptionNotificationMessage, NotUsed],
         Flow[SubscriptionNotificationMessage, DSAMessage, NotUsed],
         Sink[DSAMessage, Future[Seq[DSAMessage]]]

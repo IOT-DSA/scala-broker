@@ -32,7 +32,7 @@ case class ResponseEnvelope(responses: Seq[DSAResponse]) {
     s"ResponseEnvelope(List(${responses.head},...${responses.size - 1} more))"
 }
 
-case class SubscriptionResponseEnvelope(response: DSAResponse, sid: Int, qos: QoS.Level){
+case class SubscriptionResponseEnvelope(response: DSAResponse, sid: Int, qos: Int){
   /**
     * Outputs only the first response for compact logging.
     */

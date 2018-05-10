@@ -1,5 +1,7 @@
 package models.akka
 
+import akka.actor.ExtendedActorSystem
+import akka.serialization.BaseSerializer
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -216,7 +218,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     case r @ (_: ListRequest | _: InvokeRequest) => targetsByRid.put(r.rid, target)
     case r: SubscribeRequest                     => targetsBySid.put(
       r.path.sid,
-      PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default))
+      PathAndQos(target, r.path.qos.getOrElse(QoS.Default))
     )
     case _                                       => // do nothing
   }
@@ -264,27 +266,11 @@ case class SubscriptionsAndOther(subscriptions:Seq[DSAResponse], other:Seq[DSARe
 
 }
 
-case class PathAndQos(path:String, qos:QoS.Level)
+case class PathAndQos(path:String, qos:Int)
 
 object QoS {
-  sealed abstract class Level(val index:Int){
-    def <(other:Level) = index < other.index
-    def >(other:Level) = index > other.index
-    def >=(other:Level) = index >= other.index
-    def <=(other:Level) = index <= other.index
-  }
-
-  case object Default extends Level(0)
-  case object Queued extends Level(1)
-  case object Durable extends Level(2)
-  case object DurableAndPersist extends Level(3)
-
-
-  def apply(level:Int): QoS.Level = level match {
-    case 0 => Default
-    case 1 => Queued
-    case 2 => Durable
-    case 3 => DurableAndPersist
-    case  _ => throw new RuntimeException("unsupported QoS level")
-  }
+  val Default = 0
+  val Queued = 1
+  val Durable = 2
+  val DurableAndPersist = 3
 }

@@ -147,11 +147,6 @@ package object rpc {
   implicit val StreamStateReads = enumReads(StreamState)
   implicit val DSAResponseFormat: Format[DSAResponse] = Json.format[DSAResponse]
 
-  implicit val QoSFormat: Format[models.akka.QoS.Level] = new Format[QoS.Level] {
-    override def reads(json: JsValue): JsResult[QoS.Level] = JsSuccess(QoS(json.as[Int]))
-    override def writes(o: QoS.Level): JsValue = JsNumber(o.index)
-  }
-
   /**
    * DSAMessage <-> JSON
    */
@@ -178,7 +173,7 @@ package object rpc {
       (__ \ 'ack).formatNullable[Int] ~
       (__ \ 'responses).format[List[DSAResponse]] ~
       (__ \ 'sid).format[Int] ~
-      (__ \ 'qos).format[models.akka.QoS.Level]
+      (__ \ 'qos).format[Int]
       )(SubscriptionNotificationMessage, unlift(SubscriptionNotificationMessage.unapply))
 
 

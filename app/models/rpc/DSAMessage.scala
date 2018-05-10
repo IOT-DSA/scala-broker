@@ -57,7 +57,9 @@ case class ResponseMessage(msg: Int, ack: Option[Int] = None, responses: List[DS
     s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more))"
 }
 
-case class SubscriptionNotificationMessage(msg: Int, ack: Option[Int] = None, responses: List[DSAResponse] = Nil, sid: Int, qos: QoS.Level = QoS.Default)
+
+@SerialVersionUID(1L)
+case class SubscriptionNotificationMessage(msg: Int, ack: Option[Int] = None, responses: List[DSAResponse] = Nil, sid: Int, qos: Int = QoS.Default)
   extends DSAMessage {
   /**
     * Outputs only the first response for compact logging.
