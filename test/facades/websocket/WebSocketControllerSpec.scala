@@ -8,74 +8,65 @@ import play.api.libs.json.Json
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
-//import com.typesafe.config.ConfigFactory
-//import models.Settings.rootConfig
-//import play.api.libs.json.JsString
-//import play.api.libs.json.{JsArray, JsValue, Json}
-//import scala.collection.JavaConverters.asScalaSetConverter
-//import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import scala.concurrent.duration._
 
-
+import scala.concurrent.Await
+  
 /**
  * Tests WebSocket connection controller.
  */
 class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
+  import models.rpc.DSAMessageSerrializationFormat._
 
   "WebSocketController /conn" should {
 
-//    "render the connection response from the application" in {
-//    val connReq = ConnectionRequest("", true, true, None, "", Option(List("json", "msgpack")), true)
-//    val request = FakeRequest("POST", "/conn?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg")
-//      .withBody(connReq)
+    "render the connection response from the application" in {
+      val connReq = ConnectionRequest("", true, true, None, "", Option(List(MSGJSON, MSGPACK)), true)
+      val request = FakeRequest("POST", "/conn?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg").withBody(connReq)
 
-//      val controller = app.injector.instanceOf[WebSocketController]
-//      val conn = controller.dslinkHandshake(request)
-//
-//      status(conn) mustBe OK
-//      contentType(conn) mustBe Some("application/json")
-//
-//      val json = contentAsJson(conn)
-//      (json \ "format").toOption.value mustBe Json.toJson("msgpack")
-//      (json \ "wsUri").toOption.value mustBe Json.toJson("/ws")
-//      (json \ "path").toOption.value mustBe Json.toJson("/downstream/Shell")
-//    }
+      val controller = app.injector.instanceOf[WebSocketController]
+      val conn = controller.dslinkHandshake(request)
 
-    "WebSocketController /ws" should {
-      import models.rpc.DSAMessageSerrializationFormat._
+      status(conn) mustBe OK
+      contentType(conn) mustBe Some("application/json")
 
-      val connReq = ConnectionRequest("", true, true, None, "", Option(List(JSON, MSGPACK)), true)
-      val tempKey = (models.Settings.ServerConfiguration \ "tempKey").as[String]
-      val salt = (models.Settings.ServerConfiguration \ "salt").as[String].getBytes("UTF-8")
-
-      "render the ws connection response from the application" in {
-        val controller = app.injector.instanceOf[WebSocketController]
-        val auth = controller.buildAuth(tempKey, salt)
-        val reqUri = s"/ws?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg&auth=$auth&format=msgpack"
-        val request = FakeRequest("GET", reqUri)
-
-        val conn = controller.dslinkWSConnect(request)
-
-        //        status(conn) mustBe OK
-        //        contentType(conn) mustBe Some("application/json")
-
-        //        val json = contentAsJson(conn)
-        //        (json \ "format").toOption.value mustBe Json.toJson("msgpack")
-        //        (json \ "wsUri").toOption.value mustBe Json.toJson("/ws")
-        //        (json \ "path").toOption.value mustBe Json.toJson("/downstream/Shell")
-      }
+      val json = contentAsJson(conn)
+      (json \ "format").toOption.value mustBe Json.toJson(MSGPACK)
+      (json \ "wsUri").toOption.value mustBe Json.toJson("/ws")
+      (json \ "path").toOption.value mustBe Json.toJson("/downstream/Shell")
     }
   }
 
-//  "Server configuration" should {
-//    val rootConfig = ConfigFactory.load
-//    val BrokerName = rootConfig.getString("broker.name")
-//    val cfg = rootConfig.getConfig("broker.server-config")
-//
-//    val l : java.util.List[String] = cfg.getStringList("format")
-//    val l1 = Seq(l.toArray():_*)
-//    val l2 = l1.map(s => JsString(s.asInstanceOf[String]))
-//    val l3 = JsArray(l2)
-//
-//    println(l3)
-//  }
+  "WebSocketController /ws" should {
+
+    "render the ws connection response from the application" in {
+      val tempKey = (models.Settings.ServerConfiguration \ "tempKey").as[String]
+      val salt = (models.Settings.ServerConfiguration \ "salt").as[String].getBytes("UTF-8")
+
+      val controller = app.injector.instanceOf[WebSocketController]
+
+      val connReq = ConnectionRequest("", true, true, None, "", Option(List(MSGJSON, MSGPACK)), true)
+      val request = FakeRequest("POST", "/conn?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg")
+        .withBody(connReq)
+
+      // conn
+      // TODO: implement full cirlce unit tests for ws connection
+      // val conn1 = controller.dslinkHandshake(request)
+
+      // ws
+      val auth = controller.buildAuth(tempKey, salt)
+      val format = MSGPACK
+
+      val reqUri = s"/ws?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg&auth=$auth&format=$format"
+      val requestWs = FakeRequest("GET", reqUri)
+
+      val conn2 = controller.dslinkWSConnect(requestWs)
+      val result = Await.result(conn2, 3.seconds)
+
+      // There should be FORBIDDEN here as there is no session (Check prev. TODO)
+      result.left.get.header.status mustBe FORBIDDEN
+
+      println(conn2.toString)
+    }
+  }
 }

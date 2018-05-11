@@ -13,7 +13,7 @@ package object rpc {
   import DSAValue._
 
   object DSAMessageSerrializationFormat {
-    val JSON = "json"
+    val MSGJSON = "json"
     val MSGPACK = "msgpack"
   }
 

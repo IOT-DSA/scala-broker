@@ -62,13 +62,13 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
 
   val transformers = Map(
-      JSON->jsonTransformer
+      MSGJSON->jsonTransformer
     , MSGPACK-> msgpackTransformer
   )
 
   private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
     val mergedFormats = clientFormats intersect serverFormats
-    if (mergedFormats.contains(JSON)) MSGPACK else JSON
+    if (mergedFormats.contains(MSGJSON)) MSGPACK else MSGJSON
   }
 
   /**
@@ -80,7 +80,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val publicKey = keys.encodedPublicKey
     val dsId = Settings.BrokerName + "-" + keys.encodedHashedPublicKey
 
-    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2", Some(List(JSON, MSGPACK)), true)
+    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2", Some(List(MSGJSON, MSGPACK)), true)
     val frsp = wsc.url(url)
       .withQueryStringParameters("dsId" -> dsId)
       .post(Json.toJson(cr))
@@ -243,7 +243,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val cr = request.body
     val r  = Settings.ServerConfiguration("format").as[Seq[String]]
     val resultFormat = chooseFormat(
-      request.body.formats.getOrElse(List(JSON))
+      request.body.formats.getOrElse(List(MSGJSON))
       , List(r :_*)
     )
 
