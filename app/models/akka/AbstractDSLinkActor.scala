@@ -29,7 +29,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
   implicit val system = context.system
 
   //state actore to store different dslink state with persistance etc
-  val stateKeeper = context.actorOf(StateKeeper.props(
+  val stateKeeper = context.actorOf(QoSState.props(
     reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
     maxCapacity = Settings.Subscriptions.queueCapacity
   ), "stateKeeper")
@@ -47,7 +47,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
    * Called on link start up: notifies the registry and logs the dslink status.
    */
   override def preStart() = {
-    sendToRegistry(RegisterDSLink(linkName, connInfo.mode, false))
+    sendToRegistry(RegisterDSLink(linkName, connInfo.mode, connected = false))
     log.info(s"$ownId: initialized, not connected to Endpoint")
   }
 
@@ -76,7 +76,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
       disconnectFromEndpoint(false)
     case GetLinkInfo =>
       log.debug(s"$ownId: LinkInfo requested, dispatching")
-      sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
+      sender ! LinkInfo(connInfo, connected = true, lastConnected, lastDisconnected)
     case ConnectEndpoint(ref, ci) =>
       log.warning(s"$ownId: already connected to Endpoint, dropping previous association")
       disconnectFromEndpoint(true)
@@ -92,7 +92,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
       connectToEndpoint(ref, ci)
     case GetLinkInfo =>
       log.debug(s"$ownId: LinkInfo requested, dispatching")
-      sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
+      sender ! LinkInfo(connInfo, connected = false, lastConnected, lastDisconnected)
     case DisconnectEndpoint(_) =>
       log.warning(s"$ownId: not connected to Endpoint, ignoring DISCONNECT")
   }
@@ -113,7 +113,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
     connInfo = ci
     lastConnected = Some(DateTime.now)
 
-    sendToRegistry(DSLinkStateChanged(linkName, ci.mode, true))
+    sendToRegistry(DSLinkStateChanged(linkName, ci.mode, connected = true))
 
     log.debug(s"$ownId: unstashing all stored messages")
     unstashAll()
@@ -132,7 +132,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
     endpoint = None
     lastDisconnected = Some(DateTime.now)
     stateKeeper ! Disconnected
-    sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
+    sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, connected = false))
 
     context.become(disconnected)
   }

@@ -175,7 +175,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                            overflow:    OverflowStrategy) = {
     import akka.actor.Status._
 
-    var (toSocket, publisher) = Source.actorRef[DSAMessage](1, overflow)
+    var (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()(materializer)
 
@@ -213,11 +213,10 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
           val merge = b.add(Merge[DSAMessage](2))
 
-          val onlyDSAMessages = Flow[DSAMessage].buffer(bufferSize, overflow)
           val subscriptionChannel = Source.fromPublisher(subs)
 
           //path for non subscription responses (from websocketactor etc)
-          in ~> onlyDSAMessages ~> merge
+          in                    ~>  merge
           //path for subscription responses with qos
           subscriptionChannel   ~> merge
 
@@ -227,14 +226,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
         val counter = new AtomicInteger(0)
 
         //moved from WebSocketActor since subscriptions notifications goes from other source
-        val msgConter = Flow[DSAMessage] map { message =>
-          message match {
-            case request:RequestMessage => request.copy(msg = counter.getAndIncrement())
-            case resp:ResponseMessage => resp.copy(msg = counter.getAndIncrement())
-            case ping:PingMessage => ping.copy(msg = counter.getAndIncrement())
-            case msg:SubscriptionNotificationMessage => msg.copy(msg = counter.getAndIncrement())
-            case any:DSAMessage => any
-          }
+        val msgConter = Flow[DSAMessage] map {
+          case request: RequestMessage => request.copy(msg = counter.getAndIncrement())
+          case resp: ResponseMessage => resp.copy(msg = counter.getAndIncrement())
+          case ping: PingMessage => ping.copy(msg = counter.getAndIncrement())
+          case msg: SubscriptionNotificationMessage => msg.copy(msg = counter.getAndIncrement())
+          case any: DSAMessage => any
         }
 
         val messagePub = messageSource
@@ -261,7 +258,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val cr = request.body
-    new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
+    ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
       cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
       request.remoteAddress, request.host)
   }

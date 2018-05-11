@@ -14,7 +14,7 @@ import scala.concurrent.duration._
   * @param maxCapacity max queue size per sid
   * @param reconnectionTime timeout for storage drop
   */
-class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends Actor with ActorLogging {
+class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends Actor with ActorLogging {
 
   var subscriptionsQueue = Map[Int, mutable.Queue[SubscriptionNotificationMessage]]()
   var connected = false
@@ -38,12 +38,12 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
       sender ! subscriptionsQueue
   }
 
-  def onConnected = {
+  def onConnected() = {
     log.info(s"SubscriptionsStateKeeper ${self.path} connected.")
     connected = true
   }
 
-  def killMyself = {
+  def killMyself() = {
     if(!connected) {
       subscriptionsQueue =  Map[Int, mutable.Queue[SubscriptionNotificationMessage]]()
       log.info(s"SubscriptionsStateKeeper state has been cleared ${self.path}")
@@ -51,35 +51,31 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
   }
 
   def onDisconnect = {
-    log.info(s"SubscriptionsStateKeeper ${self.path} disconnected. Will try to clear state in ${reconnectionTime} seconds")
+    log.info(s"SubscriptionsStateKeeper ${self.path} disconnected. Will try to clear state in $reconnectionTime seconds")
     connected = false
-    subscriptionsQueue = subscriptionsQueue.filter{ case(key, value) => {
-      if(value.isEmpty) false
-      if(value.head.qos < QoS.Durable) false
-      true
-    }}
+    subscriptionsQueue = subscriptionsQueue.filter{ case(key, value) =>
+      value.nonEmpty || value.head.qos >= QoS.Durable
+    }
     context.system.scheduler.scheduleOnce(reconnectionTime seconds, self, KillStateIfNotConnected)
   }
 
   def putMessage(message:SubscriptionNotificationMessage) = message match {
-    case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) => {
+    case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) =>
       subscriptionsQueue = subscriptionsQueue + (item.sid -> mutable.Queue(message))
       log.debug("QoS == 0. Replacing with new queue")
       item.sid
-    }
-    case item @ SubscriptionNotificationMessage(_, _, _, _, _) => {
+    case item @ SubscriptionNotificationMessage(_, _, _, _, _) =>
       val queue = subscriptionsQueue.get(item.sid) map { q =>
         if (shouldDislodge(item.sid)) q.dequeue()
         q += message
-      } getOrElse (mutable.Queue(message))
+      } getOrElse mutable.Queue(message)
 
       subscriptionsQueue = subscriptionsQueue + (item.sid -> queue)
       log.debug("QoS > 0. Adding new value to queue")
       item.sid
-    }
   }
 
-  def getAndRemoveNext = {
+  def getAndRemoveNext() = {
 
     var next:Option[(Int, mutable.Queue[SubscriptionNotificationMessage])] =
 
@@ -108,6 +104,6 @@ class StateKeeper(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) exte
 
 }
 
-object StateKeeper {
-  def props(maxCapacity:Int = 30, reconnectionTime:Int = 30) = Props(new StateKeeper(maxCapacity, reconnectionTime))
+object QoSState {
+  def props(maxCapacity:Int = 30, reconnectionTime:Int = 30) = Props(new QoSState(maxCapacity, reconnectionTime))
 }
