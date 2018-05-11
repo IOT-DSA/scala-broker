@@ -2,8 +2,9 @@ package models.akka
 
 import org.joda.time.DateTime
 import akka.actor.{ActorRef, Address}
+import akka.stream.SourceRef
 import models.akka.DSLinkMode.DSLinkMode
-import models.rpc.SubscriptionNotificationMessage
+import models.rpc.{DSAMessage, SubscriptionNotificationMessage}
 
 /**
  * Common messages passed between the broker actors.
@@ -129,9 +130,15 @@ object Messages {
   case object RemoveDisconnectedDSLinks
 
   /**
-    * Sent to StateKeeper to get subscription stream publisher
+    * Sent to StateKeeper to get subscription stream ref
     */
   case class GetSubscriptionSource()
+
+
+  /**
+    * Sent from StateKeeper with subscription stream ref
+    */
+  case class SubscriptionSourceMessage(sourceRef: SourceRef[DSAMessage])
 
   /**
     * Sent to StateKeeper to add subscription message

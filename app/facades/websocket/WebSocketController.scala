@@ -21,7 +21,7 @@ import javax.inject.{Inject, Singleton}
 
 import models.Settings
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, SubscriptionChannel}
-import models.akka.Messages.{GetOrCreateDSLink, GetSubscriptionSource, RemoveDSLink}
+import models.akka.Messages.{GetOrCreateDSLink, GetSubscriptionSource, RemoveDSLink, SubscriptionSourceMessage}
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
 import models.rpc.{DSAMessage, PingMessage, RequestMessage, ResponseMessage, SubscriptionNotificationMessage}
@@ -185,9 +185,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     fRoutee flatMap   { routee =>
 
-      val subscriptions = (routee ? GetSubscriptionSource).mapTo[Publisher[DSAMessage]]
+      val subscriptions = (routee ? GetSubscriptionSource).mapTo[Future[SubscriptionSourceMessage]].flatten
 
-      subscriptions map { subs =>
+      subscriptions map { subscriptionSrcRef =>
 
         val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
           WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
@@ -206,40 +206,10 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           }
         }))
 
-        val in = Source.fromPublisher[DSAMessage](publisher)
-
-        val messageSource = Source.fromGraph(GraphDSL.create() { implicit b =>
-          import GraphDSL.Implicits._
-
-          val merge = b.add(Merge[DSAMessage](2))
-
-          val subscriptionChannel = Source.fromPublisher(subs)
-
-          //path for non subscription responses (from websocketactor etc)
-          in                    ~>  merge
-          //path for subscription responses with qos
-          subscriptionChannel   ~> merge
-
-          SourceShape(merge.out)
-        })
-
-        val counter = new AtomicInteger(0)
-
-        //moved from WebSocketActor since subscriptions notifications goes from other source
-        val msgConter = Flow[DSAMessage] map {
-          case request: RequestMessage => request.copy(msg = counter.getAndIncrement())
-          case resp: ResponseMessage => resp.copy(msg = counter.getAndIncrement())
-          case ping: PingMessage => ping.copy(msg = counter.getAndIncrement())
-          case msg: SubscriptionNotificationMessage => msg.copy(msg = counter.getAndIncrement())
-          case any: DSAMessage => any
-        }
-
-        val messagePub = messageSource
-          .via(msgConter)
-          .toMat(Sink.asPublisher(false))(Keep.right).run()
+        subscriptionSrcRef.sourceRef.source.runWith(sink)
 
         val messageSink = Sink.actorRef(fromSocket, Success(()))
-        val src = Source.fromPublisher(messagePub)
+        val src = Source.fromPublisher(publisher)
 
         Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
 

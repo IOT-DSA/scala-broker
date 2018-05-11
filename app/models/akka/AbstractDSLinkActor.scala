@@ -28,11 +28,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
 
   implicit val system = context.system
 
-  //state actore to store different dslink state with persistance etc
-  val stateKeeper = context.actorOf(QoSState.props(
-    reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
-    maxCapacity = Settings.Subscriptions.queueCapacity
-  ), "stateKeeper")
+
 
   // initially None, then set by ConnectEndpoint, unset by DisconnectEndpoint
   private var endpoint: Option[ActorRef] = None
@@ -103,10 +99,14 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
           stash()
   }
 
+  protected def afterConnection():Unit = {}
+
+  protected def afterDisconnection():Unit = {}
+
   /**
    * Associates this DSLink with an endpoint.
    */
-  private def connectToEndpoint(ref: ActorRef, ci: ConnectionInfo) = {
+  private def connectToEndpoint(ref: ActorRef, ci: ConnectionInfo): Unit = {
     assert(ci.isRequester || ci.isResponder, "DSLink must be Requester, Responder or Dual")
 
     endpoint = Some(context.watch(ref))
@@ -118,23 +118,22 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
     log.debug(s"$ownId: unstashing all stored messages")
     unstashAll()
     context.become(connected)
-    stateKeeper ! Connected
+    afterConnection()
   }
 
   /**
    * Disassociates this DSLink from the endpoint.
    */
-  private def disconnectFromEndpoint(kill: Boolean) = {
+  private def disconnectFromEndpoint(kill: Boolean):Unit = {
     endpoint foreach { ref =>
       context unwatch ref
       if (kill) ref ! PoisonPill
     }
     endpoint = None
     lastDisconnected = Some(DateTime.now)
-    stateKeeper ! Disconnected
     sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, connected = false))
-
     context.become(disconnected)
+    afterDisconnection()
   }
 
   /**

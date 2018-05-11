@@ -1,29 +1,37 @@
 package models.akka
 
-import akka.stream.scaladsl.SourceQueueWithComplete
-import akka.stream.{ActorMaterializer, OverflowStrategy}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import models.akka.Messages.{GetSubscriptionSource, PutNotification}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete, StreamRefs}
+import akka.stream.{ActorMaterializer, OverflowStrategy, SourceRef}
+import models.akka.Messages._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.util.control.NonFatal
 import org.joda.time.DateTime
-import models.{RequestEnvelope, ResponseEnvelope, SubscriptionResponseEnvelope}
+import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 import models.metrics.EventDaos
 import org.reactivestreams.Publisher
+import akka.pattern.pipe
+
+import scala.concurrent.Future
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
 trait RequesterBehavior { me: AbstractDSLinkActor =>
-  import models.Settings._
 
   implicit val materializer = ActorMaterializer()
 
   protected def eventDaos: EventDaos
   
   protected def dslinkMgr: DSLinkManager
+
+  //state actore to store different dslink state with persistance etc
+  val qosState = context.actorOf(QoSState.props(
+    reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
+    maxCapacity = Settings.Subscriptions.queueCapacity
+  ), "stateKeeper")
   
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
@@ -31,7 +39,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
   private var lastRid: Int = 0
 
-  val channel = Flow.fromGraph(new SubscriptionChannel(stateKeeper))
+  val channel = Flow.fromGraph(new SubscriptionChannel(qosState))
 
   var toSocket: SourceQueueWithComplete[SubscriptionNotificationMessage] = _
   var subscriptionsPublisher: Publisher[DSAMessage] = _
@@ -49,11 +57,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
 
-      segregateSubscriptions(responses).map2(
-        subs => handleSubscriptions(subs),
-        other => sendToEndpoint(ResponseEnvelope(other))
-      )
-    case GetSubscriptionSource => sender ! getSubscriptionSource
+      val(subscriptions, other) = responses.partition(isSubscription)
+
+      if(subscriptions.nonEmpty) handleSubscriptions(subscriptions)
+      if(other.nonEmpty) sendToEndpoint(other)
+
+    case GetSubscriptionSource =>
+      getSubscriptionSource pipeTo sender()
+
   }
 
   // requester mixin for disconnected behavior
@@ -64,30 +75,40 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
 
-      segregateSubscriptions(responses).map2(
-        subs => {
-          log.debug(s"!!!!!!!!!handle subscriptions: $subs")
-          handleSubscriptions(subs, false)
-        },
-        other => {
-          log.debug(s"!!!!!!!!!stashing other: $other")
-          stash()
-        }
-      )
+      val(subscriptions, other) = responses.partition(isSubscription)
+
+      if(other.nonEmpty){
+        log.debug(s"!!!!!!!!!stashing other: $other")
+        stash()
+      }
+
+      if(subscriptions.nonEmpty){
+        log.debug(s"!!!!!!!!!handle subscriptions: $subscriptions")
+        handleSubscriptions(subscriptions, false)
+      }
+  }
+
+  override protected def afterConnection(): Unit = {
+    qosState ! Connected
+  }
+
+  override protected def afterDisconnection(): Unit = {
+    qosState ! Disconnected
   }
 
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource = {
+  private def getSubscriptionSource:Future[SubscriptionSourceMessage] = {
     val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
       .via(channel)
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()
 
     toSocket = toSocketVal
-    subscriptionsPublisher = publisher
-    subscriptionsPublisher
+    Source.fromPublisher(publisher).runWith(StreamRefs.sourceRef()) map {
+      SubscriptionSourceMessage(_)
+    }
   }
 
   /**
@@ -111,20 +132,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
         toSocket offer toSend
       } else if(message.qos >= QoS.Durable){
         //in disconnected - just send to state actor
-        stateKeeper ! PutNotification(toSend)
+        qosState ! PutNotification(toSend)
       }
     }
   }
 
-  private def segregateSubscriptions(items:Seq[DSAResponse]):SubscriptionsAndOther = {
-    val data = items.partition(isSubscription)
-    SubscriptionsAndOther(data._1, data._2)
-  }
-
-  private def isSubscription(response:DSAResponse):Boolean = response match {
-    case subs @ DSAResponse(0, _, _, _, _) => true
-    case _ => false
-  }
+  private def isSubscription(response:DSAResponse):Boolean = response.rid == 0
 
   private def withQosAndSid(response:DSAResponse):Seq[SubscriptionResponseEnvelope] = {
     response.updates.map{
@@ -253,15 +266,6 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)
   }
-}
-
-case class SubscriptionsAndOther(subscriptions:Seq[DSAResponse], other:Seq[DSAResponse]){
-
-  def map2(f1:Seq[DSAResponse] => Unit, f2:Seq[DSAResponse] => Unit) = {
-    if(subscriptions.nonEmpty) f1(subscriptions)
-    if(other.nonEmpty) f2(other)
-  }
-
 }
 
 case class PathAndQos(path:String, qos:QoS.Level)
