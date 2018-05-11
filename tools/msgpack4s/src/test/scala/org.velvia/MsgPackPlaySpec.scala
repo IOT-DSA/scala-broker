@@ -13,7 +13,7 @@ class MsgPackPlaySpec extends FunSpec with Matchers {
     val testData : Array[String] = Array("""{"amount":40.1,"currency":"USD","label":"10.00"}"""
                                         , """{"ids":[1, 2, 3, 4], "name": "test ids"}"""
                                         , """{"myobj": {"id": 1, "name": "sub_obj", "value" : 3, "extra" : 3.1415}, "name": "test ids"}"""
-                                        , """{"amount":40919279812879817212312.1912312,"currency":"USD","label":"10.00"}"""
+                                        , """{"amount":40919279812312.1912312,"currency":"USD","label":"10.00"}"""
     )
 
     testData foreach { strJs: String =>
@@ -24,6 +24,7 @@ class MsgPackPlaySpec extends FunSpec with Matchers {
 
         val u_js = msgpack.unpack[JsValue](p)
 
+        println(u_js)
         js.toString should equal(u_js.toString)
       }
     }
