@@ -1,5 +1,6 @@
 package models.akka
 
+import akka.actor.ActorRef
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete, StreamRefs}
 import akka.stream.{ActorMaterializer, OverflowStrategy, SourceRef}
 import models.akka.Messages._
@@ -59,8 +60,15 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
       val(subscriptions, other) = responses.partition(isSubscription)
 
-      if(subscriptions.nonEmpty) handleSubscriptions(subscriptions)
-      if(other.nonEmpty) sendToEndpoint(other)
+      if(subscriptions.nonEmpty){
+        log.debug(s"handle subscriptions: $subscriptions")
+        handleSubscriptions(subscriptions)
+      }
+
+      if(other.nonEmpty){
+        log.debug(s"send to endpoint other: $other")
+        sendToEndpoint(ResponseEnvelope(other))
+      }
 
     case GetSubscriptionSource =>
       getSubscriptionSource pipeTo sender()
@@ -77,14 +85,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
       val(subscriptions, other) = responses.partition(isSubscription)
 
-      if(other.nonEmpty){
-        log.debug(s"!!!!!!!!!stashing other: $other")
-        stash()
+      if(subscriptions.nonEmpty){
+        log.debug(s"handle subscriptions: $subscriptions")
+        handleSubscriptions(subscriptions, false)
       }
 
-      if(subscriptions.nonEmpty){
-        log.debug(s"!!!!!!!!!handle subscriptions: $subscriptions")
-        handleSubscriptions(subscriptions, false)
+      if(other.nonEmpty){
+        log.debug(s"stashing other: $other")
+        stash()
       }
   }
 
