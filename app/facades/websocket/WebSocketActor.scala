@@ -1,16 +1,16 @@
 package facades.websocket
 
 import org.joda.time.DateTime
-
-import akka.actor.{ Actor, ActorLogging, ActorRef, Props, actorRef2Scala }
-import akka.dispatch.{ BoundedMessageQueueSemantics, RequiresMessageQueue }
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
+import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ ConnectionInfo, IntCounter, RichRoutee }
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
 import models.formatMessage
-import models.metrics.EventDaos
+import models.mitrics.Meter
 import models.rpc._
+import nl.grons.metrics4.scala.DefaultInstrumented
 
 /**
  * Encapsulates WebSocket actor configuration.
@@ -20,10 +20,9 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, sal
 /**
  * Represents a WebSocket connection and communicates to the DSLink actor.
  */
-class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config: WebSocketActorConfig)
-  extends Actor with ActorLogging with RequiresMessageQueue[BoundedMessageQueueSemantics] {
-
-  import eventDaos._
+class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig)
+  extends Actor with ActorLogging with RequiresMessageQueue[BoundedMessageQueueSemantics]
+  with DefaultInstrumented with Meter{
 
   protected val ci = config.connInfo
   protected val linkName = ci.linkName
@@ -33,6 +32,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
 
   private val startTime = DateTime.now
 
+
   /**
    * Sends handshake to the client and notifies the DSLink actor.
    */
@@ -40,20 +40,16 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
     routee ! ConnectEndpoint(self, ci)
-    dslinkEventDao.saveConnectionEvent(startTime, "connect", config.sessionId, ci.dsId, linkName,
-      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+    incrementTags(connectionTags(ci):_*)
   }
+
 
   /**
    * Cleans up after the actor stops and logs session data.
    */
   override def postStop() = {
     log.info("{}: stopped", ownId)
-    val endTime = DateTime.now
-    dslinkEventDao.saveConnectionEvent(endTime, "disconnect", config.sessionId, ci.dsId, linkName,
-      ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
-    dslinkEventDao.saveSessionEvent(config.sessionId, startTime, endTime, linkName, ci.linkAddress, ci.mode,
-      ci.brokerAddress)
+    decrementTags(connectionTags(ci):_*)
   }
 
   /**
@@ -69,12 +65,12 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      requestEventDao.saveRequestMessageEvent(DateTime.now, true, linkName, ci.linkAddress, m)
+      meterTags(messageTags("in.request", ci):_*)
     case m @ ResponseMessage(msg, _, _) =>
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      responseEventDao.saveResponseMessageEvent(DateTime.now, true, linkName, ci.linkAddress, m)
+      meterTags(messageTags("in.response", ci):_*)
     case e @ RequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
@@ -89,7 +85,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
   private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty) {
     val msg = ResponseMessage(localMsgId.inc, None, responses.toList)
     sendToSocket(msg)
-    responseEventDao.saveResponseMessageEvent(DateTime.now, false, linkName, ci.linkAddress, msg)
+    meterTags(messageTags("out.response", ci):_*)
   }
 
   /**
@@ -98,7 +94,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
   private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty) {
     val msg = RequestMessage(localMsgId.inc, None, requests.toList)
     sendToSocket(msg)
-    requestEventDao.saveRequestMessageEvent(DateTime.now, false, linkName, ci.linkAddress, msg)
+    meterTags(messageTags("out.request", ci):_*)
   }
 
   /**
@@ -127,6 +123,6 @@ object WebSocketActor {
   /**
    * Creates a new [[WebSocketActor]] props.
    */
-  def props(out: ActorRef, routee: Routee, eventDaos: EventDaos, config: WebSocketActorConfig) =
-    Props(new WebSocketActor(out, routee, eventDaos, config))
+  def props(out: ActorRef, routee: Routee, config: WebSocketActorConfig) =
+    Props(new WebSocketActor(out, routee, config))
 }

@@ -5,6 +5,7 @@ val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
 val AKKA_VERSION = "2.5.8"
 val JSON_VERSION = "2.6.8"
+val SCALA_METRICS_VERSION = "4.0.1"
 
 
 // settings
@@ -69,7 +70,6 @@ dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
 mappings in Universal ++= Seq(
-  file("scripts/setup-influx") -> "bin/setup-influx",
   file("scripts/start-broker") -> "bin/start-broker",
   file("scripts/stop-broker") -> "bin/stop-broker",
   file("scripts/start-backend") -> "bin/start-backend",
@@ -87,25 +87,25 @@ lazy val commonDependencies = Seq(
   ehcache,
   jdbc,
   ws,
-  "com.typesafe.play"       %% "play-json"               % JSON_VERSION,
-  "com.typesafe.play"       %% "play-json-joda"          % JSON_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster"            % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-metrics"    % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
-  "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
-  "org.bouncycastle"         % "bcprov-jdk15on"          % "1.51",
-  "com.github.romix.akka"   %% "akka-kryo-serialization" % "0.5.1",
-  "com.h2database"           % "h2"                      % "1.4.193",
-  "com.typesafe.play"       %% "anorm"                   % "2.5.3",
-  "com.maxmind.geoip2"       % "geoip2"                  % "2.10.0",
-  "ch.qos.logback"           % "logback-classic"         % "1.2.3",
-  "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
-  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force(),
+  "com.typesafe.play"       %% "play-json"                % JSON_VERSION,
+  "com.typesafe.play"       %% "play-json-joda"           % JSON_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster"             % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-metrics"     % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-tools"       % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-sharding"    % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-slf4j"               % AKKA_VERSION,
+  "org.bouncycastle"         % "bcprov-jdk15on"           % "1.51",
+  "com.github.romix.akka"   %% "akka-kryo-serialization"  % "0.5.1",
+  "com.h2database"           % "h2"                       % "1.4.193",
+  "com.typesafe.play"       %% "anorm"                    % "2.5.3",
+  "com.maxmind.geoip2"       % "geoip2"                   % "2.10.0",
+  "ch.qos.logback"           % "logback-classic"          % "1.2.3",
+  "io.netty"                 % "netty-codec-http"         % "4.0.41.Final" force(),
+  "io.netty"                 % "netty-handler"            % "4.0.41.Final" force(),
   "org.msgpack"             %% "msgpack-scala"            % "0.8.13",
-//  "org.velvia"              %% "msgpack4s"                % "0.6.0",
-  "org.json4s"              %% "json4s-native"            % "3.5.0"
+  "org.json4s"              %% "json4s-native"            % "3.5.0",
+  "nl.grons"                %% "metrics4-scala"           % SCALA_METRICS_VERSION,
+  "nl.grons"                %% "metrics4-akka_a24"        % SCALA_METRICS_VERSION
 )
 
 // akka and play test dependencies

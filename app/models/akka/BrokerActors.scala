@@ -6,13 +6,12 @@ import javax.inject.{ Inject, Singleton }
 import models.akka.cluster.ClusteredDSLinkFolderActor
 import models.akka.local.LocalDSLinkFolderActor
 import models.bench.BenchmarkActor
-import models.metrics.EventDaos
 
 /**
  * A wrapper for essential actors to be started when the application starts.
  */
 @Singleton
-class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager, eventDaos: EventDaos) {
+class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager) {
   import models.Settings._
   import models.rpc.DSAValue._
 
@@ -36,7 +35,7 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
     val upstream = actorSystem.actorOf(LocalDSLinkFolderActor.props(
       Paths.Upstream, dslinkMgr.uplinkProps, upExtra: _*), Nodes.Upstream)
 
-    val bench = actorSystem.actorOf(BenchmarkActor.props(eventDaos), "benchmark")
+    val bench = actorSystem.actorOf(BenchmarkActor.props(), "benchmark")
 
     (root, downstream, upstream, bench)
   }
