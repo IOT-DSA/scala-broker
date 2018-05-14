@@ -184,6 +184,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     fRoutee flatMap   { routee =>
 
+      //TODO should think how move this logic from controller
       val subscriptions = (routee ? GetSubscriptionSource).mapTo[Future[SubscriptionSourceMessage]].flatten
 
       subscriptions map { subscriptionSrcRef =>
