@@ -1,0 +1,446 @@
+@import _root_.akka.actor.Address
+@import org.joda.time.{DateTime, Duration}
+@import org.joda.time._
+@import org.joda.time.format._
+@import controllers._
+@import models.akka.Messages.DSLinkStats
+
+@(downCount: Option[Int], upCount: Option[Int])(implicit request: RequestHeader)
+
+@main(ViewConfig("DSA Broker: Data", "Data", "Data", "DSA Cluster Information", downCount, upCount), ht) {
+	<div id="nodesgraph" style="">
+	</div>
+	<script>
+			var br_url = '@facades.websocket.routes.WebSocketController.dslinkHandshake.absoluteURL()'
+	</script>
+	<script src="@routes.Assets.versioned("js/regex-weburl.js")"></script>
+	<script src="@routes.Assets.versioned("js/dslink.js")"></script>
+	<script src="@routes.Assets.versioned("js/d3.min.js")"></script>
+	<script src="@routes.Assets.versioned("js/data.js")"></script>
+}{<!-- no tail -->}
+
+
+@ht() = {
+	<!-- head tail. Styles for graph -->
+	<style>
+			* {
+				box-sizing: border-box;
+			}
+
+			html, body {
+				width: 100%;
+				height: 100%;
+				margin: 0;
+			}
+
+			body {
+				font-family: 'Roboto', sans-serif;
+				font-size: 1em;
+				overflow: hidden;
+			}
+
+			body.flex {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				flex-direction: column;
+			}
+
+			#title,
+			#container {
+				display: none;
+			}
+
+			#container {
+				width: 100%;
+				height: 32px;
+				align-items: center;
+				justify-content: center;
+			}
+
+			#broker-url {
+				height: 32px;
+				width: 256px;
+				border: none;
+				background-color: #34495e;
+				color: white;
+				padding: 9px;
+				border-radius: 4px;
+			}
+
+			.btn {
+				height: 32px;
+				color: white;
+				padding: 9px;
+				border-radius: 4px;
+				font-size: 14px;
+				-webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+			}
+
+			.btn:hover {
+				cursor: pointer;
+			}
+
+			.invoke-btn,
+			.set-btn {
+				line-height: 16px;
+				text-align: center;
+			}
+
+			.invoke-btn {
+				background-color: #e74c3c;
+			}
+
+			.set-btn {
+				background-color: #3498db;
+			}
+
+			#connect-btn {
+				background-color: #3498db;
+			}
+
+			#connect-btn:hover {
+				background-color: #5faee3;
+			}
+
+			#connect-btn:active {
+				background-color: #217dbb;
+			}
+
+			#tooltip {
+				line-height: 32px;
+				color: white;
+				border-radius: 4px;
+				font-size: 14px;
+				background-color: rgba(44, 62, 80, 0.9);
+				position: absolute;
+				z-index: 998;
+				min-width: 128px;
+			}
+
+			#legend2 {
+				position: absolute;
+				width: 192px;
+				padding: 9px 0;
+				border-radius: 2px;
+				font-size: 14px;
+				bottom: 16px;
+				left: 16px;
+				z-index: 999;
+				background-color: white;
+				box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+				0 3px 1px -2px rgba(0, 0, 0, 0.2),
+				0 1px 5px 0 rgba(0, 0, 0, 0.12);
+			}
+
+			#legend {
+				position: absolute;
+				width: 192px;
+				padding: 9px 0;
+				border-radius: 2px;
+				font-size: 14px;
+				top: 160px;
+				left: 16px;
+				z-index: 999;
+				background-color: white;
+				box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+				0 3px 1px -2px rgba(0, 0, 0, 0.2),
+				0 1px 5px 0 rgba(0, 0, 0, 0.12);
+			}
+
+			#legend > * {
+				display: block;
+				font-weight: bold;
+			}
+
+			#legend #title {
+				text-align: center;
+			}
+
+			#legend > .legend-item > .color {
+				float: left;
+			}
+
+			.legend-item {
+				padding: 0px 9px;
+				height: 32px;
+				width: 100%;
+				line-height: 32px;
+				white-space: nowrap;
+			}
+
+			.color {
+				display: inline-block;
+				height: 8px;
+				width: 8px;
+				border-radius: 4px;
+			}
+
+			.legend-item > .color {
+				margin: 12px;
+			}
+
+			.legend-container {
+				height: 32px;
+			}
+
+			.legend-title {
+				display: inline-block;
+				float: left;
+				width: 56px;
+			}
+
+			.legend-content {
+				display: inline-block;
+				text-align: right;
+				float: right;
+				width: auto;
+			}
+
+			#home {
+				will-change: transform;
+				padding: 16px;
+				height: 56px;
+				width: 56px;
+				z-index: 999;
+				position: absolute;
+				bottom: 16px;
+				right: 0;
+				border-radius: 50%;
+				background-color: white;
+				box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+				0 3px 1px -2px rgba(0, 0, 0, 0.2),
+				0 1px 5px 0 rgba(0, 0, 0, 0.12);
+			}
+
+			#home:hover {
+				cursor: pointer;
+			}
+
+			.props {
+				position: absolute;
+				z-index: 999;
+				height: 100%;
+				overflow-y: auto;
+				overflow-x: hidden;
+				width: 256px;
+				background-color: rgba(44, 62, 80, 0.98);
+				top: 0;
+				bottom: 0;
+				right: 0;
+				box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+				0 3px 1px -2px rgba(0, 0, 0, 0.2),
+				0 1px 5px 0 rgba(0, 0, 0, 0.12);
+				will-change: transform;
+			}
+
+			.recycler-hidden {
+				min-height: 100%;
+				width: 100%;
+			}
+
+			.recycler-item {
+				position: absolute;
+				top: 0;
+				white-space: nowrap;
+				min-width: 100%;
+				font-size: 16px;
+				color: white;
+			}
+
+			.props .legend-item {
+				padding: 0px 16px;
+				padding-top: 4px;
+				height: 100%;
+				line-height: 40px;
+			}
+
+			.props .legend-title {
+				overflow-x: hidden;
+				width: 80px;
+			}
+
+			.props .legend-container {
+				height: 100%;
+				background-color: rgba(0,0,0,0.1);
+			}
+
+			.props .legend-content {
+				width: 156px;
+				background-color: rgba(0,0,0,0.05);
+				border: 0;
+				color: white;
+				font-family: 'Roboto', sans-serif;
+				font-size: 16px;
+				overflow-y: hidden;
+				overflow-x: auto;
+				text-align: right;
+				-webkit-user-select: text;
+				-ms-user-select: text;
+				-moz-user-select: text;
+			}
+
+			.props input.legend-content,
+			.props select.legend-content {
+				-webkit-appearance: none;
+				-moz-appearance: none;
+				appearance: none;
+				outline-color: transparent !important;
+				outline-style: none !important;
+				background-color: rgba(255,255,255,0.1);
+				border-radius: 0;
+			}
+
+			.props select.legend-content {
+				background-image: url('images/expand.svg');
+				background-position: 116px center;
+				background-repeat: no-repeat;
+			}
+
+			.props input.legend-content:focus,
+			.props select.legend-content:focus {
+				background-color: rgba(255,255,255,0.15);
+			}
+
+			.props .legend-content * {
+				cursor: text;
+			}
+
+			.props .color {
+				margin: 20px;
+				float: left;
+			}
+
+			.props .expand {
+				display: inline-block;
+				float: right;
+				height: 24px;
+				width: 24px;
+				margin: 12px;
+			}
+
+			#home,
+			#legend,
+			.props,
+			.graph {
+				-webkit-user-select: none;
+				-ms-user-select: none;
+				-moz-user-select: none;
+			}
+
+			.graph {
+				transform-origin: 0 0 0;
+				width: 100%;
+				height: 100%;
+			}
+
+			.graph > div {
+				width: 100%;
+				height: 100%;
+			}
+
+			.graph > svg {
+				min-height: 100%;
+				min-width: 100%;
+			}
+
+			.graph > *,
+			.node,
+			.value,
+			.text {
+				position: absolute;
+			}
+
+			.node,
+			.value {
+				border-radius: 50%;
+				transform-origin: 50% 50%;
+			}
+
+			.node {
+				top: -4px;
+				left: -4px;
+				width: 8px;
+				height: 8px;
+				border: 2px solid;
+			}
+
+			.value {
+				left: 1px;
+				top: 1px;
+				width: 2px;
+				height: 2px;
+				border-radius: 1px;
+				background-color: #3498db;
+			}
+
+			.link, .trace {
+				fill: none;
+			}
+
+			.link {
+				stroke: #ecf0f1;
+				stroke-width: 1.5px;
+			}
+
+			.trace {
+				stroke-width: 3px;
+				stroke-dasharray: 10;
+				opacity: 0.4;
+			}
+
+			.trace:hover {
+				stroke-width: 4px;
+				opacity: 0.6;
+			}
+
+			.text {
+				top: -6px;
+				left: 8px;
+				font: 10px 'Roboto', sans-serif;
+				height: 10px;
+			}
+
+			.flip {
+				transform: rotate(180deg);
+			}
+
+			.legend-toggleable:hover {
+				cursor: pointer;
+			}
+
+			.disabled {
+				opacity: 0.4;
+			}
+
+			.inactive:hover {
+				cursor: not-allowed;
+			}
+
+			::-webkit-scrollbar {
+				height: 4px;
+				width: 8px;
+			}
+
+			::-webkit-scrollbar-track {
+				border-radius: 3px;
+				padding: 3px;
+				background-color: rgba(255, 255, 255, 0.1);
+			}
+
+			::-webkit-scrollbar-thumb {
+				background-color: rgba(255, 255, 255, 0.3);
+				border-radius: 3px;
+			}
+
+			::-webkit-scrollbar-thumb:hover {
+				background-color: rgba(255, 255, 255, 0.5);
+			}
+
+			::-webkit-scrollbar-corner {
+				background-color: transparent;
+			}
+	</style>
+}
