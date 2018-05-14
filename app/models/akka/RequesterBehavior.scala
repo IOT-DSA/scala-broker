@@ -1,11 +1,11 @@
 package models.akka
 
-import akka.actor.ActorRef
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete, StreamRefs}
-import akka.stream.{ActorMaterializer, OverflowStrategy, SourceRef}
-import models.akka.Messages._
-import scala.concurrent.ExecutionContext.Implicits.global
 
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete, StreamRefs}
+import akka.stream.{ActorMaterializer, OverflowStrategy}
+import models.akka.Messages._
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 import org.joda.time.DateTime
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
@@ -14,6 +14,7 @@ import models.rpc.DSAValue.DSAVal
 import models.metrics.EventDaos
 import org.reactivestreams.Publisher
 import akka.pattern.pipe
+import models.akka.QoSState._
 
 import scala.concurrent.Future
 

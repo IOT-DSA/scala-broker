@@ -7,6 +7,7 @@ import models.rpc.{DSAMessage, ResponseMessage}
 import akka.pattern.ask
 import akka.util.Timeout
 import models.akka.Messages._
+import models.akka.QoSState.{GetAllMessages, GetAndRemoveNext, PutNotification}
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration._

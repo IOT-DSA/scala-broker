@@ -1,7 +1,6 @@
 package facades.websocket
 
 import java.net.URL
-import java.util.concurrent.atomic.AtomicInteger
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -20,8 +19,9 @@ import controllers.BasicController
 import javax.inject.{Inject, Singleton}
 
 import models.Settings
-import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, GetSubscriptionSource, RichRoutee, SubscriptionSourceMessage}
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
 import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
+import models.akka.QoSState.{GetSubscriptionSource, SubscriptionSourceMessage}
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
 import models.rpc.DSAMessage

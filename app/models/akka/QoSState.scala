@@ -3,6 +3,7 @@ package models.akka
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.stream.SourceRef
 import models.akka.Messages._
+import models.akka.QoSState._
 import models.rpc.DSAMessage
 
 import scala.collection.immutable.Queue
@@ -101,46 +102,50 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
 
 object QoSState {
   def props(maxCapacity:Int = 30, reconnectionTime:Int = 30) = Props(new QoSState(maxCapacity, reconnectionTime))
+
+
+
+  /**
+    * Sent to StateKeeper to get subscription stream ref
+    */
+  case class GetSubscriptionSource()
+
+
+  /**
+    * Sent from StateKeeper with subscription stream ref
+    */
+  case class SubscriptionSourceMessage(sourceRef: SourceRef[DSAMessage])
+
+  /**
+    * Sent to StateKeeper to add subscription message
+    * @param message
+    */
+  case class PutNotification(message:SubscriptionNotificationMessage)
+
+  /**
+    * Sent to StateKeeper to fetch and remove message queue by sid
+    */
+  case class GetAndRemoveNext()
+
+  /**
+    * Sent to StateKeeper (dslink disconnected)
+    */
+  case class Disconnected()
+
+  /**
+    * Sent to StateKeeper (dslink connected)
+    */
+  case class Connected()
+
+  /**
+    * Sent to StateKeeper to clean state if it wasn't reconnected
+    */
+  case class KillStateIfNotConnected()
+
+  /**
+    * fetch all messages from stateKeeper subscriptions storage
+    */
+  case class GetAllMessages()
+
 }
 
-/**
-  * Sent to StateKeeper to get subscription stream ref
-  */
-case class GetSubscriptionSource()
-
-
-/**
-  * Sent from StateKeeper with subscription stream ref
-  */
-case class SubscriptionSourceMessage(sourceRef: SourceRef[DSAMessage])
-
-/**
-  * Sent to StateKeeper to add subscription message
-  * @param message
-  */
-case class PutNotification(message:SubscriptionNotificationMessage)
-
-/**
-  * Sent to StateKeeper to fetch and remove message queue by sid
-  */
-case class GetAndRemoveNext()
-
-/**
-  * Sent to StateKeeper (dslink disconnected)
-  */
-case class Disconnected()
-
-/**
-  * Sent to StateKeeper (dslink connected)
-  */
-case class Connected()
-
-/**
-  * Sent to StateKeeper to clean state if it wasn't reconnected
-  */
-case class KillStateIfNotConnected()
-
-/**
-  * fetch all messages from stateKeeper subscriptions storage
-  */
-case class GetAllMessages()
