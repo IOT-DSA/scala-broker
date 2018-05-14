@@ -30,7 +30,7 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       contentType(conn) mustBe Some("application/json")
 
       val json = contentAsJson(conn)
-      (json \ "format").toOption.value mustBe Json.toJson(MSGPACK)
+      (json \ "format").toOption.value mustBe Json.toJson(MSGJSON)
       (json \ "wsUri").toOption.value mustBe Json.toJson("/ws")
       (json \ "path").toOption.value mustBe Json.toJson("/downstream/Shell")
     }

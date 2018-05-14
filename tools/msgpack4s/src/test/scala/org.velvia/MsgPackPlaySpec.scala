@@ -24,7 +24,7 @@ class MsgPackPlaySpec extends FunSpec with Matchers {
 
         val u_js = msgpack.unpack[JsValue](p)
 
-        js.t`oString should equal(u_js.toString)
+        js.toString should equal(u_js.toString)
       }
     }
 
