@@ -7,6 +7,7 @@ import models.rpc.DSAMessage
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration._
+import scala.util.Random
 
 /**
   * actor for storing dslink - specific state as
@@ -21,6 +22,8 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
   var connected = false
 
   var iter = subscriptionsQueue.iterator
+
+  val rnd = new Random()
 
   implicit val ctx = context.system.dispatcher
 
@@ -72,27 +75,21 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
       } getOrElse Queue(message)
 
       subscriptionsQueue = subscriptionsQueue + (item.sid -> queue)
-      log.debug("QoS > 0. Adding new value to queue")
+      log.debug("QoS > 0. Adding new value to queue:{}", message)
       item.sid
   }
 
   def getAndRemoveNext() = {
 
-    var next:Option[(Int, Queue[SubscriptionNotificationMessage])] =
+    val nextSid = subscriptionsQueue.keySet.toVector(rnd.nextInt(subscriptionsQueue.keySet.size))
 
-    if(iter.hasNext){
-      Some(iter.next())
-    } else {
-      iter = subscriptionsQueue.iterator
-      if(iter.hasNext) Some(iter.next())
-      else None
-    }
+    var next:Option[Queue[SubscriptionNotificationMessage]] = subscriptionsQueue.get(nextSid)
 
-    next foreach { case (sid, queue) =>
-      subscriptionsQueue = subscriptionsQueue - sid
+    next foreach { queue =>
+      subscriptionsQueue = subscriptionsQueue - nextSid
     }
     log.debug("send and remove {}", next)
-    sender ! next.map(_._2)
+    sender ! next
   }
 
   // in case of data overflow
