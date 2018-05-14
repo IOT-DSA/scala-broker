@@ -9,6 +9,7 @@ import org.scalatestplus.play.PlaySpec
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import akka.stream.scaladsl._
+import org.slf4j.LoggerFactory
 import play.api.libs.json._
 import play.api.http.websocket._
 import org.velvia.msgpack
@@ -16,6 +17,8 @@ import org.velvia.msgpack.PlayJsonCodecs.JsValueCodec
 
 
 class DSAValueMsgpackSpec extends PlaySpec {
+
+  val log = LoggerFactory.getLogger(getClass)
 
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
@@ -37,8 +40,8 @@ class DSAValueMsgpackSpec extends PlaySpec {
       val msgTransformer = models.rpc.MsgpackTransformer.jsonFlowTransformer
 
       val logicFlow: Flow[JsValue, JsValue, _] = Flow[JsValue].map(x => {
-        println("Busines logic: income JsValue is: " + x)
-        println("Busines logic: return the same value as got")
+        log.info("Busines logic: income JsValue is: " + x)
+        log.info("Busines logic: return the same value as got")
         x
       })
 
@@ -51,7 +54,7 @@ class DSAValueMsgpackSpec extends PlaySpec {
       val sourcePayload = Source(List(inDsLinkMessage1, inDsLinkMessage2))
 
       val printingFlow: Flow[Message, Message, _] = Flow[Message].map(x => {
-        println("The message: " + x)
+        log.info("The message: " + x)
         x
       })
 
@@ -74,7 +77,7 @@ class DSAValueMsgpackSpec extends PlaySpec {
 
       val logicFlow: Flow[DSAMessage, DSAMessage, _] = Flow[DSAMessage].map(
         x => {
-          println("Busines logic: income DSAMessage is: " + x.toString + ", return the same value as was got")
+          log.info("Busines logic: income DSAMessage is: " + x.toString + ", return the same value as was got")
           x
         }
       )

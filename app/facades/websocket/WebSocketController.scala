@@ -68,7 +68,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
   private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
     val mergedFormats = clientFormats intersect serverFormats
-    if (mergedFormats.contains(MSGJSON)) MSGPACK else MSGJSON
+    if (mergedFormats.contains(MSGPACK)) MSGPACK else MSGJSON
   }
 
   /**
@@ -80,7 +80,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val publicKey = keys.encodedPublicKey
     val dsId = Settings.BrokerName + "-" + keys.encodedHashedPublicKey
 
-    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2", Some(List(MSGJSON, MSGPACK)), true)
+    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2"
+      , Some((Settings.ServerConfiguration \ "format").as[List[String]]), true)
     val frsp = wsc.url(url)
       .withQueryStringParameters("dsId" -> dsId)
       .post(Json.toJson(cr))
@@ -91,7 +92,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val tempKey = (serverConfig \ "tempKey").as[String]
       val wsUri = (serverConfig \ "wsUri").as[String]
       val salt = (serverConfig \ "salt").as[String].getBytes("UTF-8")
-      val format = (serverConfig \ "format").as[String]
+
+      //TODO: Change the uplick connection format as well, like: //(serverConfig \ "format").as[String]
+      val format = MSGJSON
 
       val auth = buildAuth(tempKey, salt)
       val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=$format"
@@ -185,7 +188,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {
-    val format = sessionInfo.fold("json")(si => {
+    val format = sessionInfo.fold(MSGJSON)(si => {
       chooseFormat(si.ci.formats, (Settings.ServerConfiguration \ "format").as[List[String]])
     })
 

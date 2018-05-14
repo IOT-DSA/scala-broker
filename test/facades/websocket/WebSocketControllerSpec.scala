@@ -2,20 +2,19 @@ package facades.websocket
 
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
-
 import play.api.libs.json.JsValue.jsValueToJsLookup
 import play.api.libs.json.Json
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
 import scala.concurrent.duration._
-
 import scala.concurrent.Await
-  
+
 /**
  * Tests WebSocket connection controller.
  */
 class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
+
   import models.rpc.DSAMessageSerrializationFormat._
 
   "WebSocketController /conn" should {
@@ -65,8 +64,6 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
 
       // There should be FORBIDDEN here as there is no session (Check prev. TODO)
       result.left.get.header.status mustBe FORBIDDEN
-
-      println(conn2.toString)
     }
   }
 }

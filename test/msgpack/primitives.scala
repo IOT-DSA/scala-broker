@@ -127,7 +127,6 @@ class MgspackTests extends PlaySpec {
         packer.clear()
         packer.packArrayHeader(arr.length)
         for (v <- arr) {
-          println(v)
           packer.packInt(v)
         }
         unpacker.reset(new ArrayBufferInput(packer.toByteArray))
