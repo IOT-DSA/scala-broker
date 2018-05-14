@@ -46,6 +46,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     case event: SidTargetsRequesterState =>
       log.debug("{}: trying to recover {}", ownId, event)
       targetsBySid.put(event.sid, event.target)
+    case event: RemoveTargetByRid =>
+      log.debug("{}: trying to recover removing by {}", ownId, event)
+      targetsByRid.remove(event.rid)
+    case event: RemoveTargetBySid =>
+      log.debug("{}: trying to recover removing by {}", ownId, event)
+      targetsBySid.remove(event.sid)
   }
 
   /**
