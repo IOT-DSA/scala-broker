@@ -61,12 +61,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       val(subscriptions, other) = responses.partition(isSubscription)
 
       if(subscriptions.nonEmpty){
-        log.debug(s"handle subscriptions: $subscriptions")
+        log.debug("handle subscriptions: {}", subscriptions)
         handleSubscriptions(subscriptions)
       }
 
       if(other.nonEmpty){
-        log.debug(s"send to endpoint other: $other")
+        log.debug(s"send to endpoint other: {}", other)
         sendToEndpoint(ResponseEnvelope(other))
       }
 
@@ -86,12 +86,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       val(subscriptions, other) = responses.partition(isSubscription)
 
       if(subscriptions.nonEmpty){
-        log.debug(s"handle subscriptions: $subscriptions")
+        log.debug(s"handle subscriptions: {}", subscriptions)
         handleSubscriptions(subscriptions, false)
       }
 
       if(other.nonEmpty){
-        log.debug(s"stashing other: $other")
+        log.debug(s"stashing other: {}", other)
         stash()
       }
   }
@@ -132,7 +132,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   private def handleSubscriptions(subscriptions:Seq[DSAResponse], connected: Boolean = true) = subscriptions foreach {
     r => withQosAndSid(r) foreach {
       message =>
-      log.debug(s"sending subscription message: $message")
+      log.debug(s"sending subscription message: {}", message)
       val toSend = SubscriptionNotificationMessage(-1, None, List(message.response), message.sid, message.qos)
 
       if(connected){

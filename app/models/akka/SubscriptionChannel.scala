@@ -3,13 +3,13 @@ package models.akka
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler, StageLogging}
-import models.rpc.{DSAMessage, ResponseMessage, SubscriptionNotificationMessage}
+import models.rpc.{DSAMessage, ResponseMessage}
 import akka.pattern.ask
 import akka.util.Timeout
 import models.akka.Messages._
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration._
-import scala.collection.mutable
 import scala.concurrent.{Await, ExecutionContext}
 
 
@@ -21,8 +21,6 @@ class SubscriptionChannel(val store: ActorRef)
 
   val in = Inlet[SubscriptionNotificationMessage]("Subscriptions.in")
   val out = Outlet[DSAMessage]("Subscriptions.out")
-  implicit val as = actorSystem
-  implicit val m = materializer
   implicit val ctx = ExecutionContext.global
 
   implicit val timeout = Timeout(3 seconds)
@@ -57,7 +55,7 @@ class SubscriptionChannel(val store: ActorRef)
       }
 
       override def onUpstreamFinish(): Unit = {
-        val futureTail = (store ? GetAllMessages).mapTo[Map[Int, mutable.Queue[SubscriptionNotificationMessage]]]
+        val futureTail = (store ? GetAllMessages).mapTo[Map[Int, Queue[SubscriptionNotificationMessage]]]
         val tail = Await.result(futureTail, 1 second)
         if (tail.nonEmpty) {
           val leftItems = tail.mapValues(toResponseMsg(_)).values.filter(_.isDefined).map(_.get)
@@ -77,9 +75,9 @@ class SubscriptionChannel(val store: ActorRef)
 
     def pushNext = {
       // to avoid locking using 'getAsyncCallback' https://doc.akka.io/docs/akka/2.5/stream/stream-customize.html#using-asynchronous-side-channels
-      val futureMessage = (store ? GetAndRemoveNext).mapTo[Option[mutable.Queue[SubscriptionNotificationMessage]]]
+      val futureMessage = (store ? GetAndRemoveNext).mapTo[Option[Queue[SubscriptionNotificationMessage]]]
 
-      val callback = getAsyncCallback[Option[mutable.Queue[SubscriptionNotificationMessage]]] {
+      val callback = getAsyncCallback[Option[Queue[SubscriptionNotificationMessage]]] {
         _ foreach {
           toResponseMsg(_).foreach { m =>
             log.debug(s"push(out, $m)")

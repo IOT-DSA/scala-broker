@@ -4,7 +4,7 @@ import org.joda.time.DateTime
 import akka.actor.{ActorRef, Address}
 import akka.stream.SourceRef
 import models.akka.DSLinkMode.DSLinkMode
-import models.rpc.{DSAMessage, SubscriptionNotificationMessage}
+import models.rpc.{DSAMessage, DSAResponse}
 
 /**
  * Common messages passed between the broker actors.
@@ -129,45 +129,13 @@ object Messages {
    */
   case object RemoveDisconnectedDSLinks
 
-  /**
-    * Sent to StateKeeper to get subscription stream ref
-    */
-  case class GetSubscriptionSource()
-
-
-  /**
-    * Sent from StateKeeper with subscription stream ref
-    */
-  case class SubscriptionSourceMessage(sourceRef: SourceRef[DSAMessage])
-
-  /**
-    * Sent to StateKeeper to add subscription message
-    * @param message
-    */
-  case class PutNotification(message:SubscriptionNotificationMessage)
-
-  /**
-    * Sent to StateKeeper to fetch and remove message queue by sid
-    */
-  case class GetAndRemoveNext()
-
-  /**
-    * Sent to StateKeeper (dslink disconnected)
-    */
-  case class Disconnected()
-
-  /**
-    * Sent to StateKeeper (dslink connected)
-    */
-  case class Connected()
-
-  /**
-    * Sent to StateKeeper to clean state if it wasn't reconnected
-    */
-  case class KillStateIfNotConnected()
-
-  /**
-    * fetch all messages from stateKeeper subscriptions storage
-    */
-  case class GetAllMessages()
+  case class SubscriptionNotificationMessage(msg: Int, ack: Option[Int] = None, responses: List[DSAResponse] = Nil, sid: Int, qos: QoS.Level = QoS.Default) {
+    /**
+      * Outputs only the first response for compact logging.
+      */
+    override def toString = if (responses.size < 2)
+      s"ResponseMessage($msg,$ack,$responses,$sid,$qos)"
+    else
+      s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more...,$sid,$qos))"
+  }
 }

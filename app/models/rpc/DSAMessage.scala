@@ -1,7 +1,5 @@
 package models.rpc
 
-import models.akka.QoS
-
 /**
  * Base trait for DSA messages.
  */
@@ -55,15 +53,4 @@ case class ResponseMessage(msg: Int, ack: Option[Int] = None, responses: List[DS
     s"ResponseMessage($msg,$ack,$responses)"
   else
     s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more))"
-}
-
-case class SubscriptionNotificationMessage(msg: Int, ack: Option[Int] = None, responses: List[DSAResponse] = Nil, sid: Int, qos: QoS.Level = QoS.Default)
-  extends DSAMessage {
-  /**
-    * Outputs only the first response for compact logging.
-    */
-  override def toString = if (responses.size < 2)
-    s"ResponseMessage($msg,$ack,$responses,$sid,$qos)"
-  else
-    s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more...,$sid,$qos))"
 }

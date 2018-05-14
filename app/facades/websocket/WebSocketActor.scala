@@ -4,11 +4,11 @@ import org.joda.time.DateTime
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
 import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
-import models.{RequestEnvelope, ResponseEnvelope, SubscriptionResponseEnvelope, formatMessage}
+import models.{RequestEnvelope, ResponseEnvelope, formatMessage}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
 import models.metrics.EventDaos
-import models.rpc.{SubscriptionNotificationMessage, _}
+import models.rpc._
 
 /**
  * Encapsulates WebSocket actor configuration.
