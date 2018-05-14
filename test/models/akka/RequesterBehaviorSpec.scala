@@ -1,13 +1,13 @@
 package models.akka
 
-import akka.actor.{ Actor, Props, actorRef2Scala }
-import akka.routing.{ ActorRefRoutee, Routee }
+import akka.actor.{Actor, Props, actorRef2Scala}
+import akka.routing.{ActorRefRoutee, Routee}
 import akka.testkit.TestProbe
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.Messages.{ DSLinkStateChanged, RegisterDSLink }
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.akka.Messages.{DSLinkStateChanged, GetLinkInfo, RegisterDSLink}
 import models.akka.local.LocalDSLinkManager
 import models.metrics.EventDaos
-import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
+import models.rpc.{DSAResponse, ListRequest, RequestMessage}
 
 /**
  * RequesterBehavior test suite.
@@ -80,5 +80,6 @@ object RequesterBehaviorSpec {
   class Requester(val dslinkMgr: DSLinkManager, registry: Routee, val eventDaos: EventDaos)
     extends AbstractDSLinkActor(registry) with RequesterBehavior {
     override def connected = super.connected orElse requesterBehavior
+    override def receiveRecover = recoverBaseState orElse recoverRequesterState
   }
 }

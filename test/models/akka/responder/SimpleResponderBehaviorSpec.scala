@@ -198,5 +198,6 @@ object SimpleResponderBehaviorSpec {
   class Responder(eventDaos: EventDaos) extends AbstractDSLinkActor(NoRoutee) with SimpleResponderBehavior {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def connected = super.connected orElse responderBehavior
+    override def receiveRecover = recoverBaseState //orElse recoverResponderState
   }
 }

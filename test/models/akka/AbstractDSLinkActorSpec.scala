@@ -88,8 +88,11 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
  * Common definitions for [[AbstractDSLinkActorSpec]].
  */
 object AbstractDSLinkActorSpec {
+
   /**
    * Test actor.
    */
-  class LinkActor(registry: Routee) extends AbstractDSLinkActor(registry)
+  class LinkActor(registry: Routee) extends AbstractDSLinkActor(registry) {
+    override def receiveRecover = recoverBaseState
+  }
 }

@@ -1,12 +1,12 @@
 package models.akka
 
 import akka.actor.Props
-import models.akka.responder.{ PooledResponderBehavior, ResponderBehavior, SimpleResponderBehavior }
+import models.akka.responder.{PooledResponderBehavior, ResponderBehavior, SimpleResponderBehavior}
 import models.metrics.EventDaos
 import akka.routing.Routee
 
 /**
- * Combines [[AbstractDSLinkActor] with Requester behavior and abstract Responder behavior
+ * Combines [[AbstractDSLinkActor]] with Requester behavior and abstract Responder behavior
  * (to be provided by the subclasses).
  */
 abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends AbstractDSLinkActor(registry)
@@ -21,6 +21,11 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
     stopRequester
     super.postStop
   }
+
+  /**
+   * Recovers DSLink state from the event journal.
+   */
+  override def receiveRecover = recoverBaseState orElse recoverRequesterState // orElse recoverResponderState
 
   /**
    * Handles messages in CONNECTED state.

@@ -1,7 +1,7 @@
 package models.akka
 
 import org.joda.time.DateTime
-import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
+import akka.actor.{ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.persistence.PersistentActor
 import akka.routing.Routee
 
@@ -16,7 +16,7 @@ import akka.routing.Routee
  * Initially the actor is in `disconnected` state. The facade initiates a session by sending `ConnectEndpoint`
  * message to the actor. The session ends either when `DisconnectEndpoint` message is sent to an actor,
  * or the endpoint actor terminates.
- * 
+ *
  * When the actor is disconnected, it stashes incoming messages and releases them to the endpoint, once it
  * becomes connected again.
  */
@@ -54,18 +54,16 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
   }
 
   /**
-    * Recovers an event from the journal.
-    */
-  override def receiveRecover: Receive = {
-    case event: DSLinkState =>
+   * Recovers events of base layer from the journal.
+   */
+  val recoverBaseState: Receive = {
+    case event: DSLinkBaseState =>
       log.debug("{}: trying to recover {}", ownId, event)
       updateState(event)
-//    case Snapshot(_, snapshot: DSLinkState) => state = snapshot
-    case _ =>
-      log.warning("{}: not supported event", ownId)
+//    case Snapshot(_, snapshot: DSLinkBaseState) => state = snapshot
   }
 
-  private def updateState(event: DSLinkState) = {
+  private def updateState(event: DSLinkBaseState) = {
     endpoint = event.endpoint
     connInfo = event.connInfo
     lastConnected = event.lastConnected.map { new DateTime(_) }
@@ -121,7 +119,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
     log.debug("{}: connectToEndpoint called, [ref: {}] [connection: {}]", ownId, ref, ci)
     assert(ci.isRequester || ci.isResponder, "DSLink must be Requester, Responder or Dual")
 
-    persist(DSLinkState(Some(context.watch(ref)), ci, Some(DateTime.now.toDate), lastDisconnected.map { _.toDate } )) { event =>
+    persist(DSLinkBaseState(Some(context.watch(ref)), ci, Some(DateTime.now.toDate), lastDisconnected.map { _.toDate } )) { event =>
       updateState(event)
       sendToRegistry(DSLinkStateChanged(linkName, ci.mode, true))
 
@@ -142,7 +140,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
       if (kill) ref ! PoisonPill
     }
 
-    persist(DSLinkState(None, connInfo, lastConnected.map { _.toDate }, Some(DateTime.now.toDate))) { event =>
+    persist(DSLinkBaseState(None, connInfo, lastConnected.map { _.toDate }, Some(DateTime.now.toDate))) { event =>
       updateState(event)
       sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
       context.become(disconnected)

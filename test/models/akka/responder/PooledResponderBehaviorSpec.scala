@@ -198,5 +198,6 @@ object PooledResponderBehaviorSpec {
   class Responder(eventDaos: EventDaos) extends AbstractDSLinkActor(NoRoutee) with PooledResponderBehavior {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def connected = super.connected orElse responderBehavior
+    override def receiveRecover = recoverBaseState // orElse recoverResponderState
   }
 }
