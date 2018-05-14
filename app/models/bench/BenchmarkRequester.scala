@@ -1,7 +1,5 @@
 package models.bench
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import org.joda.time.{DateTime, Interval}
 import BenchmarkRequester.{BenchmarkRequesterConfig, ReqStatsSample}
@@ -24,7 +22,6 @@ class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequ
   import BenchmarkRequester._
 
   import context.dispatcher
-  import eventDaos._
 
   private val ridGen = new IntCounter(1)
   private var invokeJob: Cancellable = null
@@ -83,10 +80,9 @@ class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequ
         math.max(rsp.updates.getOrElse(Nil).size, 1)
       }.sum
       updatesRcvd += updateCount
-      for("")
-      responseEventDao.saveResponseMessageEvent(DateTime.now, false, linkName, linkAddress,
-        localMsgId.inc, responses.size, updateCount, 0)
 
+      meterTagsNTimes(tagsWithPrefix("benchmark.requester.received.responses")(s"address.$linkAddress"))(responses.size)
+      meterTagsNTimes(tagsWithPrefix("benchmark.requester.received.responses.updates")(s"address.$linkAddress"))(updateCount)
     case SendBatch =>
       val requests = ridGen.inc(config.batchSize) map (idx => InvokeRequest(idx, invPath))
       sendToProxy(RequestMessage(localMsgId.inc, None, requests.toList))
@@ -116,7 +112,8 @@ class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequ
   protected def sendToProxy(msg: RequestMessage) = {
     val message = viaJson[RequestMessage, DSAMessage](msg)
     routee ! message
-    requestEventDao.saveRequestMessageEvent(DateTime.now, true, linkName, linkAddress, message)
+
+    meterTags(tagsWithPrefix("benchmark.requester.requests.sent")(s"address.$linkAddress"))
   }
 }
 

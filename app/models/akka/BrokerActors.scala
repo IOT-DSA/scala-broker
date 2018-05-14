@@ -52,7 +52,7 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
     val upstream = actorSystem.actorOf(ClusteredDSLinkFolderActor.props(
       Paths.Upstream, dslinkMgr.getUplinkRoutee, upExtra: _*), Nodes.Upstream)
 
-    val bench = actorSystem.actorOf(BenchmarkActor.props(eventDaos), "benchmark")
+    val bench = actorSystem.actorOf(BenchmarkActor.props(), "benchmark")
 
     (root, downstream, upstream, bench)
   }

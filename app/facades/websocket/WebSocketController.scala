@@ -23,7 +23,6 @@ import models.Settings
 import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee }
 import models.akka.Messages.{ GetOrCreateDSLink, RemoveDSLink }
 import models.handshake.{ LocalKeys, RemoteKey }
-import models.metrics.EventDaos
 import models.rpc.DSAMessage
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
@@ -43,12 +42,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                                      actors:       BrokerActors,
                                      wsc:          WSClient,
                                      keys:         LocalKeys,
-                                     eventDaos:    EventDaos,
                                      cc:           ControllerComponents) extends BasicController(cc) {
 
   type DSAFlow = Flow[DSAMessage, DSAMessage, _]
-
-  import eventDaos._
 
   implicit private val as = actorSystem
 
@@ -180,7 +176,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
     fRoutee map { routee =>
-      val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
+      val wsProps = WebSocketActor.props(toSocket, routee,
         WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
       val fromSocket = actorSystem.actorOf(Props(new Actor {

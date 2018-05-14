@@ -4,12 +4,11 @@ import akka.actor.{ ActorRef, ActorSystem }
 import akka.routing.{ ActorSelectionRoutee, Routee }
 import akka.util.Timeout
 import models.akka.DSLinkManager
-import models.metrics.EventDaos
 
 /**
  * Uses Akka Actor Selection to communicate with DSLinks.
  */
-class LocalDSLinkManager(val eventDaos: EventDaos)(implicit val system: ActorSystem) extends DSLinkManager {
+class LocalDSLinkManager()(implicit val system: ActorSystem) extends DSLinkManager {
   import models.Settings._
 
   implicit val timeout = Timeout(QueryTimeout)

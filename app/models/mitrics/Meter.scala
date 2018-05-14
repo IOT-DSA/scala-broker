@@ -10,6 +10,10 @@ trait Meter {
     metrics.meter(_).mark()
   }
 
+  def meterTagsNTimes(tags:String*)(count:Int = 1) = tags foreach{
+    metrics.meter(_).mark(count)
+  }
+
   def incrementTags(tags:String*) = tags foreach{
     metrics.counter(_).inc()
   }
@@ -31,5 +35,9 @@ trait Meter {
     s"$prefix.brokerAddress.${ci.brokerAddress}"
   )
 
+  def tagsWithPrefix(prefix:String)(in: String*) = {
+    val prefix = "benchmark.responses"
+    prefix + in.map(t => s"$prefix.$t")
+  }
 
 }

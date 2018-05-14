@@ -7,15 +7,12 @@ import org.joda.time.DateTime
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
-import models.metrics.EventDaos
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
 trait RequesterBehavior { me: AbstractDSLinkActor =>
   import models.Settings._
-
-  protected def eventDaos: EventDaos
   
   protected def dslinkMgr: DSLinkManager
   

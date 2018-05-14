@@ -13,7 +13,6 @@ import akka.routing.Routee
 import akka.util.Timeout
 import models.Settings
 import models.akka.Messages.GetOrCreateDSLink
-import models.metrics.EventDaos
 
 /**
  * Coordinates broker benchmarks.
