@@ -1,0 +1,21 @@
+---
+- name: download
+  become: yes
+  become_user: root
+  get_url:
+    url: '{{minikube_url}}'
+    dest: '{{minikube_install_target}}'
+    checksum: '{{minikube_checksum}}'
+    mode: 0755
+
+- name: link
+  become: yes
+  become_user: root
+  file:
+    src: '{{minikube_install_target}}'
+    dest: '{{minikube_install_dir}}/minikube'
+    state: link
+
+- name: install drivers...
+  with_items: '{{minikube_install_drivers|default([])}}'
+  include_tasks: '{{item}}.yml'

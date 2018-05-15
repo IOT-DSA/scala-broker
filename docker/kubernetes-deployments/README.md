@@ -1,6 +1,3 @@
-# scala-broker
-Scala-based implementation of DSA broker
-
 ## Deployment to local machine
 
 #### Prerequisites:
@@ -32,8 +29,8 @@ sudo apt-get install oracle-java8-installer
 #### 2. Install minikube locally
 
 ```
-git clone https://github.com/IOT-DSA/scala-broker.git
-cd scala-broker/ansible
+git clone https://github.com/IOT-DSA/scala-broker.git &&
+cd scala-broker/ansible &&
 sudo ansible-playbook -i inventory -c local full.yml
 ```
 
@@ -46,7 +43,17 @@ minikube start --vm-driver=none
 
 #### 4. Deploy cloud broker pod to Kubernetes with
 
-```
-kubectl create -f ./docker/kubernetes-deployments/all.deployment --validate=false
-kubectl create -f ./docker/kubernetes-deployments/metrics.deployment --validate=false
-```
+kubectl replace --force -f ./docker/kubernetes-deployments/metrics.deployment --validate=false
+kubectl replace --force -f ./docker/kubernetes-deployments/broker.statefulsets --validate=false
+kubectl replace --force -f ./docker/kubernetes-deployments/direct.services --validate=false
+
+
+#### Full removal
+
+minikube stop; minikube delete &&
+docker stop $(docker ps -aq) &&
+rm -r ~/.kube ~/.minikube &&
+sudo rm /usr/local/bin/localkube /usr/local/bin/minikube &&
+systemctl stop '*kubelet*.mount' &&
+sudo rm -rf /etc/kubernetes/ &&
+docker system prune -af --volumes
