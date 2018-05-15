@@ -1,0 +1,6 @@
+---
+- hosts: all
+  roles:
+    - minikube
+    - docker-server
+    - cloud-app

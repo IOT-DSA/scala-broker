@@ -1,0 +1,10 @@
+---
+- name: remove all the old crap
+  command: docker system prune -a -f
+  become: yes
+
+- name: start minikube
+  command: minikube start --vm-driver=none
+  become: yes
+  ignore_errors: yes
+
