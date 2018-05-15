@@ -197,7 +197,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
         val target = targetsByRid.get(rid).get
         persist(RemoveTargetByRid(rid)) { event =>
           log.debug("{}: removing by RID persisted {}", ownId, event)
-          targetsByRid.remove(rid)
+          targetsByRid.remove(event.rid)
         }
         target
     }
