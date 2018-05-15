@@ -6,6 +6,7 @@ import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler, St
 import models.rpc.{DSAMessage, ResponseMessage}
 import akka.pattern.ask
 import akka.util.Timeout
+import models.Settings
 import models.akka.Messages._
 import models.akka.QoSState.{GetAllMessages, GetAndRemoveNext, PutNotification}
 
@@ -24,7 +25,9 @@ class SubscriptionChannel(val store: ActorRef)
   val out = Outlet[DSAMessage]("Subscriptions.out")
   implicit val ctx = actorSystem.dispatcher
 
-  implicit val timeout = Timeout(3 seconds)
+  val timeout = Settings.QueryTimeout
+
+  implicit val implTimeout = Timeout(timeout)
 
   override def shape: FlowShape[SubscriptionNotificationMessage, DSAMessage] = FlowShape.of(in, out)
 
@@ -57,7 +60,7 @@ class SubscriptionChannel(val store: ActorRef)
 
       override def onUpstreamFinish(): Unit = {
         val futureTail = (store ? GetAllMessages).mapTo[Map[Int, Queue[SubscriptionNotificationMessage]]]
-        val tail = Await.result(futureTail, 1 second)
+        val tail = Await.result(futureTail, timeout)
         if (tail.nonEmpty) {
           val leftItems = tail.mapValues(toResponseMsg(_)).values.filter(_.isDefined).map(_.get)
           emitMultiple(out, leftItems.iterator)
