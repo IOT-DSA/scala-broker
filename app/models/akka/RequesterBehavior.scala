@@ -47,10 +47,10 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       log.debug("{}: trying to recover {}", ownId, event)
       targetsBySid.put(event.sid, event.target)
     case event: RemoveTargetByRid =>
-      log.debug("{}: trying to recover removing by {}", ownId, event)
+      log.debug("{}: trying to recover remove action by {}", ownId, event)
       targetsByRid.remove(event.rid)
     case event: RemoveTargetBySid =>
-      log.debug("{}: trying to recover removing by {}", ownId, event)
+      log.debug("{}: trying to recover remove action by {}", ownId, event)
       targetsBySid.remove(event.sid)
   }
 
@@ -80,7 +80,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       cacheRequestTarget(request, target)
       List(target -> request)
     } catch {
-      case NonFatal(e) => log.error("{}: RID/SID not found for {}", ownId, request); Nil
+      case NonFatal(_) => log.error("{}: RID/SID not found for {}", ownId, request); Nil
     })
 
     log.debug("{}: RID targets: {}, SID targets: {}", ownId, targetsByRid.size, targetsBySid.size)
@@ -184,22 +184,22 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
     val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
       case UnsubscribeRequest(_, sids) =>
-        val target = targetsBySid.get(sids.head)
+        val target = targetsBySid.get(sids.head).get
         persist(RemoveTargetBySid(sids.head)) { event =>
           log.debug("{}: removing by SID persisted {}", ownId, event)
-          targetsBySid.remove(event.sid).get
+          targetsBySid.remove(event.sid)
         }
-        target.get
+        target
     }
 
     val resolveCloseTarget: PartialFunction[DSARequest, String] = {
       case CloseRequest(rid) =>
-        val target = targetsByRid.get(rid)
+        val target = targetsByRid.get(rid).get
         persist(RemoveTargetByRid(rid)) { event =>
           log.debug("{}: removing by RID persisted {}", ownId, event)
-          targetsByRid.remove(event.rid)
+          targetsByRid.remove(rid)
         }
-        target.get
+        target
     }
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)
