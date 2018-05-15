@@ -18,7 +18,7 @@ class SubscriptionChannelSpec extends WordSpecLike
 
   implicit  val as = ActorSystem()
   implicit  val am = ActorMaterializer()
-  implicit val ctx = scala.concurrent.ExecutionContext.global
+  implicit val ctx = as.dispatcher
 
     "Subscription channel" should {
 

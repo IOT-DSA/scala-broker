@@ -22,7 +22,7 @@ class SubscriptionChannel(val store: ActorRef)
 
   val in = Inlet[SubscriptionNotificationMessage]("Subscriptions.in")
   val out = Outlet[DSAMessage]("Subscriptions.out")
-  implicit val ctx = ExecutionContext.global
+  implicit val ctx = actorSystem.dispatcher
 
   implicit val timeout = Timeout(3 seconds)
 
@@ -37,17 +37,17 @@ class SubscriptionChannel(val store: ActorRef)
     setHandler(in, new InHandler {
       override def onPush(): Unit = {
 
-        log.debug(s"on push: ${in}")
+        log.debug("on push: {}", in)
         val message = grab(in)
 
         val callback = getAsyncCallback[Int]{
           _=>
-            log.debug(s"storing $message")
+            log.debug("storing {}", message)
 
             if(isAvailable(out)){
               pushNext
             } else {
-              log.debug(s"out is unavailable.")
+              log.debug("out is unavailable.")
             }
         }
 
@@ -81,7 +81,7 @@ class SubscriptionChannel(val store: ActorRef)
       val callback = getAsyncCallback[Option[Queue[SubscriptionNotificationMessage]]] {
         _ foreach {
           toResponseMsg(_).foreach { m =>
-            log.debug(s"push(out, $m)")
+            log.debug("push(out, {})", m)
             push(out, m)
             pull(in)
           }

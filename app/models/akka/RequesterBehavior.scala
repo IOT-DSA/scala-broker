@@ -67,7 +67,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       }
 
       if(other.nonEmpty){
-        log.debug(s"send to endpoint other: {}", other)
+        log.debug("send to endpoint other: {}", other)
         sendToEndpoint(ResponseEnvelope(other))
       }
 
@@ -87,12 +87,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       val(subscriptions, other) = responses.partition(isSubscription)
 
       if(subscriptions.nonEmpty){
-        log.debug(s"handle subscriptions: {}", subscriptions)
+        log.debug("handle subscriptions: {}", subscriptions)
         handleSubscriptions(subscriptions, false)
       }
 
       if(other.nonEmpty){
-        log.debug(s"stashing other: {}", other)
+        log.debug("stashing other: {}", other)
         stash()
       }
   }
@@ -133,7 +133,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   private def handleSubscriptions(subscriptions:Seq[DSAResponse], connected: Boolean = true) = subscriptions foreach {
     r => withQosAndSid(r) foreach {
       message =>
-      log.debug(s"sending subscription message: {}", message)
+      log.debug("sending subscription message: {}", message)
       val toSend = SubscriptionNotificationMessage(-1, None, List(message.response), message.sid, message.qos)
 
       if(connected){
@@ -150,8 +150,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
 
   private def withQosAndSid(response:DSAResponse):Seq[SubscriptionResponseEnvelope] = {
     response.updates.map{
-      updates =>
-        updates.map{
+      _.map{
           update =>
             val sid = extractSid(update)
             val qos = targetsBySid.get(sid).map(_.qos) getOrElse(QoS.Default)
@@ -298,6 +297,6 @@ object QoS {
     case 1 => Queued
     case 2 => Durable
     case 3 => DurableAndPersist
-    case  _ => throw new RuntimeException("unsupported QoS level")
+    case  _ => throw new RuntimeException(s"unsupported QoS level: $level")
   }
 }

@@ -1,5 +1,7 @@
 package models.akka
 
+
+
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.stream.SourceRef
 import models.akka.Messages._
@@ -7,6 +9,7 @@ import models.akka.QoSState._
 import models.rpc.DSAMessage
 
 import scala.collection.immutable.Queue
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -19,12 +22,10 @@ import scala.util.Random
   */
 class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends Actor with ActorLogging {
 
-  var subscriptionsQueue = Map[Int, Queue[SubscriptionNotificationMessage]]()
+  val subscriptionsQueue = mutable.HashMap[Int, Queue[SubscriptionNotificationMessage]]()
   var connected = false
 
   var iter = subscriptionsQueue.iterator
-
-  val rnd = new Random()
 
   implicit val ctx = context.system.dispatcher
 
@@ -40,7 +41,8 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
       onConnected
       log.debug("stateKeeper {} connected", self.path)
     case GetAllMessages =>
-      sender ! subscriptionsQueue
+      sender ! Map[Int, Queue[SubscriptionNotificationMessage]](subscriptionsQueue.toSeq:_*)
+      subscriptionsQueue.clear()
   }
 
   def onConnected() = {
@@ -50,7 +52,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
 
   def killMyself() = {
     if(!connected) {
-      subscriptionsQueue =  Map[Int, Queue[SubscriptionNotificationMessage]]()
+      subscriptionsQueue.clear()
       log.info("SubscriptionsStateKeeper state has been cleared {}", self.path)
     }
   }
@@ -58,15 +60,15 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
   def onDisconnect = {
     log.info("SubscriptionsStateKeeper {} disconnected. Will try to clear state in {}", self.path, reconnectionTime seconds)
     connected = false
-    subscriptionsQueue = subscriptionsQueue.filter{ case(key, value) =>
+    subscriptionsQueue.filter{ case(key, value) =>
       value.nonEmpty || value.head.qos >= QoS.Durable
-    }
+    }.map(_._1).foreach(subscriptionsQueue.remove)
     context.system.scheduler.scheduleOnce(reconnectionTime seconds, self, KillStateIfNotConnected)
   }
 
   def putMessage(message:SubscriptionNotificationMessage) = message match {
     case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) =>
-      subscriptionsQueue = subscriptionsQueue + (item.sid -> Queue(message))
+      subscriptionsQueue += (item.sid -> Queue(message))
       log.debug("QoS == 0. Replacing with new queue")
       item.sid
     case item @ SubscriptionNotificationMessage(_, _, _, _, _) =>
@@ -75,22 +77,30 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
         newQ enqueue message
       } getOrElse Queue(message)
 
-      subscriptionsQueue = subscriptionsQueue + (item.sid -> queue)
+      subscriptionsQueue += (item.sid -> queue)
       log.debug("QoS > 0. Adding new value to queue:{}", message)
       item.sid
   }
 
   def getAndRemoveNext() = {
 
-    val nextSid = subscriptionsQueue.keySet.toVector(rnd.nextInt(subscriptionsQueue.keySet.size))
+    var next:Option[(Int, Queue[SubscriptionNotificationMessage])] =
+      if(iter.hasNext){
+        Some(iter.next())
+      } else {
+        iter = subscriptionsQueue.iterator
+        if(iter.hasNext) Some(iter.next())
+        else None
+      }
 
-    var next:Option[Queue[SubscriptionNotificationMessage]] = subscriptionsQueue.get(nextSid)
-
-    next foreach { queue =>
-      subscriptionsQueue = subscriptionsQueue - nextSid
+    next foreach { case (sid, queue) =>
+      subscriptionsQueue - sid
     }
     log.debug("send and remove {}", next)
-    sender ! next
+    log.debug("state after removing: {}", subscriptionsQueue.foldLeft(""){(str, next) => {
+      str + s"\n ${next._1} -> ${next._2.size}"
+    }})
+    sender ! next.map(_._2)
   }
 
   // in case of data overflow

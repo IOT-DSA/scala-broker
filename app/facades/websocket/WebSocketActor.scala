@@ -77,7 +77,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, eventDaos: EventDaos, config
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
     case e @ ResponseEnvelope(responses) =>
-      log.debug(s"{}: received {}", ownId, e)
+      log.debug("{}: received {}", ownId, e)
       sendResponses(responses: _*)
   }
 
