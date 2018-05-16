@@ -80,6 +80,14 @@ object Settings {
    */
   val ChildrenPerListResponse = rootConfig.getInt("broker.children.per.response")
 
+  object Subscriptions{
+
+    private val cfg = rootConfig.getConfig("broker.subscriptions")
+    val reconnectionTimeout = Option(cfg.getInt("reconnectionTimeout")).getOrElse(30)
+    val queueCapacity = Option(cfg.getInt("queue.capacity")).getOrElse(30)
+
+  }
+
   /**
    * WebSocket configuration.
    */

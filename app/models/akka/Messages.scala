@@ -1,10 +1,10 @@
 package models.akka
 
 import org.joda.time.DateTime
-
-import akka.actor.{ ActorPath, ActorRef, Address }
-import akka.cluster.ClusterEvent
+import akka.actor.{ActorRef, Address}
+import akka.stream.SourceRef
 import models.akka.DSLinkMode.DSLinkMode
+import models.rpc.{DSAMessage, DSAResponse}
 
 /**
  * Common messages passed between the broker actors.
@@ -128,4 +128,14 @@ object Messages {
    * Sent to Downstream actor to remove disconnected DSLinks.
    */
   case object RemoveDisconnectedDSLinks
+
+  case class SubscriptionNotificationMessage(msg: Int, ack: Option[Int] = None, responses: List[DSAResponse] = Nil, sid: Int, qos: QoS.Level = QoS.Default) {
+    /**
+      * Outputs only the first response for compact logging.
+      */
+    override def toString = if (responses.size < 2)
+      s"ResponseMessage($msg,$ack,$responses,$sid,$qos)"
+    else
+      s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more...,$sid,$qos))"
+  }
 }
