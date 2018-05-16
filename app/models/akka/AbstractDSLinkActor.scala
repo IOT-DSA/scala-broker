@@ -1,9 +1,9 @@
 package models.akka
 
 import org.joda.time.DateTime
-
-import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
+import models.metrics.Meter
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
