@@ -80,8 +80,8 @@ class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequ
       }.sum
       updatesRcvd += updateCount
 
-      meterTagsNTimes(tagsWithPrefix("requester.benchmark.in.responses")(s"address.$linkAddress"))(responses.size)
-      meterTagsNTimes(tagsWithPrefix("requester.benchmark.in.responses.updates")(s"address.$linkAddress"))(updateCount)
+      incrementTagsNTimes(tagsWithPrefix("requester.benchmark.in.responses")(s"address.$linkAddress"))(responses.size)
+      incrementTagsNTimes(tagsWithPrefix("requester.benchmark.in.responses.updates")(s"address.$linkAddress"))(updateCount)
     case SendBatch =>
       val requests = ridGen.inc(config.batchSize) map (idx => InvokeRequest(idx, invPath))
       sendToProxy(RequestMessage(localMsgId.inc, None, requests.toList))

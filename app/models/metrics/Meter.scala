@@ -5,12 +5,24 @@ import models.akka.ConnectionInfo
 
 trait Meter {
 
+  def countTags(tags:String*) = tags foreach{
+    Kamon.counter(_).increment()
+  }
+
+  def countTagsNTimes(tags:String*)(times:Int) = tags foreach{
+    Kamon.counter(_).increment(times)
+  }
+
   def meterTags(tags:String*) = tags foreach{
     Kamon.gauge(_).increment()
   }
 
-  def meterTagsNTimes(tags:String*)(count:Int = 1) = tags foreach{
+  def incrementTagsNTimes(tags:String*)(count:Int = 1) = tags foreach{
     Kamon.gauge(_).increment(count)
+  }
+
+  def decrementTagsNTimes(tags:String*)(count:Int = 1) = tags foreach{
+    Kamon.gauge(_).decrement(count)
   }
 
   def incrementTags(tags:String*) = tags foreach{
@@ -19,6 +31,10 @@ trait Meter {
 
   def decrementTags(tags:String*) = tags foreach{
     Kamon.gauge(_).decrement()
+  }
+
+  def histogramValue(tags:String*)(times:Int) = tags foreach{
+    Kamon.histogram(_).record(times)
   }
 
   def tagsForConnection(prefix:String)(ci:ConnectionInfo) = Array(

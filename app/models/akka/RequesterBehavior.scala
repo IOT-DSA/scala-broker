@@ -222,7 +222,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       "broker"
 
     meterTags(tagsForConnection("out.requests.batch")(connInfo):_*)
-    meterTagsNTimes(tagsForConnection("out.requests.batch.requests")(connInfo):_*)(requests.size)
+    incrementTagsNTimes(tagsForConnection("out.requests.batch.requests")(connInfo):_*)(requests.size)
 
   }
 

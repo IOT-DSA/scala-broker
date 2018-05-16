@@ -187,7 +187,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
       subscriptions map { subscriptionSrcRef =>
 
-        val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
+        val wsProps = WebSocketActor.props(toSocket, routee,
           WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
         val fromSocket = actorSystem.actorOf(Props(new Actor {
