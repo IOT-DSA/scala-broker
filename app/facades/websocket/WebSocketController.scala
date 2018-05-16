@@ -2,7 +2,7 @@ package facades.websocket
 
 import java.net.URL
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, duration}
 import scala.util.Random
 import org.bouncycastle.jcajce.provider.digest.SHA256
 import org.joda.time.DateTime
@@ -29,8 +29,10 @@ import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import play.api.mvc.{ ControllerComponents, Request, RequestHeader, Result, WebSocket }
+import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
+
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 /**
  * Establishes WebSocket DSLink connections
@@ -203,6 +205,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
             case _ => SupervisorStrategy.Stop
           }
         }))
+
 
         subscriptionSrcRef.sourceRef.source.runWith(sink)
 
