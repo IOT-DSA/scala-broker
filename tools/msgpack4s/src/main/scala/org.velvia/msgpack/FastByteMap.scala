@@ -28,7 +28,11 @@ case class FastByteMap[V](things: (Byte, V)*) {
 
   def getOrElse(b: Byte, default: => V): V = {
     val v = aray(b & 0x00ff)
-    if (v != null) v.asInstanceOf[V] else default
+    val r = (if (v != null)
+      v.asInstanceOf[V]
+    else
+      default)
+    r
   }
 }
 

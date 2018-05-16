@@ -15,7 +15,6 @@ scalaVersion := SCALA_VERSION
 
 // base play-akka project
 lazy val root = (project in file("."))
-  .dependsOn(msgpack)
   .enablePlugins(PlayScala)
   .settings(
     scalaVersion := SCALA_VERSION,
@@ -138,7 +137,7 @@ lazy val msgpackDependencies = Seq(
   "com.rojoma" %% "rojoma-json-v3" % "3.7.0",
   "org.json4s" %% "json4s-native" % "3.5.0",
   "org.apache.commons" % "commons-io" % "1.3.2",
-  "com.typesafe.play" %% "play-json" % "2.6.0-M1"
+  "com.typesafe.play" %% "play-json" % JSON_VERSION
 )
 
 

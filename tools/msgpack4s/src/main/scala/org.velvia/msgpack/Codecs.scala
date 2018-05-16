@@ -17,17 +17,22 @@ trait Codec[@specialized(Int, Long, Short, Byte, Double, Float) A] {
     try {
       val headerByte = in.readByte()
       val func = unpackFuncMap.getOrElse(headerByte, defaultUnpackFunc(headerByte) )
-      func(in)
+      val res = func(in)
+      res
     } catch {
       case ex: EOFException =>
         throw new InvalidMsgPackDataException("No more input available when expecting a value")
+    } finally {
+      in.close()
     }
   }
 
   type UnpackFunc = DIS => A
 
   def defaultUnpackFunc(headerByte: Byte): UnpackFunc =
-    { dis => throw new InvalidMsgPackDataException("Input contains invalid type value " + headerByte) }
+  { dis =>
+      throw new InvalidMsgPackDataException("Input contains invalid type value " + headerByte)
+  }
 
   // The unpackFuncMap maps the first byte that contains the MessagePack format type
   // to a function passed a DIS to read any additional bytes required to unpack A.

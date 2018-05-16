@@ -18,16 +18,23 @@ object MsgpackTransformer {
     def closeOnException[T](block: => T) = try {
       Left(block)
     } catch {
-      case NonFatal(e) => Right(CloseMessage(
-        Some(CloseCodes.Unacceptable),
-        "Unable to parse json message"))
+      case NonFatal(e) => Right(
+        CloseMessage(Some(CloseCodes.Unacceptable),
+                     "Unable to parse json message")
+        )
     }
 
     new MessageFlowTransformer[JsValue, JsValue] {
       def transform(flow: Flow[JsValue, JsValue, _]) = {
         AkkaStreams.bypassWith[Message, JsValue, Message](Flow[Message].collect {
-          case BinaryMessage(data) => closeOnException(msgpack.unpack(data.toArray))
-        })(flow map { json => BinaryMessage(ByteString(msgpack.pack(json))) })
+          case BinaryMessage(data) =>
+            closeOnException(
+              msgpack.unpack(data.toArray)
+            )
+        })(flow map { json =>
+                      BinaryMessage(ByteString(msgpack.pack(json)))
+                    }
+          )
       }
     }
   }
