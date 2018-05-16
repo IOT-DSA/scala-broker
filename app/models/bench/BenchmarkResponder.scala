@@ -7,10 +7,9 @@ import akka.actor.{ActorRef, Props}
 import akka.routing.Routee
 import models.RequestEnvelope
 import models.akka.{DSLinkMode, RegexContext, RichRoutee}
-import models.mitrics.Meter
+import models.metrics.Meter
 import models.rpc.{DSAValue, _}
 import models.util.SimpleCache
-import nl.grons.metrics4.scala.DefaultInstrumented
 
 /**
  * Simulates a responder which contains:
@@ -20,7 +19,7 @@ import nl.grons.metrics4.scala.DefaultInstrumented
  */
 class BenchmarkResponder(linkName: String, routee: Routee, config: BenchmarkResponderConfig)
   extends AbstractEndpointActor(linkName, DSLinkMode.Responder, routee, config)
-    with DefaultInstrumented with Meter {
+    with Meter {
 
   private type Action = Function0[Seq[DSAResponse]]
 
@@ -52,7 +51,7 @@ class BenchmarkResponder(linkName: String, routee: Routee, config: BenchmarkResp
       val requests = viaJson(env).requests
       log.debug("[{}]: received {}", linkName, env)
       val responses = requests flatMap processRequest
-      meterTags(tagsWithPrefix("benchmark.responder.received.requests")(s"address.$linkAddress", s"linkName.$linkName"))
+      meterTags(tagsWithPrefix("responder.benchmark.received.in.requests")(s"address.$linkAddress", s"linkName.$linkName"))
       sendToProxy(ResponseMessage(localMsgId.inc, None, responses.toList))
     case msg => log.warning("[{}]: received unknown message - {}", linkName, msg)
   }
@@ -154,7 +153,7 @@ class BenchmarkResponder(linkName: String, routee: Routee, config: BenchmarkResp
   protected def sendToProxy(msg: ResponseMessage) = {
     val message = viaJson[ResponseMessage, DSAMessage](msg)
     routee ! message
-    meterTags(tagsWithPrefix("benchmark.responder.sent.responses")(s"address.$linkAddress", s"linkName.$linkName"))
+    meterTags(tagsWithPrefix("responder.benchmark.out.responses")(s"address.$linkAddress", s"linkName.$linkName"))
   }
 }
 

@@ -1,19 +1,17 @@
 package models.akka
 
+import models.metrics.Meter
+
 import scala.util.control.NonFatal
-
-import org.joda.time.DateTime
-
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{RequestEnvelope, ResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
-trait RequesterBehavior { me: AbstractDSLinkActor =>
-  import models.Settings._
-  
+trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
+
   protected def dslinkMgr: DSLinkManager
   
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
@@ -113,8 +111,9 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     else
       "broker"
 
-    eventDaos.requestEventDao.saveRequestBatchEvents(DateTime.now, linkName, connInfo.linkAddress,
-      tgtLinkName, requests: _*)
+    meterTags(tagsForConnection("out.requests.batch")(connInfo):_*)
+    meterTagsNTimes(tagsForConnection("out.requests.batch.requests")(connInfo):_*)(requests.size)
+
   }
 
   /**

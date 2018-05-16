@@ -1,16 +1,23 @@
 package models
 
-import scala.collection.Seq
 
+import scala.collection.Seq
 import _root_.akka.actor.ActorSystem
 import _root_.akka.cluster.Cluster
-import javax.inject.{ Inject, Provider, Singleton }
-import models.akka.{ BrokerActors, DSLinkManager }
+import javax.inject.{Inject, Provider, Singleton}
+
+import kamon.Kamon
+import kamon.statsd.StatsDReporter
+import kamon.system.SystemMetrics
+import kamon.zipkin.ZipkinReporter
+import models.akka.{BrokerActors, DSLinkManager}
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
 import models.handshake.LocalKeys
-import play.api.{ Configuration, Environment }
-import play.api.inject.Module
+import play.api.{Configuration, Environment}
+import play.api.inject.{ApplicationLifecycle, Module}
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Provides module bindings.
@@ -21,7 +28,8 @@ class MainModule extends Module {
     Seq(
       bind[DSLinkManager].toProvider[DSLinkManagerProvider],
       bind[LocalKeys].to(LocalKeys.getFromClasspath("/keys")),
-      bind[BrokerActors].toSelf.eagerly)
+      bind[BrokerActors].toSelf.eagerly,
+      bind[StatsDConnection].toSelf.eagerly())
   }
 }
 
@@ -38,4 +46,19 @@ class DSLinkManagerProvider @Inject() (actorSystem: ActorSystem)
     new LocalDSLinkManager()(actorSystem)
 
   def get = mgr
+}
+
+@Singleton
+class StatsDConnection @Inject() (lifecycle: ApplicationLifecycle) {
+
+  Kamon.addReporter(new StatsDReporter())
+  Kamon.addReporter(new ZipkinReporter())
+  SystemMetrics.startCollecting()
+
+  lifecycle.addStopHook(() => {
+    Future{
+      SystemMetrics.stopCollecting()
+    }(ExecutionContext.global)
+  })
+
 }

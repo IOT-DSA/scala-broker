@@ -7,9 +7,8 @@ import akka.actor.{ActorRef, Cancellable, Props}
 import akka.routing.Routee
 import models.{ResponseEnvelope, ResponseEnvelopeFormat}
 import models.akka.{DSLinkMode, IntCounter, RichRoutee}
-import models.mitrics.Meter
+import models.metrics.Meter
 import models.rpc._
-import nl.grons.metrics4.scala.DefaultInstrumented
 
 /**
  * Simulates a Requester that subscribes to a responder's node updates and then repeatedly
@@ -17,7 +16,7 @@ import nl.grons.metrics4.scala.DefaultInstrumented
  */
 class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequesterConfig)
   extends AbstractEndpointActor(linkName, DSLinkMode.Requester, routee, config)
-  with DefaultInstrumented with Meter {
+  with Meter {
 
   import BenchmarkRequester._
 
@@ -81,8 +80,8 @@ class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequ
       }.sum
       updatesRcvd += updateCount
 
-      meterTagsNTimes(tagsWithPrefix("benchmark.requester.received.responses")(s"address.$linkAddress"))(responses.size)
-      meterTagsNTimes(tagsWithPrefix("benchmark.requester.received.responses.updates")(s"address.$linkAddress"))(updateCount)
+      meterTagsNTimes(tagsWithPrefix("requester.benchmark.in.responses")(s"address.$linkAddress"))(responses.size)
+      meterTagsNTimes(tagsWithPrefix("requester.benchmark.in.responses.updates")(s"address.$linkAddress"))(updateCount)
     case SendBatch =>
       val requests = ridGen.inc(config.batchSize) map (idx => InvokeRequest(idx, invPath))
       sendToProxy(RequestMessage(localMsgId.inc, None, requests.toList))
@@ -113,7 +112,7 @@ class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequ
     val message = viaJson[RequestMessage, DSAMessage](msg)
     routee ! message
 
-    meterTags(tagsWithPrefix("benchmark.requester.requests.sent")(s"address.$linkAddress"))
+    meterTags(tagsWithPrefix("requester.benchmark.out.requests")(s"address.$linkAddress"))
   }
 }
 

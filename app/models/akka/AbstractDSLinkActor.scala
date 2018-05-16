@@ -1,9 +1,9 @@
 package models.akka
 
 import org.joda.time.DateTime
-
-import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
+import models.metrics.Meter
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -20,7 +20,7 @@ import akka.routing.Routee
  * When the actor is disconnected, it stashes incoming messages and releases them to the endpoint, once it
  * becomes connected again.
  */
-abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash with ActorLogging {
+abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends Actor with Stash with ActorLogging with Meter {
   import Messages._
 
   protected val linkName = self.path.name
@@ -133,5 +133,5 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
   /**
    * Sends a message to the registry.
    */
-  protected def sendToRegistry(msg: Any): Unit = registry ! msg
+  protected def sendToRegistry(msg: Any): Unit = routeeRegistry ! msg
 }

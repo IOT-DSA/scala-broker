@@ -7,6 +7,10 @@ services:
     container_name: broker
     environment:
       JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
+      STATSD_HOST: graphana
+      STATSD_PORT: 8125
+      ZIPKIN_HOST: zipkin
+      ZIPKIN_PORT: 9411
     ports:
       - "9000:9000"
       - "9005:9005"
@@ -14,6 +18,11 @@ services:
       - "9443:9443"
     networks:
       - dsnet
+    links:
+      - graphana
+    depends_on:
+      - graphana
+      - zipkin
   shell:
     build: 
       context: ./shell-dslink
@@ -46,6 +55,37 @@ services:
     networks:
       - dsnet
 
+  storage:
+    image: openzipkin/zipkin-mysql
+    container_name: mysql
+    # Uncomment to expose the storage port for testing
+    # ports:
+    #   - 3306:3306
+
+  # The zipkin process services the UI, and also exposes a POST endpoint that
+  # instrumentation can send trace data to. Scribe is disabled by default.
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    # Environment settings are defined here https://github.com/openzipkin/zipkin/tree/1.19.0/zipkin-server#environment-variables
+    environment:
+      - STORAGE_TYPE=mysql
+      # Point the zipkin at the storage backend
+      - MYSQL_HOST=mysql
+      # Uncomment to enable scribe
+      # - SCRIBE_ENABLED=true
+      # Uncomment to enable self-tracing
+      # - SELF_TRACING_ENABLED=true
+      # Uncomment to enable debug logging
+      - JAVA_OPTS=-Dlogging.level.zipkin=DEBUG -Dlogging.level.zipkin2=DEBUG
+    ports:
+      # Port used for the Zipkin UI and HTTP Api
+      - 9411:9411
+      # Uncomment if you set SCRIBE_ENABLED=true
+      # - 9410:9410
+    depends_on:
+      - storage
+
   system:
     build: 
       context: ./system
@@ -58,6 +98,17 @@ services:
       - broker
     links:
       - broker
+    networks:
+      - dsnet
+
+  graphana:
+    image: kamon/grafana_graphite:latest
+    ports:
+      - "9680:80"
+      - "9681:81"
+      - "2003:2003"
+      - "8125:8125/udp"
+      - "8126:8126"
     networks:
       - dsnet
 

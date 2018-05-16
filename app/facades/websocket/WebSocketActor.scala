@@ -8,9 +8,8 @@ import models.{RequestEnvelope, ResponseEnvelope}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
 import models.formatMessage
-import models.mitrics.Meter
+import models.metrics.Meter
 import models.rpc._
-import nl.grons.metrics4.scala.DefaultInstrumented
 
 /**
  * Encapsulates WebSocket actor configuration.
@@ -22,7 +21,7 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, sal
  */
 class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig)
   extends Actor with ActorLogging with RequiresMessageQueue[BoundedMessageQueueSemantics]
-  with DefaultInstrumented with Meter{
+  with Meter{
 
   protected val ci = config.connInfo
   protected val linkName = ci.linkName
@@ -40,7 +39,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
     routee ! ConnectEndpoint(self, ci)
-    incrementTags(connectionTags(ci):_*)
+    incrementTags(tagsForConnection("connected")(ci):_*)
   }
 
 
@@ -49,7 +48,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
    */
   override def postStop() = {
     log.info("{}: stopped", ownId)
-    decrementTags(connectionTags(ci):_*)
+    decrementTags(tagsForConnection("connected")(ci):_*)
   }
 
   /**
@@ -65,12 +64,12 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      meterTags(messageTags("in.request", ci):_*)
+      meterTags(messageTags("request.in", ci):_*)
     case m @ ResponseMessage(msg, _, _) =>
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      meterTags(messageTags("in.response", ci):_*)
+      meterTags(messageTags("response.in", ci):_*)
     case e @ RequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
@@ -85,7 +84,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty) {
     val msg = ResponseMessage(localMsgId.inc, None, responses.toList)
     sendToSocket(msg)
-    meterTags(messageTags("out.response", ci):_*)
+    meterTags(messageTags("response.out", ci):_*)
   }
 
   /**
@@ -94,7 +93,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty) {
     val msg = RequestMessage(localMsgId.inc, None, requests.toList)
     sendToSocket(msg)
-    meterTags(messageTags("out.request", ci):_*)
+    meterTags(messageTags("request.out", ci):_*)
   }
 
   /**

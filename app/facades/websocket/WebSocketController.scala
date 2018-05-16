@@ -4,31 +4,31 @@ import java.net.URL
 
 import scala.concurrent.Future
 import scala.util.Random
-
 import org.bouncycastle.jcajce.provider.digest.SHA256
 import org.joda.time.DateTime
-
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{ Message, TextMessage, WebSocketRequest }
+import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
-import akka.stream.{ Materializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
+import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import controllers.BasicController
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
+
 import models.Settings
-import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee }
-import models.akka.Messages.{ GetOrCreateDSLink, RemoveDSLink }
-import models.handshake.{ LocalKeys, RemoteKey }
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
+import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
+import models.handshake.{LocalKeys, RemoteKey}
+import models.metrics.Meter
 import models.rpc.DSAMessage
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import play.api.mvc.{ ControllerComponents, Request, RequestHeader, Result, WebSocket }
+import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 
 /**
@@ -42,7 +42,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                                      actors:       BrokerActors,
                                      wsc:          WSClient,
                                      keys:         LocalKeys,
-                                     cc:           ControllerComponents) extends BasicController(cc) {
+                                     cc:           ControllerComponents)
+  extends BasicController(cc)
+  with Meter {
 
   type DSAFlow = Flow[DSAMessage, DSAMessage, _]
 
@@ -136,8 +138,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     cache.set(ci.dsId, DSLinkSessionInfo(ci, sessionId))
 
-    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", sessionId,
-      ci.dsId, ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+    meterTags(messageTags("handshake", ci):_*)
 
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)

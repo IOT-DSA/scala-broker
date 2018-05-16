@@ -1,4 +1,5 @@
 import Testing.itTest
+import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
 
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
@@ -17,13 +18,16 @@ scalaVersion := SCALA_VERSION
 // base play-akka project
 lazy val root = (project in file("."))
   .dependsOn(msgpack)
-  .enablePlugins(PlayScala)
+  .enablePlugins(PlayScala, JavaAgent)
   .settings(
     scalaVersion := SCALA_VERSION,
     libraryDependencies ++= commonDependencies.union(playTestDependencies)
   )
   .aggregate(msgpack)
   .dependsOn(msgpack)
+
+javaAgents += "org.aspectj" % "aspectjweaver" % "1.8.13" // (2)
+javaOptions in Universal += "-Dorg.aspectj.tracing.factory=default" // (3)
 
 // project for temporary lib msgpack4s
 lazy val msgpack = project.in(file("tools/msgpack4s"))
@@ -69,6 +73,20 @@ dockerExposedPorts := Seq(9000, 9443, 2551)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
+dockerEntrypoint ++= Seq(
+  """-Dkamon.statsd.hostname="$STATSD_HOST"""",
+  """-Dkamon.statsd.port="$STATSD_PORT"""",
+  """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
+  """-Dkamon.zipkin.port="$ZIPKIN_PORT""""
+)
+
+dockerCommands :=
+  dockerCommands.value.flatMap {
+    case ExecCmd("ENTRYPOINT", args @ _*) => Seq(Cmd("ENTRYPOINT", args.mkString(" ")))
+    case v => Seq(v)
+  }
+
+
 mappings in Universal ++= Seq(
   file("scripts/start-broker") -> "bin/start-broker",
   file("scripts/stop-broker") -> "bin/stop-broker",
@@ -104,8 +122,15 @@ lazy val commonDependencies = Seq(
   "io.netty"                 % "netty-handler"            % "4.0.41.Final" force(),
   "org.msgpack"             %% "msgpack-scala"            % "0.8.13",
   "org.json4s"              %% "json4s-native"            % "3.5.0",
-  "nl.grons"                %% "metrics4-scala"           % SCALA_METRICS_VERSION,
-  "nl.grons"                %% "metrics4-akka_a24"        % SCALA_METRICS_VERSION
+//  "nl.grons"                %% "metrics4-scala"           % SCALA_METRICS_VERSION,
+//  "nl.grons"                %% "metrics4-akka_a24"        % SCALA_METRICS_VERSION,
+//  "com.codahale.metrics"    % "metrics-graphite"          % "3.0.2",
+  "io.kamon" %% "kamon-akka-remote-2.5" % "1.0.0",
+  "io.kamon" %% "kamon-akka-2.5" % "1.0.0",
+  "io.kamon" %% "kamon-statsd" % "1.0.0",
+  "io.kamon" %% "kamon-system-metrics" % "1.0.0",
+  "io.kamon" %% "kamon-core" % "1.0.0",
+  "io.kamon" %% "kamon-zipkin" % "1.0.0"
 )
 
 // akka and play test dependencies

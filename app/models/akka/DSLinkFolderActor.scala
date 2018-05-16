@@ -16,7 +16,7 @@ import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, Response
  * When started, it verifies its own location against the `linkPath` parameter. For example,
  * if linkPath is set to "/downstream", the actor path needs to be "/user/downstream".
  */
-abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorLogging with SimpleResponderBehavior {
+abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorLogging  with SimpleResponderBehavior {
   import models.rpc.DSAValue._
   import models.rpc.StreamState._
   

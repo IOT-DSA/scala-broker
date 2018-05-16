@@ -1,13 +1,11 @@
 package models.akka.responder
 
 import scala.util.control.NonFatal
-
 import akka.actor._
 import models._
-import models.akka.AbstractDSLinkActor
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
-import models.rpc.DSAValue.{ ArrayValue, DSAVal, MapValue, StringValue, array }
+import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
