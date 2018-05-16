@@ -4,10 +4,9 @@ import org.joda.time.DateTime
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
 import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
-import models.{RequestEnvelope, ResponseEnvelope}
+import models.{RequestEnvelope, ResponseEnvelope, formatMessage}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
-import models.formatMessage
 import models.metrics.Meter
 import models.rpc._
 
@@ -30,7 +29,6 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   private val localMsgId = new IntCounter(1)
 
   private val startTime = DateTime.now
-
 
   /**
    * Sends handshake to the client and notifies the DSLink actor.
@@ -74,7 +72,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
     case e @ ResponseEnvelope(responses) =>
-      log.debug(s"{}: received {}", ownId, e)
+      log.debug("{}: received {}", ownId, e)
       sendResponses(responses: _*)
   }
 

@@ -5,7 +5,6 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import org.dsa.iot.dslink.node.Node
 import org.dsa.iot.dslink.{DSLink, DSLinkHandler}
 import org.slf4j.Logger
-
 import collection.JavaConverters._
 import scala.concurrent.duration._
 
@@ -14,7 +13,6 @@ import scala.concurrent.duration._
   */
 trait BaseDSLinkHandler extends DSLinkHandler {
 
-  implicit val ctx = scala.concurrent.ExecutionContext.global
   val log:Logger
 
   /**
