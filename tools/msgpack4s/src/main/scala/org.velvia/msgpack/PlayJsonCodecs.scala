@@ -28,15 +28,13 @@ object PlayJsonCodecs {
   }
 
   implicit object JsNumberCodec extends Codec[JsNumber] {
-//    def pack_old(out: DataOutputStream, item: JsNumber): Unit = { BigDecimalCodec.pack(out, item.value.underlying()) }
     def pack(out: DataOutputStream, item: JsNumber): Unit = {
       val value: BigDecimal = item.value
 
       // TODO: Implement special case here, something with precision and scale modification
-
       if (value.isValidLong)
         LongCodec.pack(out, value.longValue())
-      else if (value.isExactFloat)
+      else if (value.isExactFloat) // TODO: Check this method, it does not return True even for value 2.7
         FloatCodec.pack(out, value.floatValue())
       else if (value.isExactDouble)
         DoubleCodec.pack(out, value.doubleValue())
@@ -44,10 +42,9 @@ object PlayJsonCodecs {
         DoubleCodec.pack(out, value.underlying().doubleValue())
     }
 
-//    val unpackFuncMap_old = BigDecimalCodec.unpackFuncMap.mapValues(_.andThen(b ⇒ JsNumber(b)))
     val unpackFuncMap = LongCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b)))) ++
-      FloatCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b)))) ++
-      DoubleCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b))))
+                        FloatCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b)))) ++
+                        DoubleCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b))))
   }
 
   implicit object JsArrayCodec extends Codec[JsArray] {
