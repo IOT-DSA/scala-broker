@@ -1,9 +1,9 @@
 package models.akka
 
 import org.joda.time.DateTime
-
-import akka.actor.{ Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
+import models.Settings
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -26,6 +26,10 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
   protected val linkName = self.path.name
   protected val ownId = s"DSLink[$linkName]"
 
+  implicit val system = context.system
+
+
+
   // initially None, then set by ConnectEndpoint, unset by DisconnectEndpoint
   private var endpoint: Option[ActorRef] = None
 
@@ -39,7 +43,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
    * Called on link start up: notifies the registry and logs the dslink status.
    */
   override def preStart() = {
-    sendToRegistry(RegisterDSLink(linkName, connInfo.mode, false))
+    sendToRegistry(RegisterDSLink(linkName, connInfo.mode, connected = false))
     log.info(s"$ownId: initialized, not connected to Endpoint")
   }
 
@@ -68,7 +72,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
       disconnectFromEndpoint(false)
     case GetLinkInfo =>
       log.debug(s"$ownId: LinkInfo requested, dispatching")
-      sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
+      sender ! LinkInfo(connInfo, connected = true, lastConnected, lastDisconnected)
     case ConnectEndpoint(ref, ci) =>
       log.warning(s"$ownId: already connected to Endpoint, dropping previous association")
       disconnectFromEndpoint(true)
@@ -84,54 +88,63 @@ abstract class AbstractDSLinkActor(registry: Routee) extends Actor with Stash wi
       connectToEndpoint(ref, ci)
     case GetLinkInfo =>
       log.debug(s"$ownId: LinkInfo requested, dispatching")
-      sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
+      sender ! LinkInfo(connInfo, connected = false, lastConnected, lastDisconnected)
     case DisconnectEndpoint(_) =>
       log.warning(s"$ownId: not connected to Endpoint, ignoring DISCONNECT")
-    case _ =>
-      log.debug(s"$ownId: stashing the incoming message")
-      stash()
   }
+
+  def toStash: Receive = {
+        case _ =>
+          log.debug(s"$ownId: stashing the incoming message")
+          stash()
+  }
+
+  protected def afterConnection():Unit = {}
+
+  protected def afterDisconnection():Unit = {}
 
   /**
    * Associates this DSLink with an endpoint.
    */
-  private def connectToEndpoint(ref: ActorRef, ci: ConnectionInfo) = {
+  private def connectToEndpoint(ref: ActorRef, ci: ConnectionInfo): Unit = {
     assert(ci.isRequester || ci.isResponder, "DSLink must be Requester, Responder or Dual")
 
     endpoint = Some(context.watch(ref))
     connInfo = ci
     lastConnected = Some(DateTime.now)
 
-    sendToRegistry(DSLinkStateChanged(linkName, ci.mode, true))
+    sendToRegistry(DSLinkStateChanged(linkName, ci.mode, connected = true))
 
     log.debug(s"$ownId: unstashing all stored messages")
     unstashAll()
     context.become(connected)
+    afterConnection()
   }
 
   /**
    * Disassociates this DSLink from the endpoint.
    */
-  private def disconnectFromEndpoint(kill: Boolean) = {
+  private def disconnectFromEndpoint(kill: Boolean):Unit = {
     endpoint foreach { ref =>
       context unwatch ref
       if (kill) ref ! PoisonPill
     }
     endpoint = None
     lastDisconnected = Some(DateTime.now)
-
-    sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
-
+    sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, connected = false))
     context.become(disconnected)
+    afterDisconnection()
   }
 
   /**
    * Sends a message to the endpoint, if connected.
    */
-  protected def sendToEndpoint(msg: Any): Unit = endpoint foreach (_ ! msg)
+  protected def sendToEndpoint(msg: Any): Unit =  endpoint foreach (_ ! msg)
+
 
   /**
    * Sends a message to the registry.
    */
   protected def sendToRegistry(msg: Any): Unit = registry ! msg
+
 }
