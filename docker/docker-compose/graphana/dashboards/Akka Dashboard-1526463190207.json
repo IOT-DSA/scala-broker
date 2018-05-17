@@ -105,7 +105,7 @@
             },
             {
               "refId": "A",
-              "target": "stats.counters.$Application.$Host.select metric"
+              "target": "alias(stats.counters.$Application.$Host.akka_system_unhandled-messages.system.DSASystem.count, 'unhandled messages')"
             }
           ],
           "thresholds": [],
@@ -856,10 +856,6 @@
             {
               "refId": "C",
               "target": "alias(stats.counters.$Application.$Host.akka_system_dead-letters.system.DSASystem.count, 'dead letters')"
-            },
-            {
-              "refId": "D",
-              "target": "alias(stats.counters.$Application.$Host.akka_system_unhandled-messages.system.DSASystem.count, 'unhandled messages')"
             }
           ],
           "thresholds": [],
