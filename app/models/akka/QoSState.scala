@@ -94,7 +94,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
       }
 
     next foreach { case (sid, queue) =>
-      subscriptionsQueue - sid
+      subscriptionsQueue -= sid
     }
     log.debug("send and remove {}", next)
     log.debug("state after removing: {}", subscriptionsQueue.foldLeft(""){(str, next) => {
