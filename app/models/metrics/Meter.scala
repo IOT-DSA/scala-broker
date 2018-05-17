@@ -39,15 +39,15 @@ trait Meter {
 
   def tagsForConnection(prefix:String)(ci:ConnectionInfo) = Array(
     prefix,
-    s"$prefix.mode.${ci.mode}",
-    s"$prefix.brokerAddress.${ci.brokerAddress}",
-    s"$prefix.version.${if(ci.version.nonEmpty) ci.version else "undefined"}",
-    s"$prefix.compression.${ci.compression}"
+    prefix + ".mode." + ci.mode,
+    prefix + ".brokerAddress.${ci.brokerAddress}",
+    prefix + ".version." + (if(ci.version.nonEmpty) ci.version else "undefined"),
+    prefix + ".compression." + ci.compression
   )
 
   def messageTags(prefix:String, ci:ConnectionInfo) = Array(
     prefix,
-    s"$prefix.brokerAddress.${ci.brokerAddress}"
+    prefix + ".brokerAddress." + ci.brokerAddress
   )
 
   def tagsWithPrefix(prefix:String)(in: String*) = {
