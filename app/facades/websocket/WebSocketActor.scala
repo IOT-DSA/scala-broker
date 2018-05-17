@@ -4,6 +4,7 @@ import org.joda.time.DateTime
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
 import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
+import kamon.Kamon
 import models.{RequestEnvelope, ResponseEnvelope, formatMessage}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
@@ -59,11 +60,13 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
       log.debug("{}: received ping from WebSocket with msg={}, acking...", ownId, msg)
       sendAck(msg)
     case m @ RequestMessage(msg, _, _) =>
+      Kamon.currentSpan().tag("type", "request")
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
       meterTags(messageTags("request.in", ci):_*)
     case m @ ResponseMessage(msg, _, _) =>
+      Kamon.currentSpan().tag("type", "response")
       log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
