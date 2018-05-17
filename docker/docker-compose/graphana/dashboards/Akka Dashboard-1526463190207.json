@@ -811,190 +811,62 @@
     },
     {
       "collapse": false,
-      "height": 31,
+      "height": 250,
       "panels": [
         {
-          "content": "## Trace Metrics (TBD) ##",
-          "editable": true,
-          "error": false,
-          "id": 12,
-          "loadingEditor": false,
-          "mode": "markdown",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": null,
+          "fill": 1,
+          "id": 11,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
           "span": 12,
-          "style": {},
-          "title": "Trace Metrics",
-          "type": "text"
-        }
-      ],
-      "repeat": null,
-      "repeatIteration": null,
-      "repeatRowId": null,
-      "showTitle": false,
-      "title": "Router Processing Time",
-      "titleSize": "h6"
-    },
-    {
-      "collapse": false,
-      "height": 193,
-      "panels": [
-        {
-          "aliasColors": {},
-          "annotate": {
-            "enable": false
-          },
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": null,
-          "editable": true,
-          "fill": 0,
-          "grid": {
-            "max": null,
-            "min": 0
-          },
-          "id": 13,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 2,
-          "loadingEditor": false,
-          "nullPointMode": "connected",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "resolution": 100,
-          "scale": 1,
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "span": 9,
           "stack": false,
           "steppedLine": false,
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.timers.$Application.$Host.trace.*.elapsed-time.count,5)"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "# of Processed Traces",
-          "tooltip": {
-            "query_as_alias": true,
-            "shared": true,
-            "sort": 0,
-            "value_type": "cumulative"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
+              "target": "aliasByNode(stats.counters.$Application.$Host.akka_group_errors.group.*.system.DSASystem.count, 6)"
             },
             {
-              "format": "short",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "zerofill": true
-        },
-        {
-          "content": "Whether your are manually starting/finishing TraceContexts or letting Kamon do it for you in Spray and Play! applications\nthis section contains metrics about those traces!",
-          "editable": true,
-          "error": false,
-          "id": 14,
-          "loadingEditor": false,
-          "mode": "markdown",
-          "span": 3,
-          "style": {},
-          "title": "Trace Metrics",
-          "type": "text"
-        }
-      ],
-      "repeat": null,
-      "repeatIteration": null,
-      "repeatRowId": null,
-      "showTitle": false,
-      "title": "Trace Metrics Label",
-      "titleSize": "h6"
-    },
-    {
-      "collapse": false,
-      "height": "250px",
-      "panels": [
-        {
-          "aliasColors": {},
-          "annotate": {
-            "enable": false
-          },
-          "bars": true,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": null,
-          "editable": true,
-          "fill": 0,
-          "grid": {
-            "max": null,
-            "min": 0
-          },
-          "id": 16,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": false,
-          "linewidth": 2,
-          "loadingEditor": false,
-          "nullPointMode": "null as zero",
-          "percentage": true,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "resolution": 100,
-          "scale": 1,
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "span": 6,
-          "stack": true,
-          "steppedLine": false,
-          "targets": [
+              "refId": "B",
+              "target": "aliasByNode(stats.counters.$Application.$Host.akka_router_errors.dispatcher.*.path.*.system.DSASystem.count, 4, 6, 8)",
+              "textEditor": true
+            },
             {
-              "refId": "A",
-              "target": "aliasByNode(stats.timers.$Application.$Host.trace.*.elapsed-time.mean,5)"
+              "refId": "C",
+              "target": "alias(stats.counters.$Application.$Host.akka_system_dead-letters.system.DSASystem.count, 'dead letters')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.counters.$Application.$Host.akka_system_unhandled-messages.system.DSASystem.count, 'unhandled messages')"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "Relative time per Trace",
+          "title": "Errors",
           "tooltip": {
-            "query_as_alias": true,
             "shared": true,
             "sort": 0,
             "value_type": "individual"
@@ -1010,6 +882,7 @@
           "yaxes": [
             {
               "format": "short",
+              "label": null,
               "logBase": 1,
               "max": null,
               "min": null,
@@ -1017,113 +890,20 @@
             },
             {
               "format": "short",
+              "label": null,
               "logBase": 1,
               "max": null,
               "min": null,
               "show": true
             }
-          ],
-          "zerofill": true
-        },
-        {
-          "aliasColors": {},
-          "annotate": {
-            "enable": false
-          },
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": null,
-          "editable": true,
-          "fill": 0,
-          "grid": {
-            "max": null,
-            "min": 0
-          },
-          "id": 15,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 2,
-          "loadingEditor": false,
-          "nullPointMode": "null as zero",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "resolution": 100,
-          "scale": 1,
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "span": 6,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "target": "aliasByNode(scale(stats.timers.$Application.$Host.trace.*.elapsed-time.mean,0.001),5)"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "Trace Processing Time",
-          "tooltip": {
-            "query_as_alias": true,
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "µs",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "zerofill": true
+          ]
         }
       ],
       "repeat": null,
       "repeatIteration": null,
       "repeatRowId": null,
       "showTitle": false,
-      "title": "Trace Metrics and Intro",
-      "titleSize": "h6"
-    },
-    {
-      "collapse": false,
-      "height": 282,
-      "panels": [],
-      "repeat": null,
-      "repeatIteration": null,
-      "repeatRowId": null,
-      "showTitle": false,
-      "title": "Latency and Relative Time per Trace",
+      "title": "Dashboard Row",
       "titleSize": "h6"
     }
   ],

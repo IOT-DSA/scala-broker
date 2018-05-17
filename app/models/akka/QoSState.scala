@@ -90,7 +90,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
         item.sid
     }
 
-    incrementTagsNTimes("qos.sids.size")(subscriptionsQueue.size)
+    histogramValue("qos.sids.size")(subscriptionsQueue.size)
 
     result
   }
@@ -108,7 +108,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
 
     next foreach { case (sid, queue) =>
       subscriptionsQueue - sid
-      decrementTags("qos.sids.size")
+      histogramValue("qos.sids.size")(subscriptionsQueue.size)
     }
     log.debug("send and remove {}", next)
     sender ! next.map(_._2)
