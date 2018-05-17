@@ -5,7 +5,7 @@ import _root_.akka.stream.OverflowStrategy
 import scala.collection.JavaConverters.asScalaSetConverter
 import scala.concurrent.duration.DurationLong
 import com.typesafe.config.ConfigFactory
-import play.api.libs.json.{JsArray, JsString, JsValue, Json}
+import play.api.libs.json.{JsArray, JsString, Json}
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
 /**
@@ -82,6 +82,14 @@ object Settings {
    * The maximum number of children in LIST response.
    */
   val ChildrenPerListResponse = rootConfig.getInt("broker.children.per.response")
+
+  object Subscriptions{
+
+    private val cfg = rootConfig.getConfig("broker.subscriptions")
+    val reconnectionTimeout = Option(cfg.getInt("reconnectionTimeout")).getOrElse(30)
+    val queueCapacity = Option(cfg.getInt("queue.capacity")).getOrElse(30)
+
+  }
 
   /**
    * WebSocket configuration.

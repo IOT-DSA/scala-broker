@@ -22,6 +22,8 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
     super.postStop
   }
 
+  override def disconnected: Receive = super.disconnected orElse requesterDisconnected orElse toStash
+
   /**
    * Handles messages in CONNECTED state.
    */

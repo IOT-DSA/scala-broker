@@ -17,8 +17,7 @@ trait Codec[@specialized(Int, Long, Short, Byte, Double, Float) A] {
     try {
       val headerByte = in.readByte()
       val func = unpackFuncMap.getOrElse(headerByte, defaultUnpackFunc(headerByte) )
-      val res = func(in)
-      res
+      func(in)
     } catch {
       case ex: EOFException =>
         throw new InvalidMsgPackDataException("No more input available when expecting a value")
