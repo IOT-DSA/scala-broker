@@ -58,6 +58,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   "RegisterDSLink" should {
     "record link names" in {
       downstream ! RegisterDSLink("aaa", DSLinkMode.Requester, false)
+      downstream ! RegisterDSLink("bbb", DSLinkMode.Requester, false)
       downstream ! DSLinkStateChanged("bbb", DSLinkMode.Responder, false)
       whenReady((downstream ? GetDSLinkNames).mapTo[Iterable[String]]) {
         _.toSet mustBe Set("aaa", "bbb")
