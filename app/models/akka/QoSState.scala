@@ -107,7 +107,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
       }
 
     next foreach { case (sid, queue) =>
-      subscriptionsQueue - sid
+      subscriptionsQueue -= sid
       histogramValue("qos.sids.size")(subscriptionsQueue.size)
     }
     log.debug("send and remove {}", next)
