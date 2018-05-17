@@ -3,13 +3,11 @@ package org.velvia.msgpack
 import java.io.{ DataInputStream ⇒ DIS, DataOutputStream }
 
 import play.api.libs.json._
-//import org.velvia.msgpack._
 
 object PlayJsonCodecs {
   import Format._
   import SimpleCodecs._
   import RawStringCodecs.StringCodec
-//  import ExtraCodecs._
 
   implicit object JsNullCodec extends Codec[JsNull.type] {
     def pack(out: DataOutputStream, item: JsNull.type): Unit = { out.write(MP_NULL) }

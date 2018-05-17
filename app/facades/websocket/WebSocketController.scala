@@ -31,7 +31,6 @@ import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
 import org.velvia.MsgPack
-//import play.api.mvc.WebSocket.MessageFlowTransformer
 
 /**
  * Establishes WebSocket DSLink connections
@@ -244,10 +243,10 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val cr = request.body
-    val r  = Settings.ServerConfiguration("format").as[Seq[String]]
+    val availableFormats  = Settings.ServerConfiguration("format").as[Seq[String]]
     val resultFormat = chooseFormat(
       request.body.formats.getOrElse(List(MSGJSON))
-      , List(r :_*)
+      , List(availableFormats :_*)
     )
 
     new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
