@@ -49,10 +49,11 @@ class DSLinkManagerProvider @Inject() (actorSystem: ActorSystem)
 }
 
 @Singleton
-class StatsDConnection @Inject() (lifecycle: ApplicationLifecycle) {
+class StatsDConnection @Inject()(lifecycle: ApplicationLifecycle) {
 
-  Kamon.addReporter(new StatsDReporter())
-  Kamon.addReporter(new ZipkinReporter())
+  if(Settings.MetricsReporters.statsdConfigured)  Kamon.addReporter(new StatsDReporter())
+  if(Settings.MetricsReporters.zipkinConfigured)  Kamon.addReporter(new ZipkinReporter())
+
   SystemMetrics.startCollecting()
 
   lifecycle.addStopHook(() => {

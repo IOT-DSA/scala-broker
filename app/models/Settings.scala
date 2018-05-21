@@ -4,11 +4,11 @@ import _root_.akka.stream.OverflowStrategy
 
 import scala.collection.JavaConverters.asScalaSetConverter
 import scala.concurrent.duration.DurationLong
-
 import com.typesafe.config.ConfigFactory
-
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
+
+import scala.util.Try
 
 /**
  * Encapsulates application settings – both hardcoded and configured in `application.conf`.
@@ -86,6 +86,21 @@ object Settings {
     val reconnectionTimeout = Option(cfg.getInt("reconnectionTimeout")).getOrElse(30)
     val queueCapacity = Option(cfg.getInt("queue.capacity")).getOrElse(30)
 
+  }
+
+  object MetricsReporters{
+
+    private val cfg = rootConfig.getConfig("kamon")
+
+    val zipkinConfigured = cfg.atPath("zipkin.host").isResolved() &&
+      cfg.atPath("zipkin.port").isResolved &&
+      Try{cfg.getInt("zipkin.port")}.isSuccess //by some reason settings from ENV variables are not null
+
+    val statsdConfigured = cfg.atPath("statsd.hostname").isResolved() &&
+      cfg.atPath("statsd.port").isResolved &&
+      Try{cfg.getInt("statsd.port")}.isSuccess
+
+    case class HostAndPort(host:String, port:Int)
   }
 
   /**

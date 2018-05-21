@@ -75,9 +75,9 @@ dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
   """-Dkamon.statsd.hostname="$STATSD_HOST"""",
-  """-Dkamon.statsd.port="$STATSD_PORT"""",
+  """-Dkamon.statsd.port=$STATSD_PORT""",
   """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
-  """-Dkamon.zipkin.port="$ZIPKIN_PORT""""
+  """-Dkamon.zipkin.port=$ZIPKIN_PORT"""
 )
 
 dockerCommands :=
@@ -85,7 +85,6 @@ dockerCommands :=
     case ExecCmd("ENTRYPOINT", args @ _*) => Seq(Cmd("ENTRYPOINT", args.mkString(" ")))
     case v => Seq(v)
   }
-
 
 mappings in Universal ++= Seq(
   file("scripts/start-broker") -> "bin/start-broker",
@@ -122,9 +121,6 @@ lazy val commonDependencies = Seq(
   "io.netty"                 % "netty-handler"            % "4.0.41.Final" force(),
   "org.msgpack"             %% "msgpack-scala"            % "0.8.13",
   "org.json4s"              %% "json4s-native"            % "3.5.0",
-//  "nl.grons"                %% "metrics4-scala"           % SCALA_METRICS_VERSION,
-//  "nl.grons"                %% "metrics4-akka_a24"        % SCALA_METRICS_VERSION,
-//  "com.codahale.metrics"    % "metrics-graphite"          % "3.0.2",
   "io.kamon" %% "kamon-akka-remote-2.5" % "1.0.0",
   "io.kamon" %% "kamon-akka-2.5" % "1.0.0",
   "io.kamon" %% "kamon-statsd" % "1.0.0",
