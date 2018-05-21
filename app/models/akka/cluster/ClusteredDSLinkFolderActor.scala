@@ -17,10 +17,14 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
   import context.dispatcher
 
+  override def persistenceId = linkPath
+
   /**
    * Handles incoming messages.
    */
-  def receive = responderBehavior orElse mgmtHandler
+  override def receiveCommand = responderBehavior orElse mgmtHandler
+
+  override def receiveRecover = dslinkFolderRecover
 
   /**
    * Handler for messages coming from peer nodes.

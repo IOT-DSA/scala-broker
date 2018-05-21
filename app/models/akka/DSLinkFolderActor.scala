@@ -2,12 +2,14 @@ package models.akka
 
 import java.util.regex.Pattern
 
-import akka.actor.{ Actor, ActorLogging }
+import akka.actor.{ ActorLogging }
+import akka.persistence.PersistentActor
 import akka.routing.Routee
 import models.{ RequestEnvelope, Settings }
 import models.akka.DSLinkMode.DSLinkMode
 import models.akka.Messages.{ DSLinkNodeStats, LinkState }
 import models.akka.responder.SimpleResponderBehavior
+import models.akka.responder.ResponderBehavior
 import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
 
 /**
@@ -16,7 +18,7 @@ import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, Response
  * When started, it verifies its own location against the `linkPath` parameter. For example,
  * if linkPath is set to "/downstream", the actor path needs to be "/user/downstream".
  */
-abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorLogging with SimpleResponderBehavior {
+abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor with ActorLogging with SimpleResponderBehavior {
   import models.rpc.DSAValue._
   import models.rpc.StreamState._
   
@@ -31,6 +33,11 @@ abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorL
   override def preStart = log.info(s"$ownId actor created")
 
   override def postStop = log.info(s"$ownId actor stopped")
+
+  val dslinkFolderRecover: Receive = {
+    case event =>
+      log.info("{}: not implemented yet for {}", ownId, event)
+  }
 
   /**
    * Terminates the actor system if the actor's path does not match `/user/<path>`.

@@ -2,8 +2,9 @@ package models.akka.local
 
 import akka.actor.{ PoisonPill, Props, actorRef2Scala }
 import akka.routing.{ ActorRefRoutee, Routee }
-import models.akka.{ DSLinkManager, DSLinkFolderActor, IsNode, rows }
+import models.akka.{ DSLinkFolderActor, IsNode, rows }
 import models.akka.Messages._
+import models.akka.{ DSLinkRegistered, DSLinkUnregistered }
 import models.rpc.DSAValue._
 
 /**
@@ -12,24 +13,45 @@ import models.rpc.DSAValue._
 class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (String, DSAVal)*)
   extends DSLinkFolderActor(linkPath) {
 
+  override def persistenceId = linkPath
+
   /**
    * Handles incoming messages.
    */
-  def receive = responderBehavior orElse mgmtHandler
+  override def receiveCommand = responderBehavior orElse mgmtHandler
+
+  /**
+    * Handles persisted events.
+    */
+  override def receiveRecover = mgmtRecover orElse dslinkFolderRecover orElse simpleResponderRecover orElse responderRecover
+
+  /**
+   * Recovers events of [[LocalDSLinkFolderActor]] from the journal.
+   */
+  private val mgmtRecover: Receive = {
+    case event: DSLinkRegistered =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      links += (event.name -> LinkState(event.mode, event.connected))
+    case event: DSLinkUnregistered =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      links -= event.name
+  }
 
   /**
    * Handles control messages.
    */
-  val mgmtHandler: Receive = {
+  private val mgmtHandler: Receive = {
 
     case GetOrCreateDSLink(name) =>
       log.debug("{}: requested DSLink '{}'", ownId, name)
       sender ! getOrCreateDSLink(name)
 
     case RegisterDSLink(name, mode, connected) =>
-      links += (name -> LinkState(mode, connected))
-      log.info("{}: registered DSLink '{}'", ownId, name)
-      notifyOnRegister(name)
+      persist(DSLinkRegistered(name, mode, connected)) { event =>
+        links += (event.name -> LinkState(event.mode, event.connected))
+        log.info("{}: registered DSLink '{}'", ownId, event.name)
+        notifyOnRegister(event.name)
+      }
 
     case GetDSLinkNames => sender ! links.keys
 
@@ -38,9 +60,11 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
       log.debug("{}: ordered to remove DSLink '{}'", ownId, name)
 
     case UnregisterDSLink(name) =>
-      links -= name
-      log.info("{}: removed DSLink '{}'", ownId, name)
-      notifyOnRemove(name)
+      persist(DSLinkUnregistered(name)) { event =>
+        links -= event.name
+        log.info("{}: removed DSLink '{}'", ownId, event.name)
+        notifyOnRemove(event.name)
+      }
 
     case DSLinkStateChanged(name, mode, connected) => changeLinkState(name, mode, connected, true)
 
