@@ -8,9 +8,9 @@ import org.scalatest.{FlatSpec}
 
 class WSSTests extends FlatSpec with BasicCases {
 
-  LogManager.setBridge(new LoggingBridge)
-
-  "it test" should "run" in {
-    addNodeGetListNodes("wss", 9443)
-  }
+//  LogManager.setBridge(new LoggingBridge)
+//
+//  "it test" should "run" in {
+//    addNodeGetListNodes("wss", 9443)
+//  }
 }
