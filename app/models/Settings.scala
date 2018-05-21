@@ -87,7 +87,6 @@ object Settings {
   }
 
   object MetricsReporters{
-
     private val cfg = rootConfig.getConfig("kamon")
 
     val zipkinConfigured = cfg.atPath("zipkin.host").isResolved() &&
