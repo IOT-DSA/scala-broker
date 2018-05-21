@@ -45,11 +45,11 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       val controller = app.injector.instanceOf[WebSocketController]
 
       val connReq = ConnectionRequest("", true, true, None, "", Option(List(MSGJSON, MSGPACK)), true)
-      val request = FakeRequest("POST", "/conn?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg")
-        .withBody(connReq)
 
       // conn
       // TODO: implement full cirlce unit tests for ws connection
+      // val request = FakeRequest("POST", "/conn?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg")
+      //  .withBody(connReq)
       // val conn1 = controller.dslinkHandshake(request)
 
       // ws
