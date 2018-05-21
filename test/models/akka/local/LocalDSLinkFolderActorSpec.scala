@@ -119,6 +119,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 //    }
   }
 
+  //TODO reimplement those tests in more stable way
   "CloseRequest" should {
 //    "return valid response" in {
 //      downstream ! RequestEnvelope(List(CloseRequest(1)))
