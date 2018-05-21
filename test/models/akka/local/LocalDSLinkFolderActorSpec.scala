@@ -102,7 +102,6 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       }
     }
     //TODO reimplement those tests in more stable way
-
 //    "send updates on added nodes" in {
 //      downstream ! GetOrCreateDSLink("ccc")
 //      val Seq(routee, env) = receiveN(2)
