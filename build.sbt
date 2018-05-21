@@ -74,6 +74,12 @@ dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
+  """-Dakka.remote.netty.tcp.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
+  """-Dakka.remote.netty.tcp.port="$AKKA_REMOTING_BIND_PORT"""",
+  """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka.tcp://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
+  "-Dakka.io.dns.resolver=async-dns",
+  "-Dakka.io.dns.async-dns.resolve-srv=true",
+  "-Dakka.io.dns.async-dns.resolv-conf=on",
   """-Dkamon.statsd.hostname="$STATSD_HOST"""",
   """-Dkamon.statsd.port=$STATSD_PORT""",
   """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
@@ -85,6 +91,7 @@ dockerCommands :=
     case ExecCmd("ENTRYPOINT", args @ _*) => Seq(Cmd("ENTRYPOINT", args.mkString(" ")))
     case v => Seq(v)
   }
+
 
 mappings in Universal ++= Seq(
   file("scripts/start-broker") -> "bin/start-broker",
