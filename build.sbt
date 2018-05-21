@@ -1,4 +1,5 @@
 import Testing.itTest
+import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
 
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
@@ -66,6 +67,22 @@ packageName in Docker := "iotdsa/broker-scala"
 dockerExposedPorts := Seq(9000, 9443, 2551)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
+
+dockerEntrypoint ++= Seq(
+  """-Dakka.remote.netty.tcp.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
+  """-Dakka.remote.netty.tcp.port="$AKKA_REMOTING_BIND_PORT"""",
+  """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka.tcp://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
+  "-Dakka.io.dns.resolver=async-dns",
+  "-Dakka.io.dns.async-dns.resolve-srv=true",
+  "-Dakka.io.dns.async-dns.resolv-conf=on"
+)
+
+dockerCommands :=
+  dockerCommands.value.flatMap {
+    case ExecCmd("ENTRYPOINT", args @ _*) => Seq(Cmd("ENTRYPOINT", args.mkString(" ")))
+    case v => Seq(v)
+  }
+
 
 mappings in Universal ++= Seq(
   file("scripts/setup-influx") -> "bin/setup-influx",
