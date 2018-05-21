@@ -29,14 +29,13 @@ object PlayJsonCodecs {
     def pack(out: DataOutputStream, item: JsNumber): Unit = {
       val value: BigDecimal = item.value
 
-      // TODO: Implement special case here, something with precision and scale modification
       if (value.isValidLong)
         LongCodec.pack(out, value.longValue())
       else if (value.isExactFloat) // TODO: Check this method, it does not return True even for value 2.7
         FloatCodec.pack(out, value.floatValue())
       else if (value.isExactDouble)
         DoubleCodec.pack(out, value.doubleValue())
-      else
+      else  // TODO: Implement special case here, something with precision and scale modification
         DoubleCodec.pack(out, value.underlying().doubleValue())
     }
 
