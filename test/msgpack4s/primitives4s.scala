@@ -47,7 +47,11 @@ class Msgpack4sTests extends PlaySpec {
       import play.api.libs.json.{JsValue, Json}
       import org.velvia.msgpack.PlayJsonCodecs.JsValueCodec
 
-      val js: JsValue = Json.parse("""{"amount":40.1,"currency":"USD","label":"10.00"}""")
+      val js: JsValue = Json.parse(
+        """{"small_int_value": 3, "big_int_value": 1231231232131,
+          |"amount":40.1,"currency":"USD","label":"10.00"}"""
+          .stripMargin
+      )
 
       val p: Array[Byte] = msgpack.pack(js)
 
@@ -62,11 +66,30 @@ class Msgpack4sTests extends PlaySpec {
       import org.json4s.native.JsonMethods.parse
       import org.json4s.JsonAST.JValue
 
-
-      val js: JValue = parse("""{"amount":40.1,"currency":"USD","label":"10.00"}""")
+      val js: JValue = parse(
+        """{"small_int_value": 3, "big_int_value": 1231231232131,
+          |"amount":40.1,"currency":"USD","label":"10.00"}""".stripMargin)
       var p: Array[Byte] = msgpack.pack(js)
       val transJs = msgpack.unpack[JValue](p)
       transJs mustBe js
+    }
+
+    "encode/decode empty object" in {
+      import org.velvia.msgpack
+      import play.api.libs.json.{JsValue, Json}
+      import org.velvia.msgpack.PlayJsonCodecs.JsValueCodec
+
+      val js: JsValue = Json.parse("{}")
+
+      val p: Array[Byte] = msgpack.pack(js)
+
+      val transJs = msgpack.unpack[JsValue](p)
+
+      println("Decoded Json is: " + transJs.toString())
+
+      transJs mustBe js
+
+      println ("OK")
     }
 
   }

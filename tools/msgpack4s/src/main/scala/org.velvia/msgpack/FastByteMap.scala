@@ -31,4 +31,3 @@ case class FastByteMap[V](things: (Byte, V)*) {
     if (v != null) v.asInstanceOf[V] else default
   }
 }
-

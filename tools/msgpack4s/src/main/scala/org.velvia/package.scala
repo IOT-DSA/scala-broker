@@ -55,6 +55,8 @@ package object msgpack {
       case ex: InvalidMsgPackDataException =>  throw ex
       case ex: IOException =>            //this shouldn't happen
         throw new RuntimeException("ByteArrayInStream threw an IOException!", ex);
+    } finally {
+      in.close()
     }
   }
 
