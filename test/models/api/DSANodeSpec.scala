@@ -13,7 +13,7 @@ import play.api.Configuration
 class DSANodeSpec extends AbstractActorSpec {
   import models.rpc.DSAValue._
 
-  val extension = TypedActor(sy  stem)
+  val extension = TypedActor(system)
 
   "DSANode.props" should {
     "create a new node instance" in {

@@ -64,8 +64,8 @@ object ClusterDDTest {
       ////val ba = new BrokerActors(system, mgr, nullDaos)
 
       val dataNode = TypedActor(system).typedActorOf(DSANode.props(None), Data)
-      dataNode.profile = "broker/dataRoot"
-      dataNode.addChild("child1")
+  //    dataNode.profile = "broker/dataRoot"
+     // dataNode.addChild("child1")
       StandardActions.bindDataRootActions(dataNode)
 
       // Create an actor that handles cluster domain events
@@ -96,11 +96,11 @@ class ClusterDDTest extends Actor with ActorLogging {
     case msg @ ActorIdentity(`identifyId`, Some(ref)) =>
       log.info(s">> IDENTIFY: $ref via $msg by $this")
       val r1 = SetRequest(3, "val", "dd", None)
-      val setReq = SetRequest(12, "val12", DSAValue(99))
-      val envelop = RequestEnvelope(List[r1])
+//      val setReq = SetRequest(12, "val12", DSAValue(99))
+      //val envelop = RequestEnvelope(List[r1])
       val req = SubscribeRequest(11, SubscriptionPath("/data1", 101))
       val env = RequestEnvelope(List(req))
-      RequestEnvelope(List(SetRequest(111, "/downstream/R/blah", 5))), requesters(1).ref
+      //RequestEnvelope(List(SetRequest(111, "/downstream/R/blah", 5))), requesters(1).ref
     case r =>
       log.info(s">> PING: $this got $r")
       context.actorSelection("../data/*") ! Identify(identifyId)
