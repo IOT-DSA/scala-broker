@@ -59,7 +59,11 @@ class MainController @Inject() (actorSystem: ActorSystem,
   /**
    * Displays data explorer.
    */
-  def dataExplorer = TODO
+  def dataExplorer = Action.async { implicit request =>
+    getDownUpCount map {
+      case (down, up) => Ok(views.html.data(Some(down), Some(up)))
+    }
+  }
 
   /**
    * Displays the DSLinks page.
