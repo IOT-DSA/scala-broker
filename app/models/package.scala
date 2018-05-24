@@ -9,7 +9,7 @@ package object models {
   implicit val RequestEnvelopeFormat = Json.format[RequestEnvelope]
 
   /**
-   * RequestEnvelope <-> JSON
+   * ResponseEnvelope <-> JSON
    */
   implicit val ResponseEnvelopeFormat = Json.format[ResponseEnvelope]
 

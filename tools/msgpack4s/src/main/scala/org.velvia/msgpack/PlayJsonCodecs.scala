@@ -3,13 +3,11 @@ package org.velvia.msgpack
 import java.io.{ DataInputStream ⇒ DIS, DataOutputStream }
 
 import play.api.libs.json._
-import org.velvia.msgpack._
 
 object PlayJsonCodecs {
-  import org.velvia.msgpack.Format._
+  import Format._
   import SimpleCodecs._
   import RawStringCodecs.StringCodec
-  import ExtraCodecs._
 
   implicit object JsNullCodec extends Codec[JsNull.type] {
     def pack(out: DataOutputStream, item: JsNull.type): Unit = { out.write(MP_NULL) }
@@ -28,16 +26,33 @@ object PlayJsonCodecs {
   }
 
   implicit object JsNumberCodec extends Codec[JsNumber] {
-    def pack(out: DataOutputStream, item: JsNumber): Unit = { BigDecimalCodec.pack(out, item.value.underlying) }
-    val unpackFuncMap = BigDecimalCodec.unpackFuncMap.mapValues(_.andThen(b ⇒ JsNumber(BigDecimal(b))))
+    def pack(out: DataOutputStream, item: JsNumber): Unit = {
+      val value: BigDecimal = item.value
+
+      // TODO: Implement special case here, something with precision and scale modification
+      if (value.isValidLong)
+        LongCodec.pack(out, value.longValue())
+      else if (value.isExactFloat) // TODO: Check this method, it does not return True even for value 2.7
+        FloatCodec.pack(out, value.floatValue())
+      else if (value.isExactDouble)
+        DoubleCodec.pack(out, value.doubleValue())
+      else
+        DoubleCodec.pack(out, value.underlying().doubleValue())
+    }
+
+    val unpackFuncMap = LongCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b)))) ++
+                        FloatCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b)))) ++
+                        DoubleCodec.unpackFuncMap.mapValues(_.andThen(b => JsNumber(BigDecimal(b))))
   }
 
   implicit object JsArrayCodec extends Codec[JsArray] {
     lazy val seqCodec = new CollectionCodecs.SeqCodec()(JsValueCodec)
-    def pack(out: DataOutputStream, a: JsArray): Unit = { seqCodec.pack(out, a.value) }
+    def pack(out: DataOutputStream, a: JsArray): Unit = {
+      seqCodec.pack(out, a.value)
+    }
     lazy val unpackFuncMap = seqCodec
       .unpackFuncMap
-      .mapValues(_.andThen(JsArray))
+      .mapValues(_.andThen(seq => JsArray(seq.toList)))
   }
 
   implicit object JsObjectCodec extends Codec[JsObject] {

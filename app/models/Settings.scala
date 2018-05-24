@@ -5,7 +5,7 @@ import _root_.akka.stream.OverflowStrategy
 import scala.collection.JavaConverters.asScalaSetConverter
 import scala.concurrent.duration.DurationLong
 import com.typesafe.config.ConfigFactory
-import play.api.libs.json.Json
+import play.api.libs.json.{JsArray, JsString, Json}
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
 import scala.util.Try
@@ -27,6 +27,7 @@ object Settings {
    */
   val ServerConfiguration = {
     val cfg = rootConfig.getConfig("broker.server-config")
+
     Json.obj(
       "dsId" -> cfg.getString("dsId"),
       "publicKey" -> cfg.getString("publicKey"),
@@ -36,7 +37,11 @@ object Settings {
       "salt" -> cfg.getString("salt"),
       "version" -> cfg.getString("version"),
       "updateInterval" -> cfg.getInt("updateInterval"),
-      "format" -> cfg.getString("format"))
+      "format" -> JsArray(Seq(cfg.getStringList("format").toArray():_*).map {
+                                            s => JsString(s.asInstanceOf[String])
+                                          }
+      )
+    )
   }
 
   /**

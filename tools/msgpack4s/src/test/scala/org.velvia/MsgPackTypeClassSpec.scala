@@ -93,7 +93,7 @@ class MsgPackTypeClassSpec extends FunSpec with Matchers {
     import msgpack.Json4sCodecs._
 
     val aray = parse("""[1, 2.5, null, "Streater"]""")
-    val map = parse("""{"bool": true, "aray": [3, -4], "map": {"inner": "me"}}""")
+    val map = parse("""{"amount": 1232.235234323423423, "bool": true, "aray": [3, -4], "map": {"inner": "me"}}""")
 
     it("should pack and unpack Json4S AST") {
       unpack[JArray](pack(aray)) should equal (aray)
