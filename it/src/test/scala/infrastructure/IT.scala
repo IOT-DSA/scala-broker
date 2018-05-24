@@ -23,6 +23,7 @@ trait IT extends ScalaFutures
   with BeforeAndAfterAll {
   self: Suite =>
 
+
   val client: DockerClient = DefaultDockerClient.fromEnv().build()
   override implicit val dockerFactory: DockerFactory = new SpotifyDockerFactory(client)
 
