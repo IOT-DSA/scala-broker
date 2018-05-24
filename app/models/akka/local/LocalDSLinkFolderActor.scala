@@ -23,19 +23,7 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   /**
     * Handles persisted events.
     */
-  override def receiveRecover = mgmtRecover orElse dslinkFolderRecover orElse simpleResponderRecover orElse responderRecover
-
-  /**
-   * Recovers events of [[LocalDSLinkFolderActor]] from the journal.
-   */
-  private val mgmtRecover: Receive = {
-    case event: DSLinkRegistered =>
-      log.debug("{}: trying to recover {}", ownId, event)
-      links += (event.name -> LinkState(event.mode, event.connected))
-    case event: DSLinkUnregistered =>
-      log.debug("{}: trying to recover {}", ownId, event)
-      links -= event.name
-  }
+  override def receiveRecover = dslinkFolderRecover orElse responderRecover
 
   /**
    * Handles control messages.

@@ -18,8 +18,6 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
   private val targetsBySid = collection.mutable.Map.empty[Int, String]
-
-  // figure out should we persist this as a part of the internal state
   private var lastRid: Int = 0
 
   /**
@@ -29,7 +27,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     case m @ RequestMessage(msg, ack, requests) =>
       log.debug("{}: received {}", ownId, m)
       processRequests(requests)
-      requests.lastOption foreach (req => lastRid = req.rid)
+      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
@@ -39,7 +37,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   /**
     * Recovers events of requester behavior from the journal.
     */
-  val recoverRequesterState: Receive = {
+  val requesterRecover: Receive = {
     case event: RidTargetsRequesterState =>
       log.debug("{}: trying to recover {}", ownId, event)
       targetsByRid.put(event.rid, event.target)
@@ -52,6 +50,9 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     case event: RemoveTargetBySid =>
       log.debug("{}: trying to recover remove action by {}", ownId, event)
       targetsBySid.remove(event.sid)
+    case event: LastRidSet =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      lastRid = event.rid
   }
 
   /**

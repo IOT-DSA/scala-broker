@@ -64,9 +64,11 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
   val responderRecover: Receive = {
     case event: RequestsProcessed =>
       log.debug("{}: trying to recover {}", ownId, event)
+      // TODO has to be improved to separate the functionality
       processRequests(event.requests)
     case event: ResponsesProcessed =>
       log.debug("{}: trying to recover {}", ownId, event)
+      // TODO has to be improved to separate the functionality
       processResponses(event.responses)
   }
 

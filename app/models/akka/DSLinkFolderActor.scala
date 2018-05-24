@@ -35,8 +35,12 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   override def postStop = log.info(s"$ownId actor stopped")
 
   val dslinkFolderRecover: Receive = {
-    case event =>
-      log.info("{}: not implemented yet for {}", ownId, event)
+    case event: DSLinkRegistered =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      links += (event.name -> LinkState(event.mode, event.connected))
+    case event: DSLinkUnregistered =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      links -= event.name
   }
 
   /**
@@ -147,8 +151,10 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   protected def changeLinkState(name: String, mode: DSLinkMode, connected: Boolean, warnIfNotFound: Boolean) = {
     links.get(name) match {
       case Some(_) =>
-        links += (name -> LinkState(mode, connected))
-        log.info("{}: DSLink '{}' state changed to: mode={}, connected={}", ownId, name, mode, connected)
+        persist(DSLinkRegistered(name, mode, connected)) { event =>
+          links += (event.name -> LinkState(event.mode, event.connected))
+          log.info("{}: DSLink '{}' state changed to: mode={}, connected={}", ownId, event.name, event.mode, event.connected)
+        }
       case None if warnIfNotFound =>
         log.warning("{}: DSLink '{}' is not registered, ignoring state change", ownId, name)
       case _ =>

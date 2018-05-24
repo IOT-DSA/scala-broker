@@ -35,8 +35,6 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
   private var lastConnected: Option[DateTime] = None
   private var lastDisconnected: Option[DateTime] = None
 
-  override def persistenceId = linkName
-
   /**
    * Called on link start up: notifies the registry and logs the dslink status.
    */

@@ -22,10 +22,12 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
     super.postStop
   }
 
+  override def persistenceId = linkPath
+
   /**
    * Recovers DSLink state from the event journal.
    */
-  override def receiveRecover = recoverBaseState orElse recoverRequesterState orElse responderRecover
+  override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover
 
   /**
    * Handles messages in CONNECTED state.
@@ -39,13 +41,7 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
  */
 class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee, val eventDaos: EventDaos)
   extends BaseDSLinkActor(dsaParent, registry)
-  with SimpleResponderBehavior {
-
-  /**
-     * Recovers DSLink including [[SimpleResponderBehavior]] state from the event journal.
-     */
-  override def receiveRecover = super.receiveRecover orElse simpleResponderRecover
-}
+  with SimpleResponderBehavior
 
 /**
  * DSLink with a Router/Worker responder implementation, which uses two pools of workers
