@@ -20,7 +20,11 @@ trait SingleNodeIT extends IT { self: Suite =>
       9443 -> Some(9443),
       9005 -> Some(9005)
     )
-    .withEnv(s"JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n")
+    .withEnv(s"JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n " +
+      "STATSD_HOST=localhost " +
+      "STATSD_PORT=8125 " +
+      "ZIPKIN_HOST=localhost " +
+      "ZIPKIN_PORT=9411")
     .withReadyChecker(DockerReadyChecker.LogLineContains("p.c.s.AkkaHttpServer - Listening for HTTP on /0.0.0.0:9000"))
 //    .withReadyChecker(DockerReadyChecker.LogLineContains("p.c.s.AkkaHttpServer - Listening for HTTP on /0.0.0.0:9443"))
 
