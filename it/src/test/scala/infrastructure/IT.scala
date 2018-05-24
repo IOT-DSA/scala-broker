@@ -33,7 +33,6 @@ trait IT extends ScalaFutures
   def dockerPullImagesPatienceInterval =
     PatienceConfig(scaled(Span(1200, Seconds)), scaled(Span(250, Millis)))
 
-
   override val StartContainersTimeout: FiniteDuration = 90 seconds
   val log: Logger = LoggerFactory.getLogger(classOf[IT])
 
