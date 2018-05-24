@@ -8,6 +8,9 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
+
 /**
   *
   * base trait for IT
@@ -29,6 +32,8 @@ trait IT extends ScalaFutures
   def dockerPullImagesPatienceInterval =
     PatienceConfig(scaled(Span(1200, Seconds)), scaled(Span(250, Millis)))
 
+
+  override val StartContainersTimeout: FiniteDuration = 90 seconds
   val log: Logger = LoggerFactory.getLogger(classOf[IT])
 
   override protected def beforeAll(): Unit = {
