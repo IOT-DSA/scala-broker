@@ -1,33 +1,62 @@
 package models.api
 
-import akka.actor.{ActorRef, TypedActor}
+import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
+import akka.cluster.Cluster
+import akka.cluster.ddata.LWWRegister
+import akka.cluster.ddata.Replicator.Get
 import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue.{DSAMap, DSAVal}
+import akka.cluster.ddata.Replicator._
+import akka.pattern.{PromiseRef, ask}
+import akka.util.Timeout
+import models.Settings
+import models.api.DistributedNodesRegistry.GetNode
 
-import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
-abstract class DistributedDSANode(val parent: Option[DSANode]) extends DSANode
+class DistributedDSANode(
+                          val path:String,
+                          val name:String,
+                          val parent: Option[DSANode],
+                          val initialVal: DSAVal,
+                          val valType:DSAValueType,
+                          val registry:ActorRef,
+                          val replicator:ActorRef
+                        )(implicit cluster:Cluster, system:ActorSystem, executionContext:ExecutionContext) extends DSANode
   with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
 
-  override def name: String = ???
+  val dataKey = DistributedDSANodeKey(path)
 
-  override def path: String = ???
+  val timeout = 3 second
 
-  override def value: Future[DSAVal] = ???
+  implicit val implicitTimeout = Timeout(timeout)
 
-  override def value_=(v: DSAVal): Unit = ???
+  replicator ! Update(dataKey, empty, writeLocal)(old => old)
 
-  override def valueType: Future[DSAValueType] = ???
+  override def value: Future[DSAVal] = fetch.map(_.value.value)
 
-  override def valueType_=(vt: DSAValueType): Unit = ???
+  override def value_=(v: DSAVal): Unit = editProperty {old =>
+      old.copy(value = old.value.withValue(v))
+  }
 
-  override def displayName: Future[String] = ???
+  override def valueType: Future[DSAValueType] = fetch.map(state => DSAValueType.byName(state.valueType.value))
 
-  override def displayName_=(name: String): Unit = ???
+  override def valueType_=(vt: DSAValueType): Unit = editProperty {old =>
+      old.copy(valueType = old.valueType.withValue(vt.toString))}
 
-  override def profile: String = ???
 
-  override def profile_=(p: String): Unit = ???
+  override def displayName: Future[String] = fetch.map(_.displayName.value)
+
+  override def displayName_=(name: String): Unit = editProperty {old =>
+    old.copy(displayName = old.displayName.withValue(name))
+  }
+
+  override def profile: String = Await.result(fetch.map(_.profile.value), timeout)
+
+  override def profile_=(p: String): Unit = editProperty {old =>
+    old.copy(profile = old.profile.withValue(p))
+  }
 
   override def configs: Future[Map[String, DSAVal]] = ???
 
@@ -67,10 +96,51 @@ abstract class DistributedDSANode(val parent: Option[DSANode]) extends DSANode
 
   override def unlist(rid: Int): Unit = ???
 
-  override def onReceive(message: Any, sender: ActorRef): Unit = ???
+  override def onReceive(message: Any, sender: ActorRef): Unit = {
+    message match {
+      case g @ GetSuccess(dataKey, future:Some[PromiseRef[Any]]) =>
+        future.foreach(_.promise.success(g.get(dataKey)))
+      case NotFound(dataKey, req) =>
+        //TODO do logging
+    }
+  }
 
-  override def preStart(): Unit = ???
+  override def preStart(): Unit = {
 
-  override def postStop(): Unit = ???
+  }
 
+  override def postStop(): Unit = {
+
+  }
+
+  private[this] def fetch = {
+    val promise = PromiseRef(5 seconds)
+    replicator.!(Get(dataKey, readLocal, Some(promise)))(TypedActor.context.self)
+    promise.future.mapTo[DistributedDSANodeState]
+  }
+
+  private[this] def editProperty(transform: DistributedDSANodeState => DistributedDSANodeState) =
+    replicator ! Update(dataKey, empty, writeLocal)(transform)
+
+  private[this] def empty = new DistributedDSANodeState(
+    LWWRegister(name),
+    LWWRegister(name),
+    LWWRegister(parent.map(_.path)),
+    LWWRegister(path),
+    LWWRegister(initialVal),
+    LWWRegister(valType.toString),
+    LWWRegister("")
+  )
+}
+
+/**
+  * Factory for [[DSANodeImpl]] instances.
+  */
+object DistributedDSANode {
+  /**
+    * Creates a new [[DSANodeImpl]] props instance.
+    */
+  def props(path:String, name:String, parent: Option[DSANode], initialVal:DSAVal, valType:DSAValueType, registry:ActorRef, replicator:ActorRef)
+           (implicit cluster:Cluster, system:ActorSystem, executionContext:ExecutionContext) =
+    TypedProps(classOf[DSANode], new DistributedDSANode(path, name, parent, initialVal, valType, registry, replicator))
 }

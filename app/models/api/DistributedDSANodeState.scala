@@ -1,26 +1,48 @@
 package models.api
 
-import akka.cluster.ddata.{DeltaReplicatedData, LWWRegister}
+import akka.cluster.Cluster
+import akka.cluster.ddata._
 import models.rpc.DSAValue
 
-//case class DistributedDSANodeState(
-//
-//                                    name:LWWRegister[String],
-//                                    parent:LWWRegister[String],
-//                                    path:LWWRegister[String],
-//                                    value:LWWRegister[DSAValue[_]]
-//
-//                                  ) extends DeltaReplicatedData {
-//
-//  override type D = DistributedDSANodeState
-//
-//  override def delta: Option[DistributedDSANodeState] = ???
-//
-//  override def mergeDelta(thatDelta: DistributedDSANodeState): DistributedDSANodeState = merge(thatDelta)
-//
-//  override def resetDelta: DistributedDSANodeState = ???
-//
-//  override type T = DistributedDSANodeState
-//
-//  override def merge(that: DistributedDSANodeState): DistributedDSANodeState = ???
-//}
+@SerialVersionUID(1L)
+final case class DistributedDSANodeState(
+                                    name:LWWRegister[String],
+                                    displayName:LWWRegister[String],
+                                    parent:LWWRegister[Option[String]],
+                                    path:LWWRegister[String],
+                                    value:LWWRegister[DSAValue[_]],
+                                    valueType: LWWRegister[String],
+                                    profile: LWWRegister[String],
+
+                                  ) extends ReplicatedData {
+
+  type T = DistributedDSANodeState
+
+  override def merge(that: DistributedDSANodeState): DistributedDSANodeState = copy(
+    name = this.name.merge(that.name),
+    displayName = this.name.merge(that.displayName),
+    parent = this.parent.merge(that.parent),
+    path = this.path.merge(that.path),
+    value = this.value.merge(that.value),
+    valueType = this.valueType.merge(that.valueType),
+    profile = this.profile.merge(that.profile)
+  )
+}
+
+object DistributedDSANodeState{
+
+  def empty(implicit cluster:Cluster) = DistributedDSANodeState(
+    LWWRegister(""),
+    LWWRegister(""),
+    LWWRegister(Option[String](null)),
+    LWWRegister(""),
+    LWWRegister(DSAValue.StringValue("").asInstanceOf[DSAValue[_]]),
+    LWWRegister(""),
+    LWWRegister("")
+  )
+
+}
+
+@SerialVersionUID(1L)
+final case class DistributedDSANodeKey(_id: String) extends Key[DistributedDSANodeState](_id) with ReplicatedDataSerialization
+
