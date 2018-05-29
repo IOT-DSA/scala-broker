@@ -37,9 +37,12 @@ class DataStateKeeperSpec extends WordSpecLike
 
       implicit val timeout = Timeout(5 seconds)
 
-      val created = Await.result(registry ? AddNode("/data"), 2 seconds)
+      val created = Await.result((registry ? AddNode("/data")).mapTo[DSANode], 2 seconds)
       val createdChild = Await.result((registry ? AddNode("/data/child")).mapTo[DSANode], 2 seconds)
-      val created2 = Await.result(registry ? AddNode("/data2"), 2 seconds)
+      createdChild.addConfigs(("$some" -> 123))
+      createdChild.addAttributes(("@attr" -> 123332))
+      createdChild.value = "Changed"
+      val created2 = Await.result((registry ? AddNode("/data2")).mapTo[DSANode], 2 seconds)
 
       TimeUnit.SECONDS.sleep(2)
 
@@ -47,6 +50,10 @@ class DataStateKeeperSpec extends WordSpecLike
 
       createdChild.parent.isDefined shouldBe true
       createdChild.parent.get shouldBe created
+
+      Await.result(created.child("child"), 2 seconds).get shouldBe createdChild
+
+      TimeUnit.SECONDS.sleep(5)
 
       pathsOfReplica shouldBe Set("/data", "/data/child", "/data2")
     }

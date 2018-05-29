@@ -15,10 +15,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 
 /**
-  * DSA Node actor-based implementation.
+  * DSA Node actor-based in memory implementation.
   */
-class DSANodeImpl(val parent: Option[DSANode])
-  extends DSANode with TypedActor.Receiver with TypedActor.PreStart with TypedActor.PostStop {
+class InMemoryDSANode(val parent: Option[DSANode])
+  extends DSANode
+    with DSANodeRequestHandler
+    with TypedActor.Receiver
+    with TypedActor.PreStart
+    with TypedActor.PostStop {
 
   protected val log = Logging(TypedActor.context.system, getClass)
 
@@ -44,7 +48,7 @@ class DSANodeImpl(val parent: Option[DSANode])
   def profile = Await.result(config("$is").map(_.map(_.value.toString).getOrElse("node")), Duration.Inf)
   def profile_=(p: String) = addConfigs("$is" -> p)
 
-  private val _configs = collection.mutable.Map[String, DSAVal]("$is" -> "node")
+  protected var _configs = Map[String, DSAVal]("$is" -> "node")
   def configs = Future.successful(_configs.toMap)
   def config(name: String) = configs map (_.get(name))
   def addConfigs(configs: (String, DSAVal)*) = {
@@ -61,7 +65,7 @@ class DSANodeImpl(val parent: Option[DSANode])
     notifyListActors(obj("name" -> name, "change" -> "remove"))
   }
 
-  private val _attributes = collection.mutable.Map.empty[String, DSAVal]
+  protected var _attributes = Map.empty[String, DSAVal]
   def attributes = Future.successful(_attributes.toMap)
   def attribute(name: String) = attributes map (_.get(name))
   def addAttributes(attributes: (String, DSAVal)*) = {
@@ -78,19 +82,25 @@ class DSANodeImpl(val parent: Option[DSANode])
     notifyListActors(obj("name" -> name, "change" -> "remove"))
   }
 
-  private val _children = collection.mutable.Map.empty[String, DSANode]
+  protected var _children = Map.empty[String, DSANode]
   def children = Future.successful(_children.toMap)
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
     val child = TypedActor(TypedActor.context).typedActorOf(props, name)
+    addChild(name, child)
+  }
+
+  override def addChild(name: String, child:DSANode):Future[DSANode] = {
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
     notifyListActors(array(name, obj("$is" -> "node")))
     Future.successful(child)
   }
+
   def removeChild(name: String) = {
-    _children remove name foreach TypedActor(TypedActor.context).stop
+    _children get(name) foreach TypedActor(TypedActor.context).stop
+    _children -= name
     log.debug(s"$ownId: removed child '$name'")
     notifyListActors(obj("name" -> name, "change" -> "remove"))
   }
@@ -99,10 +109,11 @@ class DSANodeImpl(val parent: Option[DSANode])
   def action = _action
   def action_=(a: DSAAction) = {
     _action = Some(a)
-    _configs("$params") = a.params map {
+    val params =  a.params map {
       case (pName, pType) => obj("name" -> pName, "type" -> pType.toString)
     }
-    _configs("$invokable") = "write"
+    _configs += ("$params" -> params)
+    _configs += ("$invokable" -> "write")
     profile = "static"
   }
 
@@ -129,6 +140,44 @@ class DSANodeImpl(val parent: Option[DSANode])
     case msg @ _ => log.error("Unknown message: " + msg)
   }
 
+
+  // event handlers
+
+  def preStart() = log.info(s"DSANode[$path] initialized")
+
+  def postStop() = log.info(s"DSANode[$path] stopped")
+
+  /**
+    * Sends DSAResponse instances to actors listening to SUBSCRIBE updates.
+    */
+  private def notifySubscribeActors(value: DSAVal) = {
+    val ts = now
+    _sids foreach {
+      case (sid, ref) =>
+        val update = obj("sid" -> sid, "value" -> value, "ts" -> ts)
+        val response = ResponseEnvelope(DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil)
+        ref ! response
+    }
+  }
+
+  /**
+    * Sends DSAResponse instances to actors listening to LIST updates.
+    */
+  private def notifyListActors(updates: DSAVal*) = _rids foreach {
+    case (rid, ref) => ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
+  }
+
+
+
+}
+
+trait DSANodeRequestHandler { self:DSANode =>
+
+  protected def _configs:Map[String, DSAVal]
+  protected def _attributes:Map[String, DSAVal]
+  protected def _children:Map[String, DSANode]
+
+
   /**
     * Handles DSA requests by processing them and sending the response to itself.
     */
@@ -137,11 +186,11 @@ class DSANodeImpl(val parent: Option[DSANode])
     /* set */
 
     case SetRequest(rid, "", newValue, _) =>
-      value = newValue
+      self.value = newValue
       DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     case SetRequest(rid, name, newValue, _) if name.startsWith("$") =>
-      addConfigs(name -> newValue)
+      self.addConfigs(name -> newValue)
       DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     case SetRequest(rid, name, newValue, _) if name.startsWith("@") =>
@@ -170,11 +219,16 @@ class DSANodeImpl(val parent: Option[DSANode])
       assert(paths.size == 1, "Only a single path is allowed in Subscribe")
       subscribe(paths.head.sid, sender)
       val head = DSAResponse(rid, Some(StreamState.Closed))
-      val tail = if (_value != null) {
-        val update = obj("sid" -> paths.head.sid, "value" -> _value, "ts" -> now)
-        DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil
-      } else Nil
-      head :: tail
+
+      val futureTail = value.map{ v =>
+        if (v != null) {
+          val update = obj("sid" -> paths.head.sid, "value" -> v, "ts" -> now)
+          DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil
+        } else Nil
+
+      }
+
+      head :: Await.result(futureTail, Duration.Inf)
 
     /* unsubscribe */
 
@@ -205,41 +259,16 @@ class DSANodeImpl(val parent: Option[DSANode])
       DSAResponse(rid, Some(StreamState.Closed)) :: Nil
   }
 
-  // event handlers
-
-  def preStart() = log.info(s"DSANode[$path] initialized")
-
-  def postStop() = log.info(s"DSANode[$path] stopped")
-
-  /**
-    * Sends DSAResponse instances to actors listening to SUBSCRIBE updates.
-    */
-  private def notifySubscribeActors(value: DSAVal) = {
-    val ts = now
-    _sids foreach {
-      case (sid, ref) =>
-        val update = obj("sid" -> sid, "value" -> value, "ts" -> ts)
-        val response = ResponseEnvelope(DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil)
-        ref ! response
-    }
-  }
-
-  /**
-    * Sends DSAResponse instances to actors listening to LIST updates.
-    */
-  private def notifyListActors(updates: DSAVal*) = _rids foreach {
-    case (rid, ref) => ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
-  }
-
   /**
     * Formats the current date/time as ISO.
     */
-  private def now = DateTime.now.toString(ISODateTimeFormat.dateTime)
+  def now = DateTime.now.toString(ISODateTimeFormat.dateTime)
 
   /**
     * Converts data to a collection of DSAResponse-compatible update rows.
     */
-  private def toUpdateRows(data: collection.Map[String, DSAVal]) = data map (cfg => array(cfg._1, cfg._2)) toSeq
+  def toUpdateRows(data: collection.Map[String, DSAVal]) = data map (cfg => array(cfg._1, cfg._2)) toSeq
+
 }
 
 

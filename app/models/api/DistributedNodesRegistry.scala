@@ -7,7 +7,7 @@ import akka.cluster.ddata.Replicator.Update
 import akka.cluster.ddata.Replicator._
 import akka.util.Timeout
 import models.Settings.QueryTimeout
-import models.rpc.DSAValue.BooleanValue
+import models.rpc.DSAValue.{BooleanValue, StringValue}
 
 import scala.annotation.tailrec
 import scala.concurrent.Future
@@ -82,12 +82,14 @@ class DistributedNodesRegistry(val replicator: ActorRef)(implicit cluster:Cluste
     val node = pPath match {
       case (None, name) =>
         TypedActor(context)
-          .typedActorOf(DistributedDSANode.props(path, name, None, new BooleanValue(false), DSAValueType.DSABoolean, self, replicator))
+          .typedActorOf(DistributedDSANode.props(path, None, new StringValue(""), self, replicator))
       case (Some(parent), name) => {
         val parentNode: DSANode = registry.get(parent)
           .getOrElse(getOrCreateNode(parent))
-        TypedActor(context)
-          .typedActorOf(DistributedDSANode.props(path, name, Some(parentNode), new BooleanValue(false), DSAValueType.DSABoolean, self, replicator))
+        val child:DSANode = TypedActor(context)
+          .typedActorOf(DistributedDSANode.props(path, Some(parentNode), new StringValue(""), self, replicator))
+        parentNode.addChild(name, child)
+        child
       }
     }
 
@@ -105,7 +107,6 @@ object DistributedNodesRegistry {
 
   case class AddNode(path:String)
   case class RemoveNode(path:String)
-  case class CreateChild(name:String)
   case class GetNodes()
   case class GetNode(path:String)
 

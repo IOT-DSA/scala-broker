@@ -46,6 +46,7 @@ trait DSANode {
   def children: Future[Map[String, DSANode]]
   def child(name: String): Future[Option[DSANode]]
   def addChild(name: String): Future[DSANode]
+  def addChild(name: String, node: DSANode): Future[DSANode]
   def removeChild(name: String): Unit
 
   def action: Option[DSAAction]
@@ -61,11 +62,11 @@ trait DSANode {
 }
 
 /**
-  * Factory for [[DSANodeImpl]] instances.
+  * Factory for [[InMemoryDSANode]] instances.
   */
 object DSANode {
   /**
-    * Creates a new [[DSANodeImpl]] props instance.
+    * Creates a new [[InMemoryDSANode]] props instance.
     */
-  def props(parent: Option[DSANode]) = TypedProps(classOf[DSANode], new DSANodeImpl(parent))
+  def props(parent: Option[DSANode]) = TypedProps(classOf[DSANode], new InMemoryDSANode(parent))
 }
