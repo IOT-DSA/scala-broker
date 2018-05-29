@@ -5,13 +5,9 @@ import akka.event.Logging
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
-import models.rpc.{CloseRequest, DSARequest, DSAResponse, InvokeRequest, ListRequest, RemoveRequest, SetRequest, StreamState, SubscribeRequest, UnsubscribeRequest}
-import org.joda.time.DateTime
-import org.joda.time.format.ISODateTimeFormat
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
-import scala.concurrent.ExecutionContext.Implicits.global
 
 
 /**
@@ -20,6 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class InMemoryDSANode(val parent: Option[DSANode])
   extends DSANode
     with DSANodeRequestHandler
+    with DSANodeSubscriptions
     with TypedActor.Receiver
     with TypedActor.PreStart
     with TypedActor.PostStop {
@@ -30,6 +27,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
   val path = parent.map(_.path).getOrElse("") + "/" + name
 
   protected def ownId = s"[$path]"
+  override implicit val executionContext:ExecutionContext = TypedActor.context.dispatcher
 
   private var _value: DSAVal = _
   def value = Future.successful(_value)
@@ -119,11 +117,11 @@ class InMemoryDSANode(val parent: Option[DSANode])
 
   def invoke(params: DSAMap) = _action foreach (_.handler(ActionContext(this, params)))
 
-  private val _sids = collection.mutable.Map.empty[Int, ActorRef]
+  protected var _sids = Map.empty[Int, ActorRef]
   def subscribe(sid: Int, ref: ActorRef) = _sids += sid -> ref
   def unsubscribe(sid: Int) = _sids -= sid
 
-  private val _rids = collection.mutable.Map.empty[Int, ActorRef]
+  protected var _rids = Map.empty[Int, ActorRef]
   def list(rid: Int, ref: ActorRef) = _rids += rid -> ref
   def unlist(rid: Int) = _rids -= rid
 
@@ -146,129 +144,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
   def preStart() = log.info(s"DSANode[$path] initialized")
 
   def postStop() = log.info(s"DSANode[$path] stopped")
-
-  /**
-    * Sends DSAResponse instances to actors listening to SUBSCRIBE updates.
-    */
-  private def notifySubscribeActors(value: DSAVal) = {
-    val ts = now
-    _sids foreach {
-      case (sid, ref) =>
-        val update = obj("sid" -> sid, "value" -> value, "ts" -> ts)
-        val response = ResponseEnvelope(DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil)
-        ref ! response
-    }
-  }
-
-  /**
-    * Sends DSAResponse instances to actors listening to LIST updates.
-    */
-  private def notifyListActors(updates: DSAVal*) = _rids foreach {
-    case (rid, ref) => ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
-  }
-
-
-
 }
 
-trait DSANodeRequestHandler { self:DSANode =>
-
-  protected def _configs:Map[String, DSAVal]
-  protected def _attributes:Map[String, DSAVal]
-  protected def _children:Map[String, DSANode]
-
-
-  /**
-    * Handles DSA requests by processing them and sending the response to itself.
-    */
-  def handleRequest(sender: ActorRef): PartialFunction[DSARequest, Iterable[DSAResponse]] = {
-
-    /* set */
-
-    case SetRequest(rid, "", newValue, _) =>
-      self.value = newValue
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    case SetRequest(rid, name, newValue, _) if name.startsWith("$") =>
-      self.addConfigs(name -> newValue)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    case SetRequest(rid, name, newValue, _) if name.startsWith("@") =>
-      addAttributes(name -> newValue)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* remove */
-
-    case RemoveRequest(rid, name) if name.startsWith("$") =>
-      removeConfig(name)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    case RemoveRequest(rid, name) if name.startsWith("@") =>
-      removeAttribute(name)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* invoke */
-
-    case InvokeRequest(rid, _, params, _) =>
-      invoke(params)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* subscribe */
-
-    case SubscribeRequest(rid, paths) =>
-      assert(paths.size == 1, "Only a single path is allowed in Subscribe")
-      subscribe(paths.head.sid, sender)
-      val head = DSAResponse(rid, Some(StreamState.Closed))
-
-      val futureTail = value.map{ v =>
-        if (v != null) {
-          val update = obj("sid" -> paths.head.sid, "value" -> v, "ts" -> now)
-          DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil
-        } else Nil
-
-      }
-
-      head :: Await.result(futureTail, Duration.Inf)
-
-    /* unsubscribe */
-
-    case UnsubscribeRequest(rid, sids) =>
-      assert(sids.size == 1, "Only a single sid is allowed in Unsubscribe")
-      unsubscribe(sids.head)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-
-    /* list */
-
-    // TODO this needs to be rewritten to remove blocking
-    case ListRequest(rid, _) =>
-      list(rid, sender)
-      val cfgUpdates = array("$is", _configs("$is")) +: toUpdateRows(_configs - "$is")
-      val attrUpdates = toUpdateRows(_attributes)
-      val childUpdates = Await.result(Future.sequence(_children map {
-        case (name, node) => node.configs map (cfgs => name -> cfgs)
-      }), Duration.Inf) map {
-        case (name, cfgs) => array(name, cfgs)
-      }
-      val updates = cfgUpdates ++ attrUpdates ++ childUpdates
-      DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil
-
-    /* close */
-
-    case CloseRequest(rid) =>
-      unlist(rid)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
-  }
-
-  /**
-    * Formats the current date/time as ISO.
-    */
-  def now = DateTime.now.toString(ISODateTimeFormat.dateTime)
-
-  /**
-    * Converts data to a collection of DSAResponse-compatible update rows.
-    */
-  def toUpdateRows(data: collection.Map[String, DSAVal]) = data map (cfg => array(cfg._1, cfg._2)) toSeq
-
-}
 
 

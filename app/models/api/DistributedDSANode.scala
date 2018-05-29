@@ -22,16 +22,21 @@ class DistributedDSANode(
                           var initialVal: DSAVal,
                           val registry:ActorRef,
                           val replicator:ActorRef
-                        )(implicit cluster:Cluster, system:ActorSystem, executionContext:ExecutionContext) extends DSANode
+                        )(implicit cluster:Cluster, system:ActorSystem) extends DSANode
   with TypedActor.Receiver
   with TypedActor.PreStart
   with TypedActor.PostStop
+  with DSANodeSubscriptions
   with DSANodeRequestHandler{
 
   val dataKey = DistributedDSANodeKey(path)
 
   protected val log = Logging(TypedActor.context.system, getClass)
   protected def ownId = s"ddNode[$path]"
+  override protected var _sids: Map[Int, ActorRef] = Map.empty
+  override protected var _rids: Map[Int, ActorRef] = Map.empty
+  override implicit val executionContext: ExecutionContext = TypedActor.context.dispatcher
+
 
 
   val name = path.split("/").last
@@ -139,13 +144,22 @@ class DistributedDSANode(
 
   override def invoke(params: DSAMap): Unit = _action foreach (_.handler(ActionContext(this, params)))
 
-  override def subscribe(sid: Int, ref: ActorRef): Unit = ???
+  override def subscribe(sid: Int, ref: ActorRef): Unit = editProperty {old =>
+    old.copy(subscriptions = old.subscriptions + (sid -> ref))
+  }
 
-  override def unsubscribe(sid: Int): Unit = ???
+  override def unsubscribe(sid: Int): Unit = editProperty {old =>
+    old.copy(subscriptions = old.subscriptions - sid)
+  }
 
-  override def list(rid: Int, ref: ActorRef): Unit = ???
+  override def list(rid: Int, ref: ActorRef): Unit = editProperty {old =>
+    old.copy(listSubscriptions = old.listSubscriptions + (rid -> ref))
+  }
 
-  override def unlist(rid: Int): Unit = ???
+  override def unlist(rid: Int): Unit = editProperty {old =>
+    old.copy(listSubscriptions = old.listSubscriptions - rid)
+  }
+
 
   private[this] def updateLocalState(data: ReplicatedData) = data match {
     case d:DistributedDSANodeState =>
@@ -198,7 +212,6 @@ class DistributedDSANode(
     replicator ! Update(dataKey, empty, writeLocal)(transform)
 
   private[this] def empty = DistributedDSANodeState.empty
-
 }
 
 /**
