@@ -1,20 +1,49 @@
 version: '2'
 services:
-  broker:
+  broker2:
     # build:
     #   context: ./broker
     image: iotdsa/broker-scala:0.4.0-SNAPSHOT
-    container_name: broker
+    container_name: broker2
     environment:
       JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
       STATSD_HOST: graphana
       STATSD_PORT: 8125
       ZIPKIN_HOST: zipkin
       ZIPKIN_PORT: 9411
-      AKKA_REMOTING_BIND_HOST: broker
+      AKKA_REMOTING_BIND_HOST: broker2
       AKKA_REMOTING_BIND_PORT: 2551
-      AKKA_SEED_NODES: broker1:2551
+      AKKA_SEED_NODES: broker1:2551,broker2:2551
       AKKA_ACTOR_SYSTEM_NAME: DSASystem
+      CONF_FILE: /opt/docker/conf/backend.conf
+    ports:
+      - "9000:9000"
+      - "9005:9005"
+      - "2551:2551"
+      - "9443:9443"
+    networks:
+      - dsnet
+    links:
+      - graphana
+    depends_on:
+      - graphana
+      - zipkin
+  broker1:
+    # build:
+    #   context: ./broker
+    image: iotdsa/broker-scala:0.4.0-SNAPSHOT
+    container_name: broker1
+    environment:
+      JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
+      STATSD_HOST: graphana
+      STATSD_PORT: 8125
+      ZIPKIN_HOST: zipkin
+      ZIPKIN_PORT: 9411
+      AKKA_REMOTING_BIND_HOST: broker1
+      AKKA_REMOTING_BIND_PORT: 2551
+      AKKA_SEED_NODES: broker1:2551,broker2:2551
+      AKKA_ACTOR_SYSTEM_NAME: DSASystem
+      CONF_FILE: /opt/docker/conf/backend.conf
     ports:
       - "9010:9000"
       - "9015:9005"
@@ -28,14 +57,14 @@ services:
       - graphana
       - zipkin
   shell:
-    build: 
+    build:
       context: ./shell-dslink
     image: shell-dslink:latest
     stdin_open: true
     tty: true
     container_name: shell-dslink
     environment:
-      BROKER_HOST: broker
+      BROKER_HOST: broker1
       BROKER_PORT: 9000
     depends_on:
       - broker1
@@ -45,12 +74,12 @@ services:
       - dsnet
 
   weather:
-    build: 
+    build:
       context: ./weather-dslink
     image: weather-dslink:latest
     container_name: weather-dslink
     environment:
-      BROKER_HOST: broker
+      BROKER_HOST: broker2
       BROKER_PORT: 9000
     depends_on:
       - broker2
@@ -95,12 +124,12 @@ services:
       - dsnet
 
   system:
-    build: 
+    build:
       context: ./system
     image: system-dslink:latest
     container_name: system-dslink
     environment:
-      BROKER_HOST: broker
+      BROKER_HOST: broker2
       BROKER_PORT: 9000
     depends_on:
       - broker2

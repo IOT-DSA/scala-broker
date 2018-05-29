@@ -82,7 +82,7 @@ dockerEntrypoint ++= Seq(
   """-Dkamon.statsd.port=$STATSD_PORT""",
   """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
   """-Dkamon.zipkin.port=$ZIPKIN_PORT""",
-  """-Dconfig.file=/opt/docker/conf/backend.conf"""
+  """-Dconfig.file="$CONF_FILE""""
 )
 
 dockerCommands :=
