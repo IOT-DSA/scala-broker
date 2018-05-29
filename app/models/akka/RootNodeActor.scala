@@ -2,11 +2,10 @@ package models.akka
 
 import akka.actor._
 import akka.cluster.singleton._
-import models.{RequestEnvelope, ResponseEnvelope}
+import models.{ RequestEnvelope, ResponseEnvelope }
 import models.api.DSANode
-import models.ddata.DataKeeperActor
-import models.rpc.{DSAError, DSARequest, DSAResponse, ListRequest}
-import models.rpc.DSAValue.{StringValue, array, obj}
+import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
+import models.rpc.DSAValue.{ StringValue, array, obj }
 
 /**
  * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
@@ -63,11 +62,7 @@ class RootNodeActor extends Actor with ActorLogging {
   private def createDataNode = {
     val dataNode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
     dataNode.profile = "broker/dataRoot"
-    dataNode.addChild("")
     StandardActions.bindDataRootActions(dataNode)
-
-    //val dataKeeper = Actor(context).actorOf(DataKeeperActor)
-
     dataNode
   }
 

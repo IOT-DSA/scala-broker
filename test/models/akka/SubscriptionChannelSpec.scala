@@ -101,8 +101,10 @@ class SubscriptionChannelSpec extends WordSpecLike
         val list = 0 until iterations map { i => SubscriptionNotificationMessage(0, None, List(DSAResponse(i, None, None, None, None)), i % sids, qosLevel)}
         val source = Source(list)
 
-        val sink = Sink.fold[Set[Int], DSAMessage](Set[Int]())({case (set, next:ResponseMessage) =>
-          set ++ next.responses.map(_.rid)
+        val sink = Sink.fold[Set[Int], DSAMessage](Set[Int]())({
+          case (set, ResponseMessage(_, _, responses)) =>
+            set ++ responses.map(_.rid)
+          case (set, _)  => set
         })
 
         assertion(source, flow, sink)

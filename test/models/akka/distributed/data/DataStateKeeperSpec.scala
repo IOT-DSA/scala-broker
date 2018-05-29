@@ -2,12 +2,12 @@ package models.akka.distributed.data
 
 import java.util.concurrent.TimeUnit
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.cluster.Cluster
 import akka.cluster.ddata.DistributedData
 import com.typesafe.config.ConfigFactory
 import models.api.{DSANode, DistributedNodesRegistry}
-import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
+import org.scalatest.{BeforeAndAfter, GivenWhenThen, Matchers, WordSpecLike}
 import akka.pattern.ask
 import akka.util.Timeout
 import models.api.DistributedNodesRegistry.{AddNode, GetNodes}
@@ -18,20 +18,40 @@ import scala.concurrent.duration._
 
 class DataStateKeeperSpec extends WordSpecLike
   with Matchers
-  with GivenWhenThen {
+  with GivenWhenThen
+  with BeforeAndAfter {
+
+  var system1:ActorSystem = _
+  var replicator1:ActorRef = _
+  var node1:Cluster = _
+
+  var system2:ActorSystem = _
+  var replicator2:ActorRef = _
+  var node2:Cluster = _
+
+  var registry:ActorRef = _
+  var registryReplica:ActorRef = _
 
   "distributed data registry" should {
 
-    val system1 = system("2551")
-    val replicator1 = DistributedData(system1).replicator
-    val node1 = Cluster(system1)
+    before{
+      system1 = system("2555")
+      replicator1 = DistributedData(system1).replicator
+      node1 = Cluster(system1)
 
-    val system2 = system("2552")
-    val replicator2 = DistributedData(system2).replicator
-    val node2 = Cluster(system2)
 
-    val registry = system1.actorOf(DistributedNodesRegistry.props(replicator1, node1, system1), "registry")
-    val registryReplica = system1.actorOf(DistributedNodesRegistry.props(replicator2, node2, system2), "registryReplica")
+      system2 = system("2556")
+      replicator2 = DistributedData(system2).replicator
+      node2 = Cluster(system2)
+
+      registry = system1.actorOf(DistributedNodesRegistry.props(replicator1, node1, system1), "registry")
+      registryReplica = system1.actorOf(DistributedNodesRegistry.props(replicator2, node2, system2), "registryReplica")
+    }
+
+    after{
+      Await.result(system1.terminate(), 20 seconds)
+      Await.result(system2.terminate(), 20 seconds)
+    }
 
     "create distributed DSNode in every instance" in {
 
@@ -71,7 +91,7 @@ class DataStateKeeperSpec extends WordSpecLike
             }
             akka.cluster {
               seed-nodes = [
-                "akka.tcp://DDTestClusterSystem@127.0.0.1:2551"]
+                "akka.tcp://DDTestClusterSystem@127.0.0.1:2555"]
               auto-down-unreachable-after = 10s
             }
             """)))
