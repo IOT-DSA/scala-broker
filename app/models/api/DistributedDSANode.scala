@@ -13,6 +13,7 @@ import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.AddNode
 import akka.pattern.ask
+import models.rpc.DSAValue
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -46,6 +47,8 @@ class DistributedDSANode(
   override protected def _attributes: Map[String, DSAVal] = data.attributes
   protected var _children: Map[String, DSANode] = Map()
   var _action:Option[DSAAction] = None
+
+  replicator ! Subscribe(dataKey, sender)
 
   private[this] var data = DistributedDSANodeData(initialVal)
 
@@ -99,7 +102,7 @@ class DistributedDSANode(
   override def config(name: String): Future[Option[DSAVal]] = Future.successful(data.configs.get(name))
 
   override def addConfigs(cfg: (String, DSAVal)*): Unit = editProperty {old =>
-    val newConf = cfg.foldLeft(old.configs)((c, next) => c + next)
+    val newConf = cfg.map(addSuffix("$")).foldLeft(old.configs)((c, next) => c + next)
     old.copy(configs = newConf)
   }
 
@@ -112,7 +115,7 @@ class DistributedDSANode(
   override def attribute(name: String): Future[Option[DSAVal]] = Future.successful(data.attributes.get(name))
 
   override def addAttributes(cfg: (String, DSAVal)*): Unit = editProperty {old =>
-    old.copy(attributes = cfg.foldLeft(old.attributes)((a, next) => a + next))
+    old.copy(attributes = cfg.map(addSuffix("@")).foldLeft(old.attributes)((a, next) => a + next))
   }
 
   override def removeAttribute(name: String): Unit = editProperty {old =>
@@ -161,9 +164,11 @@ class DistributedDSANode(
   }
 
 
-  private[this] def updateLocalState(data: ReplicatedData) = data match {
+  private[this] def updateLocalState(update: ReplicatedData) = update match {
     case d:DistributedDSANodeState =>
       val localData = toLocalData(d)
+      data = localData
+      log.info("!!!!! data replicated: {}", data)
     case _ =>
       log.warning("Unsupported data type: {}", data)
   }
@@ -173,6 +178,10 @@ class DistributedDSANode(
       d.configs.entries,
       d.attributes.entries,
   )
+
+  private[this] def addSuffix(suffix:String)(tuple: (String, DSAValue.DSAVal)):(String, DSAValue.DSAVal) = {
+     (if (tuple._1.startsWith(suffix)) tuple._1 else suffix + tuple._1) -> tuple._2
+  }
 
 
   override def onReceive(message: Any, sender: ActorRef): Unit = {
@@ -215,7 +224,7 @@ class DistributedDSANode(
 }
 
 /**
-  * Factory for [[InMemoryDSANode]] instances.
+  * Factory for [[DistributedDSANode]] instances.
   */
 object DistributedDSANode {
 

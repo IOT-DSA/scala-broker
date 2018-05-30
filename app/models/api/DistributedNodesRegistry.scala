@@ -31,7 +31,7 @@ class DistributedNodesRegistry(val replicator: ActorRef)(implicit cluster:Cluste
     case RemoveNode(path) =>
       sender ! removeNode(path)
     case GetNodes() =>
-      sender ! registry.keySet
+      sender ! registry
     case GetNode(path:String) =>
       sender ! registry.get(path)
     case resp: UpdateResponse[_] => log.debug("Created on cluster: {}", resp.request)
@@ -45,8 +45,6 @@ class DistributedNodesRegistry(val replicator: ActorRef)(implicit cluster:Cluste
 
       log.debug("Created nodes: {}", toAdd)
       log.debug("Removed nodes: {}", toRemove)
-    case _ =>
-      val f = 123
   }
 
   def removeNode(path:String, notifyCluster:Boolean = true):Set[String] = {
