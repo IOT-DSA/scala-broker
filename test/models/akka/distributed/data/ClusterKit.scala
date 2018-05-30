@@ -51,6 +51,35 @@ trait ClusterKit { self: GivenWhenThen =>
     }
   }
 
+  def withDistributedNodesExtended(leftPort:String, rightPort:String)(action:((DSANode, DDStuff), (DSANode, DDStuff)) => Unit): Unit = {
+    withDDStuff(leftPort){
+      leftTools =>
+        withDDStuff(rightPort){
+          rightTools =>
+
+
+            And("Distributed nodes pair created")
+            val leftRegistry = leftTools.system.actorOf(DistributedNodesRegistry.props(leftTools.replicator, leftTools.cluster, leftTools.system), "left")
+            val rightRegistry = rightTools.system.actorOf(DistributedNodesRegistry.props(rightTools.replicator, rightTools.cluster, rightTools.system), "right")
+
+            val l = (leftRegistry ? AddNode("/data")).mapTo[DSANode]
+            val r = (rightRegistry ? AddNode("/data")).mapTo[DSANode]
+
+            val lrFuture = for {
+              left <- l
+              right <- r
+            } yield (left, right)
+
+            val arg = Await.result(lrFuture, 2 seconds)
+
+            TimeUnit.SECONDS.sleep(2)
+
+            action((arg._1, leftTools), (arg._2, rightTools))
+
+        }
+    }
+  }
+
   def withDDStuff(port: String)(action:DDStuff => Unit):Unit = {
     withSystem(port){ system =>
       val node = Cluster(system)

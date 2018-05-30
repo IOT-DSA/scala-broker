@@ -2,6 +2,8 @@ package models.akka.distributed.data
 
 import java.util.concurrent.TimeUnit
 
+import akka.testkit.TestProbe
+import models.ResponseEnvelope
 import models.api.DSAValueType
 import models.rpc.DSAValue._
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
@@ -99,7 +101,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
     }
 
-    "should create and delete children" in withDistributedNodes("2555", "2556") { case (left, right) =>
+    "create and delete children" in withDistributedNodes("2555", "2556") { case (left, right) =>
 
       val child1 = Await.result(left.addChild("child1"), 1 second)
       val child2 = Await.result(left.addChild("child2"), 1 second)
@@ -115,6 +117,26 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
       rightChildren("child1").parent shouldBe Some(right)
       Await.result(rightChildren("child1").children, 1 second)("grandChild").parent.get shouldBe rightChildren.get("child1").get
     }
+
+    "send subscriptions to local actors on value update" in withDistributedNodesExtended("2555", "2556") {
+      case ((left, lTools), (right, rTools)) =>
+
+        val leftProbe = TestProbe("probe1")(lTools.system)
+        val rightProbe = TestProbe("probe1")(rTools.system)
+
+        left.subscribe(1, leftProbe.ref)
+        right.subscribe(2, rightProbe.ref)
+
+        left.value = "CHANGED!!!"
+
+        val notification1 = leftProbe.receiveOne(2 seconds)
+        leftProbe.expectNoMessage(2 seconds)
+        val notification2 = rightProbe.receiveOne(2 seconds)
+        rightProbe.expectNoMessage(2 seconds)
+
+    }
+
+
 
   }
 

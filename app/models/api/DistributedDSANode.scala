@@ -4,16 +4,16 @@ import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.cluster.Cluster
 import akka.cluster.ddata.ReplicatedData
 import models.api.DSAValueType.DSAValueType
-import models.rpc.DSAValue.{DSAMap, DSAVal}
+import models.rpc.DSAValue.{DSAMap, DSAVal, obj}
 import akka.cluster.ddata.Replicator._
 import akka.event.Logging
 import akka.pattern.PromiseRef
 import akka.util.Timeout
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
-import models.api.DistributedNodesRegistry.{AddNode, GetNodes, GetNodesByPath}
+import models.api.DistributedNodesRegistry.{AddNode, GetNodesByPath}
 import akka.pattern.ask
-import models.rpc.DSAValue
+import models.rpc.{DSAResponse, DSAValue, StreamState}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -46,8 +46,6 @@ class DistributedDSANode(
   override protected def _configs: Map[String, DSAVal] = data.configs
   override protected def _attributes: Map[String, DSAVal] = data.attributes
   protected var _children: Map[String, DSANode] = Map()
-  protected var _subscriptions: Map[Int, ActorRef] = Map()
-  protected var _listSubscriptions: Map[Int, ActorRef] = Map()
   var _action:Option[DSAAction] = None
 
   replicator ! Subscribe(dataKey, sender)
@@ -170,11 +168,16 @@ class DistributedDSANode(
     old.copy(listSubscriptions = old.listSubscriptions - rid)
   }
 
+  private[this] def isLocal(ref:ActorRef):Boolean = ref.path.address == sender.path.address
+
 
   private[this] def updateLocalState(update: ReplicatedData) = update match {
     case d:DistributedDSANodeState =>
       val localData = toLocalData(d)
       localData.foreach{ newData =>
+        _sids = newData.subscriptions.filter(kv => isLocal(kv._2))
+        _rids = newData.listSubscriptions.filter(kv => isLocal(kv._2))
+        if(data.value != newData.value) notifySubscribeActors(newData.value)
         data = newData
         log.debug("data replicated: {}", data)
       }
@@ -198,8 +201,8 @@ class DistributedDSANode(
       configs = d.configs.entries,
       attributes = d.attributes.entries,
       children = children,
-      subscriptions = Map(),
-      listSubscriptions = Map()
+      subscriptions = d.subscriptions.entries,
+      listSubscriptions = d.listSubscriptions.entries
     )
   }
 
