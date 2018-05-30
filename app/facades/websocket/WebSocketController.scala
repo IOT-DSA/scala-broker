@@ -31,9 +31,6 @@ import play.api.libs.ws.WSClient
 import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
-import org.velvia.MsgPack
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 /**
  * Establishes WebSocket DSLink connections
@@ -236,7 +233,6 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
             case _ => SupervisorStrategy.Stop
           }
         }))
-
 
         subscriptionSrcRef.sourceRef.source.runWith(sink)
 

@@ -2,7 +2,7 @@ package models.akka
 
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.routing.{ ActorSelectionRoutee, Routee }
-import models.Settings.{ Nodes, Paths, Responder }
+import models.Settings.{ Paths, Responder }
 import play.api.Logger
 
 /**

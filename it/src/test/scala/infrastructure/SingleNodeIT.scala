@@ -1,10 +1,10 @@
 package infrastructure
 
 
-import com.whisk.docker.{DockerContainer, DockerReadyChecker, LogLineReceiver}
+import com.whisk.docker.{DockerContainer, LogLineReceiver}
 import org.scalatest.Suite
 import org.slf4j.{Logger, LoggerFactory}
-;
+
 
 /**
   *
