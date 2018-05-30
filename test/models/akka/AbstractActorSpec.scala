@@ -2,7 +2,6 @@ package models.akka
 
 import org.scalatest.{ BeforeAndAfterAll, MustMatchers, OptionValues, WordSpecLike }
 import org.scalatest.concurrent.ScalaFutures
-
 import akka.actor.ActorSystem
 import akka.testkit.{ ImplicitSender, TestKit }
 import models.metrics.{ EventDaos, NullDaos }

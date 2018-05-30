@@ -3,12 +3,11 @@ package models.akka.local
 import scala.concurrent.duration.DurationInt
 
 import org.scalatest.Inside
-
 import akka.actor.actorRef2Scala
 import akka.pattern.ask
 import akka.routing.ActorRefRoutee
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
 import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
 import akka.actor.Address
@@ -20,7 +19,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   import models.Settings._
   import models.akka.Messages._
   import models.rpc.DSAValue._
-  
+
   type FoundLinks = Map[Address, Iterable[String]]
 
   implicit val timeout = Timeout(3 seconds)

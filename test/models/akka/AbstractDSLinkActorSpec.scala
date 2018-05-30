@@ -1,12 +1,11 @@
 package models.akka
 
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.DurationInt
 import org.scalatest.Inside
-import org.scalatest.time.{Millis, Seconds, Span}
-import akka.actor.{ActorRef, PoisonPill, Props, Terminated}
+import akka.actor.{ PoisonPill, Props }
 import akka.pattern.ask
-import akka.routing.{ActorRefRoutee, Routee}
-import akka.testkit.{TestActorRef, TestProbe}
+import akka.routing.{ ActorRefRoutee, Routee }
+import akka.testkit.{ TestActorRef, TestProbe }
 import akka.util.Timeout
 
 /**
@@ -15,8 +14,6 @@ import akka.util.Timeout
 class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
   import AbstractDSLinkActorSpec._
   import Messages._
-
-//  override implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(10, Seconds), interval = Span(5, Seconds))
 
   implicit val timeout = Timeout(5 seconds)
   val dsId = "link" + "?" * 44
