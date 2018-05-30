@@ -11,7 +11,7 @@ import akka.pattern.PromiseRef
 import akka.util.Timeout
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
-import models.api.DistributedNodesRegistry.AddNode
+import models.api.DistributedNodesRegistry.{AddNode, GetNodes, GetNodesByPath}
 import akka.pattern.ask
 import models.rpc.DSAValue
 
@@ -46,6 +46,8 @@ class DistributedDSANode(
   override protected def _configs: Map[String, DSAVal] = data.configs
   override protected def _attributes: Map[String, DSAVal] = data.attributes
   protected var _children: Map[String, DSANode] = Map()
+  protected var _subscriptions: Map[Int, ActorRef] = Map()
+  protected var _listSubscriptions: Map[Int, ActorRef] = Map()
   var _action:Option[DSAAction] = None
 
   replicator ! Subscribe(dataKey, sender)
@@ -127,18 +129,23 @@ class DistributedDSANode(
   override def child(name: String): Future[Option[DSANode]] = Future.successful(_children.get(name))
 
   override def addChild(name: String): Future[DSANode] = {
-    (registry ? AddNode(s"path/$name")).mapTo[DSANode] flatMap { addChild(name, _) }
+    (registry ? AddNode(s"$path/$name")).mapTo[DSANode] flatMap { addChild(name, _) }
   }
 
   override def addChild(name: String, node:DSANode): Future[DSANode] = {
     _children += (name -> node)
-    log.info("Added child node {}: {}", ownId, name)
+    log.info("Added child node {}: ({} -> {})", ownId, name, node)
+
+    editProperty {old =>
+      old.copy(children = old.children + name)
+    }
+
     Future.successful(node)
   }
 
   override def removeChild(name: String): Unit = {
     _children -= name
-    log.info("Added child node {}: {}", ownId, name)
+    log.info("Removed child node {}: {}", ownId, name)
   }
 
   override def action: Option[DSAAction] = _action
@@ -167,17 +174,34 @@ class DistributedDSANode(
   private[this] def updateLocalState(update: ReplicatedData) = update match {
     case d:DistributedDSANodeState =>
       val localData = toLocalData(d)
-      data = localData
-      log.info("!!!!! data replicated: {}", data)
+      localData.foreach{ newData =>
+        data = newData
+        log.debug("data replicated: {}", data)
+      }
     case _ =>
       log.warning("Unsupported data type: {}", data)
   }
 
-  private[this] def toLocalData(d:DistributedDSANodeState):DistributedDSANodeData = DistributedDSANodeData(
-      d.value.value,
-      d.configs.entries,
-      d.attributes.entries,
-  )
+  private[this] def toLocalData(d:DistributedDSANodeState):Future[DistributedDSANodeData] = {
+
+    val futureChildren = (registry ? GetNodesByPath(d.children.elements
+      .filterNot(_children.contains)
+      .map(name => s"$path/$name")))
+      .mapTo[Map[String, DSANode]]
+
+    val f = 13
+
+    for{
+      children <- futureChildren
+    } yield DistributedDSANodeData(
+      value = d.value.value,
+      configs = d.configs.entries,
+      attributes = d.attributes.entries,
+      children = children,
+      subscriptions = Map(),
+      listSubscriptions = Map()
+    )
+  }
 
   private[this] def addSuffix(suffix:String)(tuple: (String, DSAValue.DSAVal)):(String, DSAValue.DSAVal) = {
      (if (tuple._1.startsWith(suffix)) tuple._1 else suffix + tuple._1) -> tuple._2
@@ -230,7 +254,10 @@ object DistributedDSANode {
 
   case class DistributedDSANodeData(value: DSAVal,
                                     configs: Map[String, DSAVal] = Map("$is" -> "node"),
-                                    attributes: Map[String, DSAVal] = Map())
+                                    attributes: Map[String, DSAVal] = Map(),
+                                    subscriptions:Map[Int, ActorRef] = Map(),
+                                    listSubscriptions:Map[Int, ActorRef] = Map(),
+                                    children:Map[String, DSANode] = Map())
 
   case class DiffReport[A](created:Map[String, A], updated:Map[String, A], removed:Set[String])
 

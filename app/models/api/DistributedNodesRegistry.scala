@@ -34,6 +34,9 @@ class DistributedNodesRegistry(val replicator: ActorRef)(implicit cluster:Cluste
       sender ! registry
     case GetNode(path:String) =>
       sender ! registry.get(path)
+    case GetNodesByPath(pathes) =>
+      val response:Set[(String, DSANode)] = pathes.map(p => (p -> getOrCreateNode(p,notifyCluster = false)))
+      sender ! response.toMap
     case resp: UpdateResponse[_] => log.debug("Created on cluster: {}", resp.request)
     case c @ Changed(DataKey) =>
       val data = c.get(DataKey)
@@ -106,6 +109,7 @@ object DistributedNodesRegistry {
   case class AddNode(path:String)
   case class RemoveNode(path:String)
   case class GetNodes()
+  case class GetNodesByPath(pathes:Set[String])
   case class GetNode(path:String)
 
   def parentPath(path:String):(Option[String], String) = aggregateParent(None, path.split("/").toList.filter(!_.isEmpty))

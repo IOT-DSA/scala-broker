@@ -75,6 +75,7 @@ trait ClusterKit { self: GivenWhenThen =>
     val config = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port).
       withFallback(ConfigFactory.load(
         ConfigFactory.parseString("""
+            akka.loglevel = "DEBUG"
             akka.actor.provider = "akka.cluster.ClusterActorRefProvider"
             akka.remote {
               netty.tcp {
