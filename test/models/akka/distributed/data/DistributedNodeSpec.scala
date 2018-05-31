@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import akka.testkit.TestProbe
 import models.ResponseEnvelope
 import models.api.DSAValueType
+import models.rpc.DSAValue
 import models.rpc.DSAValue._
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
 
@@ -127,6 +128,8 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         left.subscribe(1, leftProbe.ref)
         right.subscribe(2, rightProbe.ref)
 
+        TimeUnit.SECONDS.sleep(1)
+
         left.value = "CHANGED!!!"
 
         val notification1 = leftProbe.receiveOne(2 seconds)
@@ -134,8 +137,58 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         val notification2 = rightProbe.receiveOne(2 seconds)
         rightProbe.expectNoMessage(2 seconds)
 
+        left.unsubscribe(1)
+        right.unsubscribe(2)
+
+        TimeUnit.SECONDS.sleep(1)
+
+        right.value = "CHANGED2"
+
+        leftProbe.expectNoMessage(2 seconds)
+        rightProbe.expectNoMessage(2 seconds)
     }
 
+    "send list notifications to local address on child/attribute/config updates" in withDistributedNodesExtended("2555", "2556") {
+      case ((left, lTools), (right, rTools)) =>
+
+        val leftProbe = TestProbe("probe1")(lTools.system)
+        val rightProbe = TestProbe("probe1")(rTools.system)
+
+        left.list(1, leftProbe.ref)
+        right.list(2, rightProbe.ref)
+
+        TimeUnit.SECONDS.sleep(1)
+
+        left.addChild("child1")
+        left.addConfigs("config" -> StringValue("!!!"))
+        left.addAttributes("attribute" -> StringValue("!!!"))
+
+        def extractUpdates(envelops: Seq[ResponseEnvelope]) = for {
+          e <- envelops
+          resp <- e.responses
+          update <- resp.updates.getOrElse(List())
+          unpacked <- update match {
+            case v: DSAValue[DSAArray] => v.value.toList
+            case anyOther => List(anyOther)
+          }
+        } yield unpacked
+
+        val notifications2 = extractUpdates(rightProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
+        val notifications1 = extractUpdates(leftProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
+
+        notifications1.size shouldBe notifications2.size
+        notifications1.size shouldBe 3
+
+        left.removeAttribute("@attribute")
+        left.removeConfig("$config")
+        left.removeChild("child1")
+
+        val deleteNat2 = extractUpdates(rightProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
+        val deleteNat1 = extractUpdates(leftProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
+
+        deleteNat1.size shouldBe deleteNat2.size
+        deleteNat1.size shouldBe 3
+    }
 
 
   }

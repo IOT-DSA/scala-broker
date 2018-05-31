@@ -8,11 +8,11 @@ import akka.cluster.ddata.DistributedData
 import com.typesafe.config.ConfigFactory
 import models.api.DistributedNodesRegistry.AddNode
 import models.api.{DSANode, DistributedNodesRegistry}
-import org.scalatest.{BeforeAndAfter, GivenWhenThen}
+import org.scalatest.{GivenWhenThen}
 import akka.pattern.ask
 import akka.util.Timeout
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await}
 import scala.concurrent.duration._
 
 trait ClusterKit { self: GivenWhenThen =>

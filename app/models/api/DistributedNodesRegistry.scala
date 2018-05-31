@@ -95,6 +95,7 @@ class DistributedNodesRegistry(val replicator: ActorRef)(implicit cluster:Cluste
     }
 
     registry = registry + (path -> node)
+    log.debug(s"registry:$registry")
 
     if(notifyCluster){
       replicator ! Update(DataKey, ORSet.empty[String], WriteLocal)(_ + path)
