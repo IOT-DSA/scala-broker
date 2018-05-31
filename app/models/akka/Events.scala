@@ -23,7 +23,7 @@ case class DSLinkBaseState(endpoint: Option[ActorRef],
   * Internal events to recover requester behavior state.
   */
 case class RidTargetsRequesterState(rid: Int, target: String)
-case class SidTargetsRequesterState(sid: Int, target: String)
+case class SidTargetsRequesterState(sid: Int, pathAndQos: PathAndQos)
 case class RemoveTargetByRid(rid: Int)
 case class RemoveTargetBySid(sid: Int)
 case class LastRidSet(rid: Int)

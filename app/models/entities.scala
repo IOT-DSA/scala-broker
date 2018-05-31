@@ -1,7 +1,8 @@
 package models
 
-import models.rpc.{ DSARequest, DSAResponse }
+import models.rpc.{DSARequest, DSAResponse}
 import _root_.akka.actor.ActorRef
+import models.akka.QoS
 
 /**
  * Envelope for internal request routing.
@@ -29,6 +30,14 @@ case class ResponseEnvelope(responses: Seq[DSAResponse]) {
     s"ResponseEnvelope($responses})"
   else
     s"ResponseEnvelope(List(${responses.head},...${responses.size - 1} more))"
+}
+
+case class SubscriptionResponseEnvelope(response: DSAResponse, sid: Int, qos: QoS.Level){
+  /**
+    * Outputs only the first response for compact logging.
+    */
+  override def toString =
+    s"SubscriptionResponseEnvelope(response:$response, sid:$sid, qos:$qos)"
 }
 
 /**

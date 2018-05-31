@@ -1,4 +1,5 @@
 import Testing.itTest
+import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
 
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
@@ -19,7 +20,16 @@ lazy val root = (project in file("."))
   .settings(
     scalaVersion := SCALA_VERSION,
     libraryDependencies ++= commonDependencies.union(playTestDependencies)
-)
+  )
+  .aggregate(msgpack)
+  .dependsOn(msgpack)
+
+// project for temporary lib msgpack4s
+lazy val msgpack = project.in(file("tools/msgpack4s"))
+    .settings(
+      scalaVersion := SCALA_VERSION,
+      libraryDependencies ++= msgpackDependencies
+    )
 
 // project for integrational tests
 lazy val it = project.in(file("it"))
@@ -36,6 +46,8 @@ EclipseKeys.withJavadoc := true
 
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
+resolvers += "velvia maven" at "http://dl.bintray.com/velvia/maven"
+
 scalacOptions ++= Seq(
   "-feature",
   "-unchecked",
@@ -55,6 +67,22 @@ packageName in Docker := "iotdsa/broker-scala"
 dockerExposedPorts := Seq(9000, 9443, 2551)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
+
+dockerEntrypoint ++= Seq(
+  """-Dakka.remote.netty.tcp.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
+  """-Dakka.remote.netty.tcp.port="$AKKA_REMOTING_BIND_PORT"""",
+  """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka.tcp://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
+  "-Dakka.io.dns.resolver=async-dns",
+  "-Dakka.io.dns.async-dns.resolve-srv=true",
+  "-Dakka.io.dns.async-dns.resolv-conf=on"
+)
+
+dockerCommands :=
+  dockerCommands.value.flatMap {
+    case ExecCmd("ENTRYPOINT", args @ _*) => Seq(Cmd("ENTRYPOINT", args.mkString(" ")))
+    case v => Seq(v)
+  }
+
 
 mappings in Universal ++= Seq(
   file("scripts/setup-influx") -> "bin/setup-influx",
@@ -92,7 +120,9 @@ lazy val commonDependencies = Seq(
   "com.maxmind.geoip2"           % "geoip2"                  % "2.10.0",
   "ch.qos.logback"               % "logback-classic"         % "1.2.3",
   "io.netty"                     % "netty-codec-http"        % "4.0.41.Final" force(),
-  "io.netty"                     % "netty-handler"           % "4.0.41.Final" force()
+  "io.netty"                     % "netty-handler"           % "4.0.41.Final" force(),
+  "org.msgpack"                 %% "msgpack-scala"           % "0.8.13",
+  "org.json4s"                  %% "json4s-native"           % "3.5.0"
 )
 
 // akka and play test dependencies
@@ -119,6 +149,14 @@ lazy val itDependencies = Seq(
 
 )
 
+lazy val msgpackDependencies = Seq(
+  "org.scalatest" %% "scalatest" % "3.0.4" % "test",
+  "org.mockito" % "mockito-all" % "1.9.0" % "test",
+  "com.rojoma" %% "rojoma-json-v3" % "3.7.0",
+  "org.json4s" %% "json4s-native" % "3.5.0",
+  "org.apache.commons" % "commons-io" % "1.3.2",
+  "com.typesafe.play" %% "play-json" % JSON_VERSION
+)
 
 
 

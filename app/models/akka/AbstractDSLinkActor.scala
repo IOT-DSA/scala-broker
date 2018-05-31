@@ -1,8 +1,8 @@
 package models.akka
 
 import org.joda.time.DateTime
-import akka.actor.{ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.persistence.PersistentActor
+import akka.actor.{ ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala }
 import akka.routing.Routee
 
 /**
@@ -25,6 +25,8 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
 
   protected val linkName = self.path.name
   protected val ownId = s"DSLink[$linkName]"
+
+  implicit val system = context.system
 
   // initially None, then set by ConnectEndpoint, unset by DisconnectEndpoint
   private var endpoint: Option[ActorRef] = None
@@ -96,7 +98,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
   /**
    * Handles messages in DISCONNECTED state.
    */
-  private def disconnected: Receive = {
+  def disconnected: Receive = {
     case ConnectEndpoint(ref, ci) =>
       log.info("{}: connected to Endpoint", ownId)
       connectToEndpoint(ref, ci)
@@ -105,10 +107,17 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
     case DisconnectEndpoint(_) =>
       log.warning("{}: not connected to Endpoint, ignoring DISCONNECT", ownId)
+  }
+
+  def toStash: Receive = {
     case _ =>
       log.debug("{}: stashing the incoming message", ownId)
       stash()
   }
+
+  protected def afterConnection():Unit = {}
+
+  protected def afterDisconnection():Unit = {}
 
   /**
    * Associates this DSLink with an endpoint.
@@ -124,6 +133,7 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
       log.debug("{}: unstashing all stored messages", ownId)
       unstashAll()
       context.become(connected)
+      afterConnection()
     }
   }
 
@@ -132,7 +142,6 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
    */
   private def disconnectFromEndpoint(kill: Boolean) = {
     log.debug("{}: disconnectFromEndpoint called, [kill: {}]", ownId, kill)
-
     endpoint foreach { ref =>
       context unwatch ref
       if (kill) ref ! PoisonPill
@@ -142,16 +151,19 @@ abstract class AbstractDSLinkActor(registry: Routee) extends PersistentActor wit
       updateState(event)
       sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
       context.become(disconnected)
+      afterDisconnection()
     }
   }
 
   /**
    * Sends a message to the endpoint, if connected.
    */
-  protected def sendToEndpoint(msg: Any): Unit = endpoint foreach (_ ! msg)
+  protected def sendToEndpoint(msg: Any): Unit =  endpoint foreach (_ ! msg)
+
 
   /**
    * Sends a message to the registry.
    */
   protected def sendToRegistry(msg: Any): Unit = registry ! msg
+
 }

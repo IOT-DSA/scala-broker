@@ -29,6 +29,8 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
    */
   override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover
 
+  override def disconnected: Receive = super.disconnected orElse requesterDisconnected orElse toStash
+
   /**
    * Handles messages in CONNECTED state.
    */
