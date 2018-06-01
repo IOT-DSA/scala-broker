@@ -2,7 +2,7 @@ package models.akka
 
 import org.scalatest.{ BeforeAndAfterAll, MustMatchers, OptionValues, WordSpecLike }
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{ Millis, Seconds, Span }
+import org.scalatest.time.{ Millis, Span }
 
 import akka.actor.ActorSystem
 import akka.testkit.{ ImplicitSender, TestKit }
@@ -19,7 +19,7 @@ abstract class AbstractActorSpec extends TestKit(ActorSystem()) with ImplicitSen
     * The simple tune to avoid some issues for asynchronous operations in unit tests.
     * Probably the amount of timeout and interval should be figured out experimentally.
     */
-  override implicit val patienceConfig = PatienceConfig(timeout = Span(150, Millis), interval = Span(15, Millis))
+  override implicit val patienceConfig = PatienceConfig(timeout = Span(500, Millis), interval = Span(150, Millis))
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
