@@ -151,7 +151,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val ci = buildConnectionInfo(request)
     val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
-    val json = (Settings.ServerConfiguration. + ("path" -> Json.toJson(linkPath))) ++ Json.obj("format" -> ci.resultFormat)
+    val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++ Json.obj("format" -> ci.resultFormat)
 
     val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
 
