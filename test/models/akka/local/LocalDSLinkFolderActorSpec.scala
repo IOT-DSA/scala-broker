@@ -26,7 +26,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   implicit val timeout = Timeout(3 seconds)
   val dsId = "link" + "?" * 44
 
-  val dslinkMgr = new LocalDSLinkManager(nullDaos)
+  val dslinkMgr = new LocalDSLinkManager()
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(
     Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
 
@@ -65,7 +65,6 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       }
     }
     "record link stats" in {
-      Thread.sleep(500)
       whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
         _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 0, 1, 0, 0))
       }

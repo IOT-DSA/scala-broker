@@ -11,7 +11,6 @@ import akka.routing.Routee
 import javax.inject.{ Inject, Singleton }
 import models.Settings
 import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
-import models.metrics.EventDaos
 import play.api.mvc.ControllerComponents
 import akka.actor.Address
 
@@ -22,7 +21,6 @@ import akka.actor.Address
 class MainController @Inject() (actorSystem: ActorSystem,
                                 dslinkMgr:   DSLinkManager,
                                 actors:      BrokerActors,
-                                eventDaos:   EventDaos,
                                 cc:          ControllerComponents) extends BasicController(cc) {
 
   import models.akka.Messages._

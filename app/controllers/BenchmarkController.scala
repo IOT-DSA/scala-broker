@@ -17,7 +17,6 @@ import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
 import models.bench.BenchmarkStatsAggregator
-import models.metrics.EventDaos
 import play.api.libs.json.{ JsObject, Json, Writes }
 import play.api.mvc.{ ControllerComponents, Result }
 
@@ -28,7 +27,6 @@ import play.api.mvc.{ ControllerComponents, Result }
 class BenchmarkController @Inject() (actorSystem: ActorSystem,
                                      dslinkMgr:   DSLinkManager,
                                      actors:      BrokerActors,
-                                     eventDaos:   EventDaos,
                                      cc:          ControllerComponents) extends BasicController(cc) {
 
   import models.bench.BenchmarkActor._

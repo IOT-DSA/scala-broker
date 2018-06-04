@@ -2,8 +2,7 @@ package models.akka
 
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.routing.{ ActorSelectionRoutee, Routee }
-import models.Settings.{ Nodes, Paths, Responder }
-import models.metrics.EventDaos
+import models.Settings.{ Paths, Responder }
 import play.api.Logger
 
 /**
@@ -17,11 +16,6 @@ trait DSLinkManager {
    * Actor system.
    */
   def system: ActorSystem
-
-  /**
-   * Event DAOs.
-   */
-  def eventDaos: EventDaos
 
   /**
    * Downstream node routee.
@@ -59,14 +53,14 @@ trait DSLinkManager {
    * </ul>
    */
   val dnlinkProps = Responder.GroupCallEngine match {
-    case "simple"  => DSLinkFactory.createSimpleProps(this, Paths.Downstream, downstream, eventDaos)
-    case "pooled"  => DSLinkFactory.createPooledProps(this, Paths.Downstream, downstream, eventDaos)
-    case "pubsub"  => DSLinkFactory.createPubSubProps(this, Paths.Downstream, downstream, eventDaos)
-    case "dpubsub" => DSLinkFactory.createDPubSubProps(this, Paths.Downstream, downstream, eventDaos)
+    case "simple"  => DSLinkFactory.createSimpleProps(this, Paths.Downstream, downstream)
+    case "pooled"  => DSLinkFactory.createPooledProps(this, Paths.Downstream, downstream)
+    case "pubsub"  => DSLinkFactory.createPubSubProps(this, Paths.Downstream, downstream)
+    case "dpubsub" => DSLinkFactory.createDPubSubProps(this, Paths.Downstream, downstream)
   }
 
   /**
    * An instance of uplink actor props.
    */
-  val uplinkProps = DSLinkFactory.createSimpleProps(this, Paths.Upstream, upstream, eventDaos)
+  val uplinkProps = DSLinkFactory.createSimpleProps(this, Paths.Upstream, upstream)
 }
