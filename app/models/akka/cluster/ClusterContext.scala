@@ -9,17 +9,16 @@ import com.google.inject.Inject
 import models.akka.DSLinkManager
 import models.akka.local.LocalDSLinkManager
 import models.api.DistributedNodesRegistry
-import models.metrics.EventDaos
 
 @Singleton
-class ClusterContext @ Inject() (val actorSystem: ActorSystem, val eventDaos: EventDaos){
+class ClusterContext @ Inject() (val actorSystem: ActorSystem){
 
   val isCluster = actorSystem.hasExtension(Cluster)
 
   val manager: DSLinkManager = if (isCluster)
-    new ClusteredDSLinkManager(false, eventDaos)(actorSystem)
+    new ClusteredDSLinkManager(false)(actorSystem)
   else
-    new LocalDSLinkManager(eventDaos)(actorSystem)
+    new LocalDSLinkManager()(actorSystem)
 
   val distributedRegistry:Option[ActorRef] = if(isCluster){
     val cluster = Cluster(actorSystem)
