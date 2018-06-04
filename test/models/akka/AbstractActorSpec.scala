@@ -19,7 +19,7 @@ abstract class AbstractActorSpec extends TestKit(ActorSystem()) with ImplicitSen
     * The simple tune to avoid some issues for asynchronous operations in unit tests.
     * Probably the amount of timeout and interval should be figured out experimentally.
     */
-  override implicit val patienceConfig = PatienceConfig(timeout = Span(150, Millis), interval = Span(30, Millis))
+  override implicit val patienceConfig = PatienceConfig(timeout = Span(300, Millis), interval = Span(100, Millis))
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
