@@ -37,6 +37,8 @@ case class RequestsProcessed(requests: Seq[DSARequest])
 /**
   * Internal events to recover [[LocalDSLinkFolderActor]] state.
   */
+case class DSLinkCreated(name: String)
+case class DSLinkRemoved(name: String)
 case class DSLinkRegistered(name: String, mode: DSLinkMode, connected: Boolean)
 case class DSLinkUnregistered(name: String)
 

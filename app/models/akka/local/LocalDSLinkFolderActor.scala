@@ -1,10 +1,9 @@
 package models.akka.local
 
-import akka.actor.{ PoisonPill, Props, actorRef2Scala }
-import akka.routing.{ ActorRefRoutee, Routee }
-import models.akka.{ DSLinkFolderActor, IsNode, rows }
+import akka.actor.{PoisonPill, Props, actorRef2Scala}
+import akka.routing.{ActorRefRoutee, Routee}
+import models.akka.{DSLinkCreated, DSLinkFolderActor, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered, IsNode, rows}
 import models.akka.Messages._
-import models.akka.{ DSLinkRegistered, DSLinkUnregistered }
 import models.rpc.DSAValue._
 
 /**
@@ -31,8 +30,10 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   private val mgmtHandler: Receive = {
 
     case GetOrCreateDSLink(name) =>
-      log.debug("{}: requested DSLink '{}'", ownId, name)
-      sender ! getOrCreateDSLink(name)
+      persist(DSLinkCreated(name)) { event =>
+        log.debug("{}: requested DSLink '{}'", ownId, event.name)
+        sender ! getOrCreateDSLink(event.name)
+      }
 
     case RegisterDSLink(name, mode, connected) =>
       persist(DSLinkRegistered(name, mode, connected)) { event =>
@@ -44,8 +45,10 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
     case GetDSLinkNames => sender ! links.keys
 
     case RemoveDSLink(name) =>
-      removeDSLinks(name)
-      log.debug("{}: ordered to remove DSLink '{}'", ownId, name)
+      persist(DSLinkRemoved(name)) { event =>
+        removeDSLinks(event.name)
+        log.debug("{}: ordered to remove DSLink '{}'", ownId, event.name)
+      }
 
     case UnregisterDSLink(name) =>
       persist(DSLinkUnregistered(name)) { event =>
@@ -75,6 +78,10 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
       context.actorOf(linkProps, name)
     }
     ActorRefRoutee(child)
+  }
+
+  private def newdslink(name: String): Unit = {
+    sender ! getOrCreateDSLink(name)
   }
 
   /**

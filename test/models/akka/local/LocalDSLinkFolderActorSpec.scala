@@ -1,16 +1,14 @@
 package models.akka.local
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.Inside
-import akka.actor.actorRef2Scala
+import akka.actor.{Address, PoisonPill, actorRef2Scala}
 import akka.pattern.ask
 import akka.routing.ActorRefRoutee
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
-import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
-import akka.actor.Address
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.akka.{AbstractActorSpec, DSLinkMode, IsNode, rows}
+import models.rpc.{CloseRequest, DSAResponse, ListRequest}
 
 /**
  * LocalDSLinkFolderActor test suite.
@@ -23,7 +21,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   type FoundLinks = Map[Address, Iterable[String]]
 
   implicit val timeout = Timeout(3 seconds)
-  val dsId = "link" + "?" * 44
+  var downstreamRecovered: akka.actor.ActorRef =_
 
   val dslinkMgr = new LocalDSLinkManager(nullDaos)
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(
@@ -100,38 +98,50 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
           list mustBe rows(IsNode, "downstream" -> true, "aaa" -> obj(IsNode), "bbb" -> obj(IsNode))
       }
     }
-//    "send updates on added nodes" in {
-//      downstream ! GetOrCreateDSLink("ccc")
-//      val Seq(routee, env) = receiveN(2)
-//      inside(env) {
-//        case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
-//          list mustBe rows("ccc" -> obj(IsNode))
-//      }
-//    }
-//    "send updates on removed nodes" in {
-//      downstream ! RemoveDSLink("ccc")
-//      inside(receiveOne(timeout.duration)) {
-//        case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
-//          list mustBe List(obj("name" -> "ccc", "change" -> "remove"))
-//      }
-//    }
+    "send updates on added nodes" in {
+      downstream ! GetOrCreateDSLink("ccc")
+      val Seq(routee, env) = receiveN(2)
+      inside(env) {
+        case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
+          list mustBe rows("ccc" -> obj(IsNode))
+      }
+    }
+    "send updates on removed nodes" in {
+      downstream ! RemoveDSLink("ccc")
+      inside(receiveOne(timeout.duration)) {
+        case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
+          list mustBe List(obj("name" -> "ccc", "change" -> "remove"))
+      }
+    }
   }
 
   "CloseRequest" should {
-//    "return valid response" in {
-//      downstream ! RequestEnvelope(List(CloseRequest(1)))
-//      downstream ! GetOrCreateDSLink("ddd")
-//      expectMsgClass(classOf[ActorRefRoutee])
-//      expectNoMessage(timeout.duration)
-//    }
+    "return valid response" in {
+      downstream ! RequestEnvelope(List(CloseRequest(1)))
+      downstream ! GetOrCreateDSLink("ddd")
+      expectMsgClass(classOf[ActorRefRoutee])
+      expectNoMessage(timeout.duration)
+    }
+  }
+
+  "PoisonPill" should {
+    "kill downstream and then try to recover it" in {
+      downstream ! PoisonPill
+      Thread.sleep(500)
+      downstreamRecovered = system.actorOf(LocalDSLinkFolderActor.props(
+        Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
+      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 2, 0, 1, 0, 0))
+      }
+    }
   }
 
   "RemoveDisconnectedDSLinks" should {
-    "remove all disconnected dslinks" in {
-      downstream ! RemoveDisconnectedDSLinks
+    "remove all disconnected dslinks after the state recovering" in {
+      downstreamRecovered ! RemoveDisconnectedDSLinks
       Thread.sleep(500)
-      whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
-        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 0, 0, 0, 0, 0))
+      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 0, 0, 0, 0, 0))
       }
     }
   }

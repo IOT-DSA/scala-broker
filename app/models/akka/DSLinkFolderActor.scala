@@ -35,6 +35,12 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   override def postStop = log.info(s"$ownId actor stopped")
 
   val dslinkFolderRecover: Receive = {
+    case event: DSLinkCreated =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      getOrCreateDSLink(event.name)
+    case event: DSLinkRemoved =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      removeDSLinks(event.name)
     case event: DSLinkRegistered =>
       log.debug("{}: trying to recover {}", ownId, event)
       links += (event.name -> LinkState(event.mode, event.connected))
