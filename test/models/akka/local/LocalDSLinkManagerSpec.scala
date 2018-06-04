@@ -21,7 +21,7 @@ class LocalDSLinkManagerSpec extends AbstractActorSpec with Inside {
 
   implicit val timeout = Timeout(3 seconds)
 
-  val mgr = new LocalDSLinkManager(nullDaos)
+  val mgr = new LocalDSLinkManager()
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Downstream, mgr.dnlinkProps), Settings.Nodes.Downstream)
   val upstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Upstream, mgr.uplinkProps), Settings.Nodes.Upstream)
   system.actorOf(RootNodeActor.props(None), Settings.Nodes.Root)

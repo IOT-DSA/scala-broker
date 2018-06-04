@@ -3,7 +3,6 @@ package models.akka
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.routing.Routee
 import models.Settings
-import models.metrics.EventDaos
 
 /**
  * DSLinkManager test suite.
@@ -11,7 +10,7 @@ import models.metrics.EventDaos
 class DSLinkManagerSpec extends AbstractActorSpec {
   import DSLinkManagerSpec._
 
-  val mgr = new TestDSLinkManager(system, nullDaos)
+  val mgr = new TestDSLinkManager(system)
 
   "downstream" should {
     "point to /user/downstream actor" in {
@@ -42,7 +41,7 @@ class DSLinkManagerSpec extends AbstractActorSpec {
  * DSLinkManager test utilities.
  */
 object DSLinkManagerSpec {
-  class TestDSLinkManager(val system: ActorSystem, val eventDaos: EventDaos) extends DSLinkManager {
+  class TestDSLinkManager(val system: ActorSystem) extends DSLinkManager {
     def dsaSend(path: String, message: Any)(implicit sender: ActorRef): Unit = ???
     def getDownlinkRoutee(name: String): Routee = ???
     def getUplinkRoutee(name: String): Routee = ???

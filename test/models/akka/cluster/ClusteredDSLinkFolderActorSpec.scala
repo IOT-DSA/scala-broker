@@ -34,15 +34,15 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   val extra: (String, DSAVal) = "downstream" -> true
 
   val system1 = createActorSystem(2551)
-  val mgr1 = new ClusteredDSLinkManager(false, nullDaos)(system1)
+  val mgr1 = new ClusteredDSLinkManager(false)(system1)
   val downstream1 = system1.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr1.getDownlinkRoutee, extra), Nodes.Downstream)
 
   val system2 = createActorSystem(0)
-  val mgr2 = new ClusteredDSLinkManager(false, nullDaos)(system2)
+  val mgr2 = new ClusteredDSLinkManager(false)(system2)
   val downstream2 = system2.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr2.getDownlinkRoutee, extra), Nodes.Downstream)
 
   val system3 = createActorSystem(0)
-  val mgr3 = new ClusteredDSLinkManager(false, nullDaos)(system3)
+  val mgr3 = new ClusteredDSLinkManager(false)(system3)
   val downstream3 = system3.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr3.getDownlinkRoutee, extra), Nodes.Downstream)
 
   override def afterAll = {

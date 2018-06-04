@@ -2,7 +2,7 @@ package facades.websocket
 
 import java.net.URL
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, duration}
 import scala.util.Random
 import org.bouncycastle.jcajce.provider.digest.SHA256
 import org.joda.time.DateTime
@@ -24,13 +24,13 @@ import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
 import models.akka.QoSState.{GetSubscriptionSource, SubscriptionSourceMessage}
 import models.akka.cluster.ClusterContext
 import models.handshake.{LocalKeys, RemoteKey}
-import models.metrics.EventDaos
+import models.metrics.Meter
 import models.rpc.DSAMessage
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import play.api.mvc._
+import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
 
@@ -44,12 +44,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                                      actors:       BrokerActors,
                                      wsc:          WSClient,
                                      keys:         LocalKeys,
-                                     eventDaos:    EventDaos,
-                                     cc:           ControllerComponents) extends BasicController(cc) {
+                                     cc:           ControllerComponents)
+  extends BasicController(cc)
+  with Meter {
 
   type DSAFlow = Flow[DSAMessage, DSAMessage, _]
 
-  import eventDaos._
   import models.rpc.DSAMessageSerrializationFormat._
 
   implicit private val as = actorSystem
@@ -157,8 +157,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     cache.set(ci.dsId, DSLinkSessionInfo(ci, sessionId))
 
-    dslinkEventDao.saveConnectionEvent(DateTime.now, "handshake", sessionId,
-      ci.dsId, ci.linkName, ci.linkAddress, ci.mode, ci.version, ci.compression, ci.brokerAddress)
+    meterTags(messageTags("handshake", ci):_*)
 
     log.debug(s"Conn response sent: ${json.toString}")
     Ok(json)
@@ -219,7 +218,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
       subscriptions map { subscriptionSrcRef =>
 
-        val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
+        val wsProps = WebSocketActor.props(toSocket, routee,
           WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
         val fromSocket = actorSystem.actorOf(Props(new Actor {

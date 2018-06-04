@@ -9,8 +9,7 @@ import akka.routing.Routee
 import javax.inject.{Inject, Singleton}
 
 import models.Settings
-import models.akka.{BrokerActors, DSLinkManager, RichRoutee}
-import models.metrics.EventDaos
+import models.akka.{ BrokerActors, RichRoutee }
 import play.api.mvc.ControllerComponents
 import akka.actor.Address
 import models.akka.cluster.ClusterContext
@@ -22,7 +21,6 @@ import models.akka.cluster.ClusterContext
 class MainController @Inject() (actorSystem: ActorSystem,
                                 clusterContext:   ClusterContext,
                                 actors:      BrokerActors,
-                                eventDaos:   EventDaos,
                                 cc:          ControllerComponents) extends BasicController(cc) {
 
   import models.akka.Messages._

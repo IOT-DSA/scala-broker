@@ -120,7 +120,7 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
    */
   private def createClusterArtifacts(port: Int, proxyMode: Boolean) = {
     val system = createActorSystem(port)
-    val mgr = new ClusteredDSLinkManager(proxyMode, nullDaos)(system)
+    val mgr = new ClusteredDSLinkManager(proxyMode)(system)
     system.actorOf(TestActors.forwardActorProps(downstreamProbe.ref), Settings.Nodes.Downstream)
     system.actorOf(TestActors.forwardActorProps(upstreamProbe.ref), Settings.Nodes.Upstream)
     if (proxyMode)
