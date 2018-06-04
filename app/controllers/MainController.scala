@@ -1,26 +1,26 @@
 package controllers
 
 import scala.concurrent.Future
-
 import org.joda.time.DateTime
-
 import akka.actor.ActorSystem
-import akka.cluster.{ Cluster, MemberStatus }
+import akka.cluster.{Cluster, MemberStatus}
 import akka.pattern.ask
 import akka.routing.Routee
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
+
 import models.Settings
-import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
+import models.akka.{BrokerActors, DSLinkManager, RichRoutee}
 import models.metrics.EventDaos
 import play.api.mvc.ControllerComponents
 import akka.actor.Address
+import models.akka.cluster.ClusterContext
 
 /**
  * Handles main web requests.
  */
 @Singleton
 class MainController @Inject() (actorSystem: ActorSystem,
-                                dslinkMgr:   DSLinkManager,
+                                clusterContext:   ClusterContext,
                                 actors:      BrokerActors,
                                 eventDaos:   EventDaos,
                                 cc:          ControllerComponents) extends BasicController(cc) {

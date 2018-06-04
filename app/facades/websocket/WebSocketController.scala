@@ -17,10 +17,12 @@ import akka.stream.{Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
+
 import models.Settings
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
 import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
 import models.akka.QoSState.{GetSubscriptionSource, SubscriptionSourceMessage}
+import models.akka.cluster.ClusterContext
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
 import models.rpc.DSAMessage
@@ -31,7 +33,6 @@ import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
-import org.velvia.MsgPack
 
 /**
  * Establishes WebSocket DSLink connections
@@ -40,7 +41,6 @@ import org.velvia.MsgPack
 class WebSocketController @Inject() (actorSystem:  ActorSystem,
                                      materializer: Materializer,
                                      cache:        SyncCacheApi,
-                                     dslinkMgr:    DSLinkManager,
                                      actors:       BrokerActors,
                                      wsc:          WSClient,
                                      keys:         LocalKeys,

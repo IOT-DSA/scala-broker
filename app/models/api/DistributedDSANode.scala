@@ -130,15 +130,26 @@ class DistributedDSANode(
 
   override def child(name: String): Future[Option[DSANode]] = Future.successful(_children.get(name))
 
-  override def addChild(name: String): Future[DSANode] =
-    (registry ? AddNode(s"$path/$name")).mapTo[DSANode] flatMap {
-      addChild(name, _)
+  override def addChild(name: String): Future[DSANode] = {
+    _children.get(name).map(Future.successful).getOrElse {
+      (registry ? AddNode(s"$path/$name")).mapTo[DSANode] flatMap { actor =>
+        log.debug(s"Adding child: $name ->  $actor")
+        addChild(name, actor)
+      }
     }
+  }
 
 
   override def addChild(name: String, node: DSANode): Future[DSANode] = {
 
+    if (_children.get(name).isDefined) {
+      val df = 123
+    }
+
+    log.debug(s"children before: ${_children}")
+    log.debug(s"Adding child: $name ->  $node")
     _children += (name -> node)
+    log.debug(s"children after: ${_children}")
 
     editProperty({ old =>
       old.copy(children = old.children + name)
@@ -184,9 +195,9 @@ class DistributedDSANode(
 
       val createdChildren = newData.children.diff(data.children)
 
-      (registry ? GetNodesByPath(createdChildren)).mapTo[Map[String, DSANode]]
-        .foreach({ ch =>
 
+      (registry ? GetNodesByPath(createdChildren.map(ch => s"$path/$ch"))).mapTo[Map[String, DSANode]]
+        .foreach({ ch =>
           val newChildren = createdChildren.map { n => array(n, obj("$is" -> "node")) }
 
           val attrUpdates = newData.attributes

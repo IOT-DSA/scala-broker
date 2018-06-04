@@ -29,6 +29,7 @@ trait ClusterKit { self: GivenWhenThen =>
           rightTools =>
 
 
+
             And("Distributed nodes pair created")
             val leftRegistry = leftTools.system.actorOf(DistributedNodesRegistry.props(leftTools.replicator, leftTools.cluster, leftTools.system), "left")
             val rightRegistry = rightTools.system.actorOf(DistributedNodesRegistry.props(rightTools.replicator, rightTools.cluster, rightTools.system), "right")
@@ -94,9 +95,13 @@ trait ClusterKit { self: GivenWhenThen =>
 
   def withSystem(port: String)(action:ActorSystem => Unit): Unit = {
     val s = system(port)
-    action(s)
-    And(s"ActorSystem on port $port stopped")
-    Await.result(s.terminate(), 30 seconds)
+    try{
+      action(s)
+      And(s"ActorSystem on port $port stopped")
+      Await.result(s.terminate(), 30 seconds)
+    } finally {
+      s.terminate()
+    }
   }
 
   def system(port: String) = {

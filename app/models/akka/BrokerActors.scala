@@ -1,9 +1,10 @@
 package models.akka
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem}
 import akka.cluster.Cluster
-import javax.inject.{ Inject, Singleton }
-import models.akka.cluster.ClusteredDSLinkFolderActor
+import javax.inject.{Inject, Singleton}
+
+import models.akka.cluster.{ClusterContext, ClusteredDSLinkFolderActor}
 import models.akka.local.LocalDSLinkFolderActor
 import models.bench.BenchmarkActor
 import models.metrics.EventDaos
@@ -12,7 +13,9 @@ import models.metrics.EventDaos
  * A wrapper for essential actors to be started when the application starts.
  */
 @Singleton
-class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager, eventDaos: EventDaos) {
+class BrokerActors @Inject() (actorSystem: ActorSystem,
+                              clusterContext: ClusterContext,
+                              eventDaos: EventDaos) {
   import models.Settings._
   import models.rpc.DSAValue._
 
@@ -28,13 +31,13 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
    * Create actors for clusterless deployment.
    */
   private def createLocalActors = {
-    val root = actorSystem.actorOf(RootNodeActor.props, Nodes.Root)
+    val root = actorSystem.actorOf(RootNodeActor.props(clusterContext.distributedRegistry), Nodes.Root)
 
     val downstream = actorSystem.actorOf(LocalDSLinkFolderActor.props(
-      Paths.Downstream, dslinkMgr.dnlinkProps, downExtra: _*), Nodes.Downstream)
+      Paths.Downstream, clusterContext.manager.dnlinkProps, downExtra: _*), Nodes.Downstream)
 
     val upstream = actorSystem.actorOf(LocalDSLinkFolderActor.props(
-      Paths.Upstream, dslinkMgr.uplinkProps, upExtra: _*), Nodes.Upstream)
+      Paths.Upstream, clusterContext.manager.uplinkProps, upExtra: _*), Nodes.Upstream)
 
     val bench = actorSystem.actorOf(BenchmarkActor.props(eventDaos), "benchmark")
 
@@ -45,13 +48,13 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
    * Create actors for clustered deployment.
    */
   private def createClusteredActors = {
-    val root = RootNodeActor.singletonStart(actorSystem)
+    val root = RootNodeActor.singletonStart(actorSystem, clusterContext.distributedRegistry)
 
     val downstream = actorSystem.actorOf(ClusteredDSLinkFolderActor.props(
-      Paths.Downstream, dslinkMgr.getDownlinkRoutee, downExtra: _*), Nodes.Downstream)
+      Paths.Downstream, clusterContext.manager.getDownlinkRoutee, downExtra: _*), Nodes.Downstream)
 
     val upstream = actorSystem.actorOf(ClusteredDSLinkFolderActor.props(
-      Paths.Upstream, dslinkMgr.getUplinkRoutee, upExtra: _*), Nodes.Upstream)
+      Paths.Upstream, clusterContext.manager.getUplinkRoutee, upExtra: _*), Nodes.Upstream)
 
     val bench = actorSystem.actorOf(BenchmarkActor.props(eventDaos), "benchmark")
 

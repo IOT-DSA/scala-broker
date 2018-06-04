@@ -1,25 +1,28 @@
 package models
 
-import java.sql.{ Connection, DriverManager }
+import java.sql.{Connection, DriverManager}
 
 import scala.collection.Seq
-
 import com.paulgoldbaum.influxdbclient.Database
+import _root_.akka.actor._
+import _root_.akka.actor.{ActorRef => AkkaActorRef}
+import _root_.akka.cluster.{Cluster => AkkaCluster}
+import _root_.akka.cluster.ddata.DistributedData
+import javax.inject.{Inject, Provider, Singleton}
 
-import _root_.akka.actor.ActorSystem
-import _root_.akka.cluster.Cluster
-import javax.inject.{ Inject, Provider, Singleton }
-import models.Settings.{ InfluxDb, JDBC, Metrics }
-import models.akka.{ BrokerActors, DSLinkManager }
-import models.akka.cluster.ClusteredDSLinkManager
+import models.Settings.{InfluxDb, JDBC, Metrics}
+import models.akka.{BrokerActors, DSLinkManager}
+import akka.cluster.{ClusteredDSLinkManager}
 import models.akka.local.LocalDSLinkManager
+import models.api.DistributedNodesRegistry
 import models.handshake.LocalKeys
 import models.metrics._
 import models.metrics.NullDaos._
 import models.metrics.influxdb._
 import models.metrics.jdbc._
-import play.api.{ Configuration, Environment }
+import play.api.{Configuration, Environment}
 import play.api.inject.Module
+import com.google.inject.name.Names
 
 /**
  * Provides module bindings.
@@ -28,9 +31,9 @@ class MainModule extends Module {
 
   def bindings(environment: Environment, configuration: Configuration) = {
     Seq(
-      bind[DSLinkManager].toProvider[DSLinkManagerProvider],
       bind[LocalKeys].to(LocalKeys.getFromClasspath("/keys")),
       bind[BrokerActors].toSelf.eagerly) ++ createEventDaoBindings
+
   }
 
   private def createEventDaoBindings = Metrics.Collector match {
@@ -60,20 +63,6 @@ class MainModule extends Module {
     bind[ResponseEventDao].to[NullResponseEventDao])
 }
 
-/**
- * Provides an instance of [[DSLinkManager]] class.
- */
-@Singleton
-class DSLinkManagerProvider @Inject() (actorSystem: ActorSystem, eventDaos: EventDaos)
-  extends Provider[DSLinkManager] {
-
-  private val mgr = if (actorSystem.hasExtension(Cluster))
-    new ClusteredDSLinkManager(false, eventDaos)(actorSystem)
-  else
-    new LocalDSLinkManager(eventDaos)(actorSystem)
-
-  def get = mgr
-}
 
 /**
  * Provides an instance of InfluxDb database.

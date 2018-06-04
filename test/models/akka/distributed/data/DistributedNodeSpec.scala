@@ -27,7 +27,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
       left.profile = "someProfile"
       And("display name")
       left.displayName = "Clark Kent"
-      TimeUnit.MILLISECONDS.sleep(500)
+      TimeUnit.MILLISECONDS.sleep(2000)
       Then("value should be changed in right")
       val rightValue = Await.result(right.value, 2 seconds)
       val rightType = Await.result(right.valueType, 2 seconds)

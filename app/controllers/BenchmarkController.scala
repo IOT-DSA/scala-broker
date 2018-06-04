@@ -4,29 +4,29 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-
 import org.joda.time.DateTime
-
-import akka.actor.{ ActorSystem, RootActorPath }
+import akka.actor.{ActorSystem, RootActorPath}
 import akka.cluster.Cluster
 import akka.pattern.ask
-import akka.routing.{ ActorRefRoutee, ActorSelectionRoutee, Routee }
-import javax.inject.{ Inject, Singleton }
-import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
-import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
+import akka.routing.{ActorRefRoutee, ActorSelectionRoutee, Routee}
+import javax.inject.{Inject, Singleton}
+
+import models.akka.cluster.ClusterContext
+import models.akka.{BrokerActors, DSLinkManager, RichRoutee}
+import models.bench.AbstractEndpointActor.{ReqStatsBehavior, RspStatsBehavior}
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
 import models.bench.BenchmarkStatsAggregator
 import models.metrics.EventDaos
-import play.api.libs.json.{ JsObject, Json, Writes }
-import play.api.mvc.{ ControllerComponents, Result }
+import play.api.libs.json.{JsObject, Json, Writes}
+import play.api.mvc.{ControllerComponents, Result}
 
 /**
  * Performs broker load test.
  */
 @Singleton
 class BenchmarkController @Inject() (actorSystem: ActorSystem,
-                                     dslinkMgr:   DSLinkManager,
+                                     clusterContext:   ClusterContext,
                                      actors:      BrokerActors,
                                      eventDaos:   EventDaos,
                                      cc:          ControllerComponents) extends BasicController(cc) {
