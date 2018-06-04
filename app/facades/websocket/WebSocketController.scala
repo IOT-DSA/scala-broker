@@ -1,5 +1,6 @@
 package facades.websocket
 
+import java.io.File
 import java.net.URL
 
 import scala.concurrent.Future
@@ -164,6 +165,20 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     Ok(json)
   }
 
+  private def createHandshakeResponse(ci: ConnectionInfo) = {
+    val localKeys = LocalKeys.getFromFileSystem(new File(Settings.BrokerKeyFilename))
+    val dsId =  Settings.BrokerName + "-" + localKeys.encodedHashedPublicKey
+    val publicKey = localKeys.encodedPublicKey
+    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
+    val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++
+      Json.obj(
+        "format" -> ci.resultFormat
+        , "dsId" -> dsId
+        , "publicKey" -> publicKey
+      )
+
+    json
+  }
   /**
    * Establishes a WebSocket connection.
    */
