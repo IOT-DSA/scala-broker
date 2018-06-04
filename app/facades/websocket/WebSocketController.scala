@@ -67,6 +67,15 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     , MSGPACK-> msgpackTransformer
   )
 
+  private var salt: String = ""
+  private var saltBase: String = ""
+  private var saltInc: String = ""
+
+  private def updateSalt() = {
+    saltInc += Random.nextInt()
+    salt = "${saltBase}${saltInc.toRadixString(16)}"
+  }
+
   private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
     val mergedFormats = clientFormats intersect serverFormats
     if (mergedFormats.contains(MSGPACK)) MSGPACK else MSGJSON
@@ -166,15 +175,18 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   private def createHandshakeResponse(ci: ConnectionInfo) = {
-    val localKeys = LocalKeys.getFromFileSystem(new File(Settings.BrokerKeyFilename))
+    val localKeys = keys//LocalKeys.getFromFileSystem(new File(Settings.BrokerKeyFilename))
     val dsId =  Settings.BrokerName + "-" + localKeys.encodedHashedPublicKey
     val publicKey = localKeys.encodedPublicKey
     val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
+    val tempKeysPair = LocalKeys.generate
+    val tempKey = tempKeysPair.encodedPublicKey
     val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++
       Json.obj(
         "format" -> ci.resultFormat
         , "dsId" -> dsId
         , "publicKey" -> publicKey
+        , "tempKey" -> tempKey
       )
 
     json

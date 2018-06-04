@@ -47,7 +47,7 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       val connReq = ConnectionRequest("", true, true, None, "", Option(List(MSGJSON, MSGPACK)), true)
 
       // conn
-      // TODO: implement full cirlce unit tests for ws connection
+      // TODO: implement full circle unit tests for ws connection
       // val request = FakeRequest("POST", "/conn?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg")
       //  .withBody(connReq)
       // val conn1 = controller.dslinkHandshake(request)
