@@ -16,13 +16,16 @@ scalaVersion := SCALA_VERSION
 
 // base play-akka project
 lazy val root = (project in file("."))
-  .enablePlugins(PlayScala)
+  .enablePlugins(PlayScala, JavaAgent)
   .settings(
     scalaVersion := SCALA_VERSION,
     libraryDependencies ++= commonDependencies.union(playTestDependencies)
   )
   .aggregate(msgpack)
   .dependsOn(msgpack)
+
+javaAgents += "org.aspectj" % "aspectjweaver" % "1.8.13" // (2)
+javaOptions in Universal += "-Dorg.aspectj.tracing.factory=default" // (3)
 
 // project for temporary lib msgpack4s
 lazy val msgpack = project.in(file("tools/msgpack4s"))
@@ -74,7 +77,12 @@ dockerEntrypoint ++= Seq(
   """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka.tcp://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
   "-Dakka.io.dns.resolver=async-dns",
   "-Dakka.io.dns.async-dns.resolve-srv=true",
-  "-Dakka.io.dns.async-dns.resolv-conf=on"
+  "-Dakka.io.dns.async-dns.resolv-conf=on",
+  """-Dkamon.statsd.hostname="$STATSD_HOST"""",
+  """-Dkamon.statsd.port=$STATSD_PORT""",
+  """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
+  """-Dkamon.zipkin.port=$ZIPKIN_PORT""",
+  """-Dconfig.file="$CONF_FILE""""
 )
 
 dockerCommands :=
@@ -85,7 +93,6 @@ dockerCommands :=
 
 
 mappings in Universal ++= Seq(
-  file("scripts/setup-influx") -> "bin/setup-influx",
   file("scripts/start-broker") -> "bin/start-broker",
   file("scripts/stop-broker") -> "bin/stop-broker",
   file("scripts/start-backend") -> "bin/start-backend",
@@ -122,7 +129,13 @@ lazy val commonDependencies = Seq(
   "io.netty"                     % "netty-codec-http"        % "4.0.41.Final" force(),
   "io.netty"                     % "netty-handler"           % "4.0.41.Final" force(),
   "org.msgpack"                 %% "msgpack-scala"           % "0.8.13",
-  "org.json4s"                  %% "json4s-native"           % "3.5.0"
+  "org.json4s"                  %% "json4s-native"           % "3.5.0",
+  "io.kamon"                    %% "kamon-akka-remote-2.5"   % "1.0.0",
+  "io.kamon"                    %% "kamon-akka-2.5"          % "1.0.0",
+  "io.kamon"                    %% "kamon-statsd"            % "1.0.0",
+  "io.kamon"                    %% "kamon-system-metrics"    % "1.0.0",
+  "io.kamon"                    %% "kamon-core"              % "1.0.0",
+  "io.kamon"                    %% "kamon-zipkin"            % "1.0.0"
 )
 
 // akka and play test dependencies

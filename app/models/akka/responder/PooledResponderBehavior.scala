@@ -13,6 +13,7 @@ import models.rpc.DSAResponse
  * for implementing multi-recipient responce delivery (LIST, SUBSCRIBE).
  */
 trait PooledResponderBehavior extends ResponderBehavior { me: PersistentActor with ActorLogging =>
+
   import context.system
   import ResponderWorker._
   import akka.routing.ConsistentHashingRouter._

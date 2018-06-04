@@ -1,9 +1,10 @@
 package infrastructure
 
 
-import com.whisk.docker.{DockerContainer, DockerReadyChecker}
+import com.whisk.docker.{DockerContainer, LogLineReceiver}
 import org.scalatest.Suite
-;
+import org.slf4j.{Logger, LoggerFactory}
+
 
 /**
   *
@@ -14,6 +15,8 @@ import org.scalatest.Suite
   */
 trait SingleNodeIT extends IT { self: Suite =>
 
+  val dockerLogger: Logger = LoggerFactory.getLogger("docker")
+
   lazy val singleNodeContainer: DockerContainer = DockerContainer("iotdsa/broker-scala:latest")
     .withPorts(
       9000 -> Some(9000),
@@ -21,7 +24,8 @@ trait SingleNodeIT extends IT { self: Suite =>
       9005 -> Some(9005)
     )
     .withEnv(s"JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n")
-    .withReadyChecker(DockerReadyChecker.LogLineContains("p.c.s.AkkaHttpServer - Listening for HTTP on /0.0.0.0:9000"))
+    .withEnv(s"CONF_FILE=/opt/docker/conf/application.conf")
+    .withLogLineReceiver(new LogLineReceiver(true, line => dockerLogger.info(line)))
 //    .withReadyChecker(DockerReadyChecker.LogLineContains("p.c.s.AkkaHttpServer - Listening for HTTP on /0.0.0.0:9443"))
 
 

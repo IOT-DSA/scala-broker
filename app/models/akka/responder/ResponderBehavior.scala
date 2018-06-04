@@ -2,9 +2,12 @@ package models.akka.responder
 
 import scala.util.control.NonFatal
 import akka.persistence.PersistentActor
+
 import akka.actor._
+import kamon.Kamon
 import models._
 import models.akka.{ ResponsesProcessed, RequestsProcessed }
+
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -171,16 +174,21 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
       val ridOrigin = Origin(sender, srcRid)
       val sidOrigin = Origin(sender, srcPath.sid)
 
+      Kamon.currentSpan().tag("rid", srcRid)
+      Kamon.currentSpan().tag("kind", "SubscribeRequest")
+
       sidRegistry.lookupByPath(srcPath.path) match {
         case None =>
           val tgtRid = ridRegistry.saveSubscribeLookup(ridOrigin)
           val tgtSid = sidRegistry.saveLookup(srcPath.path)
+          Kamon.currentSpan().tag("sid", tgtSid)
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
           addSubscribeOrigin(tgtSid, sidOrigin)
           HandlerResult(SubscribeRequest(tgtRid, tgtPath))
         case Some(tgtSid) =>
           // Close and Subscribe response may come out of order, leaving until it's a problem
           addSubscribeOrigin(tgtSid, sidOrigin)
+          Kamon.currentSpan().tag("sid", tgtSid)
           HandlerResult(DSAResponse(srcRid, Some(StreamState.Closed)))
       }
   }

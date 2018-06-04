@@ -22,14 +22,6 @@ DELETE   /dslinks               controllers.MainController.removeDisconnectedLin
 PUT      /uplinks               facades.websocket.WebSocketController.uplinkHandshake(url, name)
 DELETE   /uplinks/:name         facades.websocket.WebSocketController.removeUplink(name)
 
-# Metrics
-GET      /metrics/cluster       controllers.MetricController.memberEvents(role: Option[String], address: Option[String], from: Option[Long], to: Option[Long])
-GET      /metrics/connections   controllers.MetricController.connectionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
-GET      /metrics/sessions      controllers.MetricController.sessionEvents(linkName: Option[String], from: Option[Long], to: Option[Long])
-GET      /metrics/requests      controllers.MetricController.requestStatsByLink(from: Option[Long], to: Option[Long])
-GET      /metrics/batches       controllers.MetricController.requestStatsByMethod(from: Option[Long], to: Option[Long])
-GET      /metrics/responses     controllers.MetricController.responseStatsByLink(from: Option[Long], to: Option[Long])
-
 # Benchmark
 GET      /bench/stats           controllers.BenchmarkController.viewStats
 PUT      /bench/start           controllers.BenchmarkController.start(config: controllers.BenchmarkConfig)

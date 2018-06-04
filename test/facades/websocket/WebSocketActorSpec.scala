@@ -16,7 +16,7 @@ class WebSocketActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "ws", true, false)
   val config = WebSocketActorConfig(ci, "session", salt)
   val link = TestProbe()
-  val wsActor = system.actorOf(WebSocketActor.props(testActor, new ActorRefRoutee(link.ref), nullDaos, config))
+  val wsActor = system.actorOf(WebSocketActor.props(testActor, new ActorRefRoutee(link.ref), config))
 
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {

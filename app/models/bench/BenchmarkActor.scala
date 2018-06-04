@@ -13,12 +13,11 @@ import akka.routing.Routee
 import akka.util.Timeout
 import models.Settings
 import models.akka.Messages.GetOrCreateDSLink
-import models.metrics.EventDaos
 
 /**
  * Coordinates broker benchmarks.
  */
-class BenchmarkActor(eventDaos: EventDaos) extends Actor with ActorLogging {
+class BenchmarkActor() extends Actor with ActorLogging {
 
   import context.dispatcher
 
@@ -98,7 +97,7 @@ class BenchmarkActor(eventDaos: EventDaos) extends Actor with ActorLogging {
                               collector:     Option[ActorRef],
                               parseJson:     Boolean): Future[ActorRef] = getDSLink(name) map { routee =>
     val config = BenchmarkResponderConfig(nodeCount, statsInterval, parseJson, collector)
-    context.system.actorOf(BenchmarkResponder.props(name, routee, eventDaos, config))
+    context.system.actorOf(BenchmarkResponder.props(name, routee, config))
   }
 
   /**
@@ -114,7 +113,7 @@ class BenchmarkActor(eventDaos: EventDaos) extends Actor with ActorLogging {
                               collector:     Option[ActorRef],
                               parseJson:     Boolean): Future[ActorRef] = getDSLink(name) map { routee =>
     val config = BenchmarkRequesterConfig(subscribe, path, batchSize, tout, parseJson, statsInterval, collector)
-    context.system.actorOf(BenchmarkRequester.props(name, routee, eventDaos, config))
+    context.system.actorOf(BenchmarkRequester.props(name, routee, config))
   }
 
   /**
@@ -185,5 +184,5 @@ object BenchmarkActor {
   /**
    * Creates a new instance of [[BenchmarkActor]] props.
    */
-  def props(eventDaos: EventDaos) = Props(new BenchmarkActor(eventDaos))
+  def props() = Props(new BenchmarkActor())
 }

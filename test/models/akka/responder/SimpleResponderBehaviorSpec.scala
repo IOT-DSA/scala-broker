@@ -7,7 +7,6 @@ import akka.routing.NoRoutee
 import akka.testkit.TestProbe
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages }
-import models.metrics.EventDaos
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
 
@@ -20,7 +19,7 @@ class SimpleResponderBehaviorSpec extends AbstractActorSpec {
 
   val ci = ConnectionInfo("", "", false, true)
 
-  val responder = system.actorOf(Props(new Responder(nullDaos)), "R")
+  val responder = system.actorOf(Props(new Responder()), "R")
 
   val ws = TestProbe()
 
@@ -195,7 +194,7 @@ object SimpleResponderBehaviorSpec {
   /**
    * Test actor.
    */
-  class Responder(eventDaos: EventDaos) extends AbstractDSLinkActor(NoRoutee) with SimpleResponderBehavior {
+  class Responder() extends AbstractDSLinkActor(NoRoutee) with SimpleResponderBehavior {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def persistenceId = linkPath
     override def connected = super.connected orElse responderBehavior
