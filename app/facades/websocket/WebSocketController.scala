@@ -243,8 +243,6 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
         val src = Source.fromPublisher(publisher)
 
         Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
-
-      //}
     }
   }
 
