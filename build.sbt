@@ -4,7 +4,7 @@ import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
-val AKKA_VERSION = "2.5.12"
+val AKKA_VERSION = "2.5.13"
 val JSON_VERSION = "2.6.8"
 
 
