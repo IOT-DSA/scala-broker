@@ -1,21 +1,19 @@
 package models.akka
 
 
+import akka.actor.ActorRef
+import akka.actor.Status.Success
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete, StreamRefs}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import models.akka.Messages._
 import models.metrics.Meter
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 import org.reactivestreams.Publisher
-import akka.pattern.pipe
 import models.akka.QoSState._
-
-import scala.concurrent.Future
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
@@ -66,14 +64,15 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
         sendToEndpoint(ResponseEnvelope(other))
       }
 
-    case GetSubscriptionSource =>
-      getSubscriptionSource pipeTo sender()
+    case SubscriptionSourceMessage(actorRef) =>
+      getSubscriptionSource(actorRef)
 
   }
 
   // requester mixin for disconnected behavior
   val requesterDisconnected: Receive = {
-    case GetSubscriptionSource => sender ! getSubscriptionSource
+    case SubscriptionSourceMessage(actorRef) =>
+      getSubscriptionSource(actorRef)
     case e @ ResponseEnvelope(responses) =>
 
       log.debug("{}: received {}", ownId, e)
@@ -103,16 +102,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource:Future[SubscriptionSourceMessage] = {
+  private def getSubscriptionSource(actor:ActorRef) = {
+
+    log.info("new subscription source connected: {}", actor)
+
     val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
-      .via(channel)
-      .toMat(Sink.asPublisher(false))(Keep.both)
-      .run()
+      .via(channel).toMat(Sink.actorRef(actor, Success(())))(Keep.both).run()
 
     toSocket = toSocketVal
-    Source.fromPublisher(publisher).runWith(StreamRefs.sourceRef()) map {
-      SubscriptionSourceMessage(_)
-    }
   }
 
   /**
