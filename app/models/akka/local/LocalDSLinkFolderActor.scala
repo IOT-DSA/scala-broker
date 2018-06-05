@@ -46,8 +46,8 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
 
     case RemoveDSLink(name) =>
       persist(DSLinkRemoved(name)) { event =>
-        removeDSLinks(event.name)
-        log.debug("{}: ordered to remove DSLink '{}'", ownId, event.name)
+        removeDSLinks(event.names: _*)
+        log.debug("{}: ordered to remove DSLink '{}'", ownId, event.names)
       }
 
     case UnregisterDSLink(name) =>

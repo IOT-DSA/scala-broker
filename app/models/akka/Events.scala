@@ -5,7 +5,7 @@ import java.util.Date
 import akka.actor.ActorRef
 import models.akka.DSLinkMode.DSLinkMode
 import models.akka.local.LocalDSLinkFolderActor
-import models.rpc.{DSARequest, DSAResponse}
+import models.rpc.{ DSARequest, DSAResponse }
 
 /**
   * Internal states of DSLink Actor layers to be persist.
@@ -38,7 +38,7 @@ case class RequestsProcessed(requests: Seq[DSARequest])
   * Internal events to recover [[LocalDSLinkFolderActor]] state.
   */
 case class DSLinkCreated(name: String)
-case class DSLinkRemoved(name: String)
+case class DSLinkRemoved(names: String*)
 case class DSLinkRegistered(name: String, mode: DSLinkMode, connected: Boolean)
 case class DSLinkUnregistered(name: String)
 

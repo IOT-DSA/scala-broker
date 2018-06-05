@@ -40,7 +40,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
       getOrCreateDSLink(event.name)
     case event: DSLinkRemoved =>
       log.debug("{}: trying to recover {}", ownId, event)
-      removeDSLinks(event.name)
+      removeDSLinks(event.names: _*)
     case event: DSLinkRegistered =>
       log.debug("{}: trying to recover {}", ownId, event)
       links += (event.name -> LinkState(event.mode, event.connected))
@@ -63,8 +63,10 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
    */
   protected def removeDisconnectedDSLinks = {
     val disconnected = links.filterNot(_._2.connected).keys.toSeq
-    removeDSLinks(disconnected: _*)
-    log.info("{}: removed {} disconnected DSLinks", ownId, disconnected.size)
+    persist(DSLinkRemoved(disconnected: _*)) { event =>
+      removeDSLinks(event.names: _*)
+      log.info("{}: removed {} disconnected DSLinks", ownId, event.names.size)
+    }
   }
 
   /**

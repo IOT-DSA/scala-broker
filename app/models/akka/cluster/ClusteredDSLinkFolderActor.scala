@@ -1,12 +1,12 @@
 package models.akka.cluster
 
 import scala.concurrent.Await
-import akka.actor.{Identify, PoisonPill, Props, actorRef2Scala}
-import akka.pattern.{ask, pipe}
+import akka.actor.{ Identify, PoisonPill, Props, actorRef2Scala }
+import akka.pattern.pipe
 import akka.routing.Routee
-import models.akka.{DSLinkFolderActor, DSLinkRegistered, DSLinkUnregistered, IsNode, RichRoutee, rows}
+import models.akka.{ DSLinkCreated, DSLinkFolderActor, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered, IsNode, RichRoutee, rows }
 import models.akka.Messages._
-import models.rpc.DSAValue.{ArrayValue, DSAVal, StringValue, array, obj}
+import models.rpc.DSAValue.{ ArrayValue, DSAVal, StringValue, array, obj }
 
 /**
  * Actor for clustered DSA link folder node, such as `/upstream` or `/downstream`.
@@ -56,8 +56,10 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
     case PeerMessage(msg) => peerMsgHandler(msg)
 
     case GetOrCreateDSLink(name) =>
-      log.info("{}: requested DSLink '{}'", ownId, name)
-      sender ! getOrCreateDSLink(name)
+      persist(DSLinkCreated(name)) { event =>
+        log.info("{}: requested DSLink '{}'", ownId, event.name)
+        sender ! getOrCreateDSLink(event.name)
+      }
 
     case msg @ RegisterDSLink(name, mode, connected) =>
       persist(DSLinkRegistered(name, mode, connected)) { event =>
@@ -71,8 +73,10 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
       nodeLinks pipeTo sender
 
     case RemoveDSLink(name) =>
-      removeDSLinks(name)
-      log.info("{}: rrdered to remove DSLink '{}'", ownId, name)
+      persist(DSLinkRemoved(name)) { event =>
+        removeDSLinks(event.names: _*)
+        log.info("{}: ordered to remove DSLink '{}'", ownId, event.names)
+      }
 
     case msg @ UnregisterDSLink(name) =>
       persist(DSLinkUnregistered(name)) { event =>
