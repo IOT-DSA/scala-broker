@@ -23,7 +23,7 @@ object RemoteKey {
     val spec = new ECPublicKeySpec(point1, params)
     val point2 = spec.getQ().multiply(keys.privateKey.getD)
     val bi = point2.normalize.getXCoord.toBigInteger
-    val sharedSecret = normalize(bi.toByteArray) // bytes, required for Salt only
+    val sharedSecret = normalize(bi.toByteArray) // bytes, required for hash Salt only
     RemoteKey(sharedSecret)
   }
 

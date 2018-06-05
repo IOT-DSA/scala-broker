@@ -67,14 +67,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     , MSGPACK-> msgpackTransformer
   )
 
-  private var salt: String = ""
-  private var saltBase: String = ""
-  private var saltInc: String = ""
-
-  private def updateSalt() = {
-    saltInc += Random.nextInt()
-    salt = "${saltBase}${saltInc.toRadixString(16)}"
-  }
+  private val saltBase: String = UrlBase64.encodeBytes(Array.fill[Byte](12){Random.nextPrintableChar()})
 
   private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
     val mergedFormats = clientFormats intersect serverFormats
@@ -82,7 +75,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   /**
-   * Connects to another broker upstream.
+   * Connects to another broker upstream via ws.
    */
   def uplinkHandshake(url: String, name: String) = Action.async {
     val connUrl = new URL(url)
@@ -161,7 +154,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val ci = buildConnectionInfo(request)
     val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
-    val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++ Json.obj("format" -> ci.resultFormat)
+//    val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++ Json.obj("format" -> ci.resultFormat)
+    val json = Settings.ServerConfiguration ++ createHandshakeResponse(ci)
 
     val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
 
@@ -179,18 +173,19 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val dsId =  Settings.BrokerName + "-" + localKeys.encodedHashedPublicKey
     val publicKey = localKeys.encodedPublicKey
     val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
-    val tempKeysPair = LocalKeys.generate
-    val tempKey = tempKeysPair.encodedPublicKey
     val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++
       Json.obj(
         "format" -> ci.resultFormat
         , "dsId" -> dsId
         , "publicKey" -> publicKey
-        , "tempKey" -> tempKey
+        , "tempKey" -> ci.tempKey
+        , "salt" -> ci.salt
+        , "path" -> Json.toJson(linkPath)
       )
 
     json
   }
+
   /**
    * Establishes a WebSocket connection.
    */
@@ -207,11 +202,24 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     WebSocket { request =>
       log.debug(s"WS request received: $request")
       val dsId = getDsId(request)
+      val clientSalt = getSalt(request)
+      val clientAuth = getAuth(request)
       val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+      if (!validateSalt(sessionInfo, clientAuth, clientSalt))
+        throw new RuntimeException(s"Connection failed: salt is wrong: " + clientSalt)
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
       f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
     }
+  }
+
+  private def validateSalt(si: Option[DSLinkSessionInfo], clientAuth: String, salt: String): Boolean = {
+    if (salt == null || salt.isEmpty)
+      return false
+
+    val ci = si.getOrElse(return false).ci
+
+    LocalKeys.saltSharedSecret(ci.salt, ci.sharedSecret) == clientAuth
   }
 
   private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {
@@ -239,7 +247,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
-    fRoutee flatMap   { routee =>
+    fRoutee flatMap { routee =>
 
       //TODO should think how move this logic from controller
       val subscriptions = (routee ? GetSubscriptionSource).mapTo[Future[SubscriptionSourceMessage]].flatten
@@ -280,6 +288,22 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def getDsId(request: RequestHeader) = request.queryString("dsId").head
 
   /**
+    * Extracts `salt` from the requests query string
+    *
+    * @param request
+    * @return
+    */
+  private def getSalt(request: RequestHeader) = request.queryString("salt").head
+
+  /**
+    * Extracts "auth" parameter from URL
+    *
+    * @param request
+    * @return
+    */
+  private def getAuth(request: RequestHeader) = request.queryString("auth").head
+
+  /**
    * Constructs a connection info instance from the incoming request.
    */
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
@@ -290,10 +314,17 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       request.body.formats.getOrElse(List(MSGJSON))
       , List(availableFormats :_*)
     )
+    val tempKeys = LocalKeys.generate
+    val tempKey = tempKeys.encodedPublicKey
+    val sharedSecret = RemoteKey.generate(tempKeys, cr.publicKey).sharedSecret
+
+    val saltInc = Random.nextInt()
+    val localSalt: String = s"${saltBase}${saltInc.toHexString}"
 
     ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
       cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
-      request.remoteAddress, request.host, resultFormat = resultFormat)
+      request.remoteAddress, request.host, resultFormat = resultFormat, tempKey = tempKey
+      , sharedSecret = sharedSecret, salt = localSalt)
   }
 
   /**
