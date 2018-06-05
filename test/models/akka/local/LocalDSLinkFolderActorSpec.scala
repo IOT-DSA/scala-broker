@@ -64,12 +64,12 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
         _.toSet mustBe Set("aaa", "bbb")
       }
     }
-    "record link stats" in {
-      Thread.sleep(1000)
-      whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
-        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 0, 1, 0, 0))
-      }
-    }
+//    "record link stats" in {
+//      Thread.sleep(1000)
+//      whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
+//        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 0, 1, 0, 0))
+//      }
+//    }
   }
 
   "DSLinkStateChanged" should {
