@@ -1,11 +1,9 @@
 package models.akka
 
-import akka.actor.{Actor, ActorLogging, Props}
-import akka.stream.SourceRef
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import models.akka.Messages._
 import models.akka.QoSState._
 import models.metrics.Meter
-import models.rpc.DSAMessage
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable
@@ -127,15 +125,9 @@ object QoSState {
 
 
   /**
-    * Sent to StateKeeper to get subscription stream ref
+    * Sent from StateKeeper with subscription actor ref
     */
-  case class GetSubscriptionSource()
-
-
-  /**
-    * Sent from StateKeeper with subscription stream ref
-    */
-  case class SubscriptionSourceMessage(sourceRef: SourceRef[DSAMessage])
+  case class SubscriptionSourceMessage(actor: ActorRef)
 
   /**
     * Sent to StateKeeper to add subscription message

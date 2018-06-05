@@ -2,10 +2,9 @@ package facades.websocket
 
 import java.net.URL
 
-import scala.concurrent.{Future, duration}
+import scala.concurrent.Future
 import scala.util.Random
 import org.bouncycastle.jcajce.provider.digest.SHA256
-import org.joda.time.DateTime
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
@@ -17,10 +16,11 @@ import akka.stream.{Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
+
 import models.Settings
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
 import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
-import models.akka.QoSState.{GetSubscriptionSource, SubscriptionSourceMessage}
+import models.akka.QoSState.SubscriptionSourceMessage
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
 import models.rpc.DSAMessage
@@ -28,7 +28,7 @@ import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import play.api.mvc.{ControllerComponents, Request, RequestHeader, Result, WebSocket}
+import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
 
@@ -202,7 +202,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                            overflow:    OverflowStrategy) = {
     import akka.actor.Status._
 
-    var (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
+    val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()(materializer)
 
@@ -210,12 +210,15 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
-    fRoutee flatMap   { routee =>
+    fRoutee map   { routee =>
 
-      //TODO should think how move this logic from controller
-      val subscriptions = (routee ? GetSubscriptionSource).mapTo[Future[SubscriptionSourceMessage]].flatten
+      val (subscriptionsPusher, subscriptionsPublisher) = Source.actorRef[SubscriptionSourceMessage](bufferSize, overflow)
+        .toMat(Sink.asPublisher(false))(Keep.both)
+        .run()(materializer)
 
-      subscriptions map { subscriptionSrcRef =>
+      routee ! SubscriptionSourceMessage(subscriptionsPusher)
+
+      val subscriptionSrcRef = Source.fromPublisher(subscriptionsPublisher)
 
         val wsProps = WebSocketActor.props(toSocket, routee,
           WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
@@ -234,14 +237,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           }
         }))
 
-        subscriptionSrcRef.sourceRef.source.runWith(sink)
+        subscriptionSrcRef.runWith(sink)
 
         val messageSink = Sink.actorRef(fromSocket, Success(()))
         val src = Source.fromPublisher(publisher)
 
         Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
-
-      }
     }
   }
 
