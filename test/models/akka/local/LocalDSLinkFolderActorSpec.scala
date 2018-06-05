@@ -65,7 +65,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       }
     }
     "record link stats" in {
-      Thread.sleep(500)
+      Thread.sleep(1000)
       whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
         _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 0, 1, 0, 0))
       }
