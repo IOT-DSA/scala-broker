@@ -2,10 +2,9 @@ package facades.websocket
 
 import java.net.URL
 
-import scala.concurrent.{Future, duration}
+import scala.concurrent.Future
 import scala.util.Random
 import org.bouncycastle.jcajce.provider.digest.SHA256
-import org.joda.time.DateTime
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
@@ -14,7 +13,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
 import akka.stream.{Materializer, OverflowStrategy}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
 
