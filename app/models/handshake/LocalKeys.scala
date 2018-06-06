@@ -111,7 +111,7 @@ object LocalKeys {
     * @param sharedSecret
     * @return
     */
-  def saltSharedSecret(salt: String, sharedSecret: Array[Byte]) = {
+  def saltSharedSecret(salt: Array[Byte], sharedSecret: Array[Byte]) = {
     // TODO make more scala-like
     val bytes = Array.ofDim[Byte](salt.length + sharedSecret.length)
     System.arraycopy(salt, 0, bytes, 0, salt.length)

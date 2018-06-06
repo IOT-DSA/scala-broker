@@ -67,7 +67,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     , MSGPACK-> msgpackTransformer
   )
 
-  private val saltBase: String = UrlBase64.encodeBytes(Array.fill[Byte](12){Random.nextPrintableChar()})
+  private val saltBase: String = UrlBase64.encodeBytes(Array.fill[Byte](12){Random.nextInt(255).toByte})
 
   private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
     val mergedFormats = clientFormats intersect serverFormats
@@ -202,24 +202,22 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     WebSocket { request =>
       log.debug(s"WS request received: $request")
       val dsId = getDsId(request)
-      val clientSalt = getSalt(request)
+//      val clientSalt = getSalt(request)
       val clientAuth = getAuth(request)
       val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
-      if (!validateSalt(sessionInfo, clientAuth, clientSalt))
-        throw new RuntimeException(s"Connection failed: salt is wrong: " + clientSalt)
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
+
+      if (!validateAuth(sessionInfo, clientAuth))
+        throw new RuntimeException(s"Connection failed: auth & salt are wrong: " + clientAuth)
 
       f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
     }
   }
 
-  private def validateSalt(si: Option[DSLinkSessionInfo], clientAuth: String, salt: String): Boolean = {
-    if (salt == null || salt.isEmpty)
-      return false
-
+  private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: String): Boolean = {
     val ci = si.getOrElse(return false).ci
-
-    LocalKeys.saltSharedSecret(ci.salt, ci.sharedSecret) == clientAuth
+    val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
+    localAuth == clientAuth
   }
 
   private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {
