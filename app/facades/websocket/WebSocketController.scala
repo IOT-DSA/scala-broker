@@ -169,7 +169,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   private def createHandshakeResponse(ci: ConnectionInfo) = {
-    val localKeys = keys//LocalKeys.getFromFileSystem(new File(Settings.BrokerKeyFilename))
+    val localKeys = keys
     val dsId =  Settings.BrokerName + "-" + localKeys.encodedHashedPublicKey
     val publicKey = localKeys.encodedPublicKey
     val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
@@ -198,19 +198,19 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       Future.successful(Left[Result, DSAFlow](Forbidden))
   }
 
-  private def acceptOrResult(f: Option[DSLinkSessionInfo] => Future[Either[Result, Flow[DSAMessage, DSAMessage, _]]]): WebSocket = {
+  private def acceptOrResult(f: Option[DSLinkSessionInfo] => Future[Either[Result, DSAFlow]]): WebSocket = {
     WebSocket { request =>
       log.debug(s"WS request received: $request")
       val dsId = getDsId(request)
-//      val clientSalt = getSalt(request)
       val clientAuth = getAuth(request)
       val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
-      if (!validateAuth(sessionInfo, clientAuth))
-        throw new RuntimeException(s"Connection failed: auth & salt are wrong: " + clientAuth)
-
-      f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
+      if (validateAuth(sessionInfo, clientAuth))
+        f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
+      else
+        Future.successful(Left[Result, DSAFlow](Forbidden)) map (_.left.asInstanceOf)
+      //        throw new RuntimeException(s"Connection failed: auth & salt are wrong: " + clientAuth)
     }
   }
 
