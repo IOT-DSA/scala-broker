@@ -1,11 +1,11 @@
 package facades.websocket
 
-import java.io.File
+//import java.io.File
 import java.net.URL
 
 import scala.concurrent.Future
 import scala.util.Random
-import org.bouncycastle.jcajce.provider.digest.SHA256
+//import org.bouncycastle.jcajce.provider.digest.SHA256
 import org.joda.time.DateTime
 import akka.Done
 import akka.actor._
@@ -32,7 +32,7 @@ import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
-import org.velvia.MsgPack
+import play.api.http.Status.UNAUTHORIZED
 
 /**
  * Establishes WebSocket DSLink connections
@@ -153,8 +153,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     log.debug(s"Conn request received at $request : ${request.body}")
 
     val ci = buildConnectionInfo(request)
-    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
-//    val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++ Json.obj("format" -> ci.resultFormat)
+//    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
     val json = Settings.ServerConfiguration ++ createHandshakeResponse(ci)
 
     val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
@@ -208,9 +207,14 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
       if (validateAuth(sessionInfo, clientAuth))
         f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
-      else
-        Future.successful(Left[Result, DSAFlow](Forbidden).asInstanceOf)
-      //        throw new RuntimeException(s"Connection failed: auth & salt are wrong: " + clientAuth)
+      else {
+        val failedResult = Unauthorized.copy(header = new ResponseHeader(UNAUTHORIZED
+          , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" + clientAuth + "'")))
+
+        val either2: Either[Result, Flow[DSAMessage, DSAMessage, _]] = Left[Result, Flow[DSAMessage, DSAMessage, _]](failedResult)
+
+        Future.successful[Either[Result, Flow[DSAMessage, DSAMessage, _]]](either2)
+      }
     }
   }
 
@@ -331,13 +335,15 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   def buildAuth(tempKey: String, salt: Array[Byte]) = {
     val remoteKey = RemoteKey.generate(keys, tempKey)
     val sharedSecret = remoteKey.sharedSecret
-    // TODO make more scala-like
-    val bytes = Array.ofDim[Byte](salt.length + sharedSecret.length)
-    System.arraycopy(salt, 0, bytes, 0, salt.length)
-    System.arraycopy(sharedSecret, 0, bytes, salt.length, sharedSecret.length)
 
-    val sha = new SHA256.Digest
-    val digested = sha.digest(bytes)
-    UrlBase64.encodeBytes(digested)
+    LocalKeys.saltSharedSecret(salt, sharedSecret)
+    // TODO make more scala-like
+//    val bytes = Array.ofDim[Byte](salt.length + sharedSecret.length)
+//    System.arraycopy(salt, 0, bytes, 0, salt.length)
+//    System.arraycopy(sharedSecret, 0, bytes, salt.length, sharedSecret.length)
+//
+//    val sha = new SHA256.Digest
+//    val digested = sha.digest(bytes)
+//    UrlBase64.encodeBytes(digested)
   }
 }

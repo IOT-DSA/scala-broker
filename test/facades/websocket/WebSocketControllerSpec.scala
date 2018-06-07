@@ -68,7 +68,7 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       val remoteKey = RemoteKey.generate(clientKeys, tempKey)
       val sharedSecret = remoteKey.sharedSecret
 
-      val auth = LocalKeys.saltSharedSecret(salt, sharedSecret)
+      val auth = ""//LocalKeys.saltSharedSecret(salt, sharedSecret)
       val format = MSGJSON
 
       val reqUri = s"/ws?dsId=Shell-EX8oEoINlQFdp1WscgoQAjeFZz4shQKERE7fdm1rcWg&auth=$auth&format=$format"
