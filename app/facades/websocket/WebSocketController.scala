@@ -3,6 +3,8 @@ package facades.websocket
 //import java.io.File
 import java.net.URL
 
+import play.api.http.HttpEntity
+
 import scala.concurrent.Future
 import scala.util.Random
 //import org.bouncycastle.jcajce.provider.digest.SHA256
@@ -205,16 +207,20 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
+      val res =
       if (validateAuth(sessionInfo, clientAuth))
-        f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
+        f(sessionInfo)
       else {
-        val failedResult = Unauthorized.copy(header = new ResponseHeader(UNAUTHORIZED
-          , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" + clientAuth + "'")))
-
-        val either2: Either[Result, Flow[DSAMessage, DSAMessage, _]] = Left[Result, Flow[DSAMessage, DSAMessage, _]](failedResult)
-
-        Future.successful[Either[Result, Flow[DSAMessage, DSAMessage, _]]](either2)
+        val failedResult = Result(new ResponseHeader(UNAUTHORIZED
+                                                     , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" +
+                                                                             clientAuth + "'")
+                                                    )
+                                  , HttpEntity.NoEntity
+                                 )
+        Future.successful(Left[Result, DSAFlow](failedResult))
       }
+      
+      res.map(_.right.map(getTransformer(sessionInfo).transform))
     }
   }
 
