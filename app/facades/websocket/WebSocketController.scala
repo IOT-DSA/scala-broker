@@ -209,7 +209,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       if (validateAuth(sessionInfo, clientAuth))
         f(sessionInfo).map(_.right.map(getTransformer(sessionInfo).transform))
       else
-        Future.successful(Left[Result, DSAFlow](Forbidden)) map (_.left.asInstanceOf)
+        Future.successful(Left[Result, DSAFlow](Forbidden).asInstanceOf)
       //        throw new RuntimeException(s"Connection failed: auth & salt are wrong: " + clientAuth)
     }
   }
