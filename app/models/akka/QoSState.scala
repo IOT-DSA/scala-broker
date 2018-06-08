@@ -1,17 +1,13 @@
 package models.akka
 
-
-
-import akka.actor.{Actor, ActorLogging, Props}
-import akka.stream.SourceRef
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import models.akka.Messages._
 import models.akka.QoSState._
-import models.rpc.DSAMessage
+import models.metrics.Meter
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.util.Random
 
 /**
   * actor for storing dslink - specific state as
@@ -20,7 +16,7 @@ import scala.util.Random
   * @param maxCapacity max queue size per sid
   * @param reconnectionTime timeout for storage drop
   */
-class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends Actor with ActorLogging {
+class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends Actor with ActorLogging with Meter {
 
   val subscriptionsQueue = mutable.HashMap[Int, Queue[SubscriptionNotificationMessage]]()
   var connected = false
@@ -53,6 +49,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
   def killMyself() = {
     if(!connected) {
       subscriptionsQueue.clear()
+      meterTags("qos.state.clear")
       log.info("SubscriptionsStateKeeper state has been cleared {}", self.path)
     }
   }
@@ -66,20 +63,34 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
     context.system.scheduler.scheduleOnce(reconnectionTime seconds, self, KillStateIfNotConnected)
   }
 
-  def putMessage(message:SubscriptionNotificationMessage) = message match {
-    case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) =>
-      subscriptionsQueue += (item.sid -> Queue(message))
-      log.debug("QoS == 0. Replacing with new queue")
-      item.sid
-    case item @ SubscriptionNotificationMessage(_, _, _, _, _) =>
-      val queue = subscriptionsQueue.get(item.sid) map { q =>
-        val newQ = if (shouldDislodge(item.sid)) q.dequeue._2 else q
-        newQ enqueue message
-      } getOrElse Queue(message)
+  def putMessage(message:SubscriptionNotificationMessage) = {
+    meterTags("qos.in.level."+message.qos.index.toString)
+    val result = message match {
+      case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) =>
+        subscriptionsQueue += (item.sid -> Queue(message))
+        log.debug("QoS == 0. Replacing with new queue")
+        histogramValue(s"qos.level.0.queue.size")(1)
+        item.sid
+      case item @ SubscriptionNotificationMessage(_, _, _, _, _) =>
+        val queue = subscriptionsQueue.get(item.sid) map { q =>
+          val newQ = if (shouldDislodge(item.sid)) {
+            countTags("qos.dislodge")
+            q.dequeue._2
+          } else q
+          newQ enqueue message
+        } getOrElse {
+          Queue(message)
+        }
 
-      subscriptionsQueue += (item.sid -> queue)
-      log.debug("QoS > 0. Adding new value to queue:{}", message)
-      item.sid
+        histogramValue(s"qos.level.${item.qos.index}.queue.size")(queue.size)
+        subscriptionsQueue += (item.sid -> queue)
+        log.debug("QoS > 0. Adding new value to queue:{}", message)
+        item.sid
+    }
+
+    histogramValue("qos.sids.size")(subscriptionsQueue.size)
+
+    result
   }
 
   def getAndRemoveNext() = {
@@ -95,11 +106,9 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
 
     next foreach { case (sid, queue) =>
       subscriptionsQueue -= sid
+      histogramValue("qos.sids.size")(subscriptionsQueue.size)
     }
     log.debug("send and remove {}", next)
-    log.debug("state after removing: {}", subscriptionsQueue.foldLeft(""){(str, next) => {
-      str + s"\n ${next._1} -> ${next._2.size}"
-    }})
     sender ! next.map(_._2)
   }
 
@@ -116,15 +125,9 @@ object QoSState {
 
 
   /**
-    * Sent to StateKeeper to get subscription stream ref
+    * Sent from StateKeeper with subscription actor ref
     */
-  case class GetSubscriptionSource()
-
-
-  /**
-    * Sent from StateKeeper with subscription stream ref
-    */
-  case class SubscriptionSourceMessage(sourceRef: SourceRef[DSAMessage])
+  case class SubscriptionSourceMessage(actor: ActorRef)
 
   /**
     * Sent to StateKeeper to add subscription message

@@ -4,7 +4,7 @@ import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
-val AKKA_VERSION = "2.5.12"
+val AKKA_VERSION = "2.5.13"
 val JSON_VERSION = "2.6.8"
 
 
@@ -16,13 +16,16 @@ scalaVersion := SCALA_VERSION
 
 // base play-akka project
 lazy val root = (project in file("."))
-  .enablePlugins(PlayScala)
+  .enablePlugins(PlayScala, JavaAgent)
   .settings(
     scalaVersion := SCALA_VERSION,
     libraryDependencies ++= commonDependencies.union(playTestDependencies)
   )
   .aggregate(msgpack)
   .dependsOn(msgpack)
+
+javaAgents += "org.aspectj" % "aspectjweaver" % "1.8.13" // (2)
+javaOptions in Universal += "-Dorg.aspectj.tracing.factory=default" // (3)
 
 // project for temporary lib msgpack4s
 lazy val msgpack = project.in(file("tools/msgpack4s"))
@@ -74,7 +77,12 @@ dockerEntrypoint ++= Seq(
   """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka.tcp://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
   "-Dakka.io.dns.resolver=async-dns",
   "-Dakka.io.dns.async-dns.resolve-srv=true",
-  "-Dakka.io.dns.async-dns.resolv-conf=on"
+  "-Dakka.io.dns.async-dns.resolv-conf=on",
+  """-Dkamon.statsd.hostname="$STATSD_HOST"""",
+  """-Dkamon.statsd.port=$STATSD_PORT""",
+  """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
+  """-Dkamon.zipkin.port=$ZIPKIN_PORT""",
+  """-Dconfig.file="$CONF_FILE""""
 )
 
 dockerCommands :=
@@ -85,7 +93,6 @@ dockerCommands :=
 
 
 mappings in Universal ++= Seq(
-  file("scripts/setup-influx") -> "bin/setup-influx",
   file("scripts/start-broker") -> "bin/start-broker",
   file("scripts/stop-broker") -> "bin/stop-broker",
   file("scripts/start-backend") -> "bin/start-backend",
@@ -103,25 +110,29 @@ lazy val commonDependencies = Seq(
   ehcache,
   jdbc,
   ws,
-  "com.typesafe.play"       %% "play-json"               % JSON_VERSION,
-  "com.typesafe.play"       %% "play-json-joda"          % JSON_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster"            % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-metrics"    % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-tools"      % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
-  "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
-  "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
-  "org.bouncycastle"         % "bcprov-jdk15on"          % "1.51",
-  "com.github.romix.akka"   %% "akka-kryo-serialization" % "0.5.1",
-  "com.h2database"           % "h2"                      % "1.4.193",
-  "com.typesafe.play"       %% "anorm"                   % "2.5.3",
-  "com.maxmind.geoip2"       % "geoip2"                  % "2.10.0",
-  "ch.qos.logback"           % "logback-classic"         % "1.2.3",
-  "io.netty"                 % "netty-codec-http"        % "4.0.41.Final" force(),
-  "io.netty"                 % "netty-handler"           % "4.0.41.Final" force(),
+  "com.typesafe.play"       %% "play-json"                % JSON_VERSION,
+  "com.typesafe.play"       %% "play-json-joda"           % JSON_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster"             % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-metrics"     % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-tools"       % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-cluster-sharding"    % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-slf4j"               % AKKA_VERSION,
+  "org.bouncycastle"         % "bcprov-jdk15on"           % "1.51",
+  "com.github.romix.akka"   %% "akka-kryo-serialization"  % "0.5.1",
+  "com.h2database"           % "h2"                       % "1.4.193",
+  "com.typesafe.play"       %% "anorm"                    % "2.5.3",
+  "com.maxmind.geoip2"       % "geoip2"                   % "2.10.0",
+  "ch.qos.logback"           % "logback-classic"          % "1.2.3",
+  "io.netty"                 % "netty-codec-http"         % "4.0.41.Final" force(),
+  "io.netty"                 % "netty-handler"            % "4.0.41.Final" force(),
   "org.msgpack"             %% "msgpack-scala"            % "0.8.13",
-//  "org.velvia"              %% "msgpack4s"                % "0.6.0",
-  "org.json4s"              %% "json4s-native"            % "3.5.0"
+  "org.json4s"              %% "json4s-native"            % "3.5.0",
+  "io.kamon" %% "kamon-akka-remote-2.5" % "1.0.0",
+  "io.kamon" %% "kamon-akka-2.5" % "1.0.0",
+  "io.kamon" %% "kamon-statsd" % "1.0.0",
+  "io.kamon" %% "kamon-system-metrics" % "1.0.0",
+  "io.kamon" %% "kamon-core" % "1.0.0",
+  "io.kamon" %% "kamon-zipkin" % "1.0.0"
 )
 
 // akka and play test dependencies
