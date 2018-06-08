@@ -209,6 +209,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       if (validateAuth(sessionInfo, clientAuth))
         f(sessionInfo)
       else {
+        log.warn(s"Authentication failed, auth value is not correct.")
         val failedResult = Result(new ResponseHeader(UNAUTHORIZED
                                                      , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" +
                                                                              clientAuth + "'")
@@ -225,7 +226,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: Option[String]): Boolean = {
     val ci = si.getOrElse(return false).ci
     val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
-    localAuth == clientAuth
+    clientAuth.fold(false) { v =>
+      localAuth == v
+    }
   }
 
   private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {
@@ -311,7 +314,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     try {
       Option[String](request.queryString("auth").head)
     } catch {
-      case _=> Option[String](null)
+      case _ : Throwable=> Option[String](null)
     }
   }
 
