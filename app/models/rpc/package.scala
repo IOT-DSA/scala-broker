@@ -2,7 +2,7 @@ package models
 
 import java.util.Base64
 
-import play.api.data.validation.ValidationError
+import models.akka.QoS
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -11,6 +11,11 @@ import play.api.libs.json._
  */
 package object rpc {
   import DSAValue._
+
+  object DSAMessageSerrializationFormat {
+    val MSGJSON = "json"
+    val MSGPACK = "msgpack"
+  }
 
   val BinaryPrefix = "\u001Bbytes:"
 
@@ -166,6 +171,7 @@ package object rpc {
       (__ \ 'msg).format[Int] ~
       (__ \ 'ack).formatNullable[Int] ~
       (__ \ 'responses).format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
+
 
     def writes(msg: DSAMessage) = msg match {
       case EmptyMessage       => Json.obj()

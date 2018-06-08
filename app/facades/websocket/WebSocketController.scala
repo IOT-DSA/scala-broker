@@ -1,36 +1,40 @@
 package facades.websocket
 
+//import java.io.File
 import java.net.URL
+
+import play.api.http.HttpEntity
 
 import scala.concurrent.Future
 import scala.util.Random
-
-import org.bouncycastle.jcajce.provider.digest.SHA256
+//import org.bouncycastle.jcajce.provider.digest.SHA256
 import org.joda.time.DateTime
-
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{ Message, TextMessage, WebSocketRequest }
+import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
-import akka.stream.{ Materializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
+import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import controllers.BasicController
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
 import models.Settings
-import models.akka.{ BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee }
-import models.akka.Messages.{ GetOrCreateDSLink, RemoveDSLink }
-import models.handshake.{ LocalKeys, RemoteKey }
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
+import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
+import models.akka.QoSState.{GetSubscriptionSource, SubscriptionSourceMessage}
+import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.EventDaos
 import models.rpc.DSAMessage
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import play.api.mvc.{ ControllerComponents, Request, RequestHeader, Result, WebSocket }
+import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
+import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
+import play.api.http.Status.UNAUTHORIZED
 
 /**
  * Establishes WebSocket DSLink connections
@@ -49,6 +53,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   type DSAFlow = Flow[DSAMessage, DSAMessage, _]
 
   import eventDaos._
+  import models.rpc.DSAMessageSerrializationFormat._
 
   implicit private val as = actorSystem
 
@@ -56,10 +61,23 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
   implicit private val connReqFormat = Json.format[ConnectionRequest]
 
-  private val transformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
+  private val jsonTransformer = jsonMessageFlowTransformer[DSAMessage, DSAMessage]
+  private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
+
+  val transformers = Map(
+      MSGJSON->jsonTransformer
+    , MSGPACK-> msgpackTransformer
+  )
+
+  private val saltBase: String = UrlBase64.encodeBytes(Array.fill[Byte](12){Random.nextInt(255).toByte})
+
+  private def chooseFormat(clientFormats: List[String], serverFormats: List[String]) : String = {
+    val mergedFormats = clientFormats intersect serverFormats
+    if (mergedFormats.contains(MSGPACK)) MSGPACK else MSGJSON
+  }
 
   /**
-   * Connects to another broker upstream.
+   * Connects to another broker upstream via ws.
    */
   def uplinkHandshake(url: String, name: String) = Action.async {
     val connUrl = new URL(url)
@@ -67,7 +85,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val publicKey = keys.encodedPublicKey
     val dsId = Settings.BrokerName + "-" + keys.encodedHashedPublicKey
 
-    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2", Some(List("json")), true)
+    val cr = ConnectionRequest(publicKey, true, true, None, "1.1.2"
+      , Some((Settings.ServerConfiguration \ "format").as[List[String]]), true)
     val frsp = wsc.url(url)
       .withQueryStringParameters("dsId" -> dsId)
       .post(Json.toJson(cr))
@@ -79,8 +98,11 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val wsUri = (serverConfig \ "wsUri").as[String]
       val salt = (serverConfig \ "salt").as[String].getBytes("UTF-8")
 
+      //TODO: Change the uplick connection format as well, like: //(serverConfig \ "format").as[String]
+      val format = MSGJSON
+
       val auth = buildAuth(tempKey, salt)
-      val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=json"
+      val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=$format"
 
       uplinkWSConnect(wsUrl, name, dsId)
     }
@@ -133,8 +155,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     log.debug(s"Conn request received at $request : ${request.body}")
 
     val ci = buildConnectionInfo(request)
-    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
-    val json = Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))
+//    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
+    val json = Settings.ServerConfiguration ++ createHandshakeResponse(ci)
 
     val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
 
@@ -147,23 +169,74 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     Ok(json)
   }
 
+  private def createHandshakeResponse(ci: ConnectionInfo) = {
+    val localKeys = keys
+    val dsId =  Settings.BrokerName + "-" + localKeys.encodedHashedPublicKey
+    val publicKey = localKeys.encodedPublicKey
+    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
+    val json = (Settings.ServerConfiguration + ("path" -> Json.toJson(linkPath))) ++
+      Json.obj(
+        "format" -> ci.resultFormat
+        , "dsId" -> dsId
+        , "publicKey" -> publicKey
+        , "tempKey" -> ci.tempKey
+        , "salt" -> ci.salt
+        , "path" -> Json.toJson(linkPath)
+      )
+
+    json
+  }
+
   /**
    * Establishes a WebSocket connection.
    */
-  def dslinkWSConnect = WebSocket.acceptOrResult[DSAMessage, DSAMessage] { request =>
+  def dslinkWSConnect = acceptOrResult { sessionInfo =>
     import Settings.WebSocket._
-
-    log.debug(s"WS request received: $request")
-    val dsId = getDsId(request)
-    val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
-    log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
     sessionInfo map { si =>
       createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
     } getOrElse
       Future.successful(Left[Result, DSAFlow](Forbidden))
+  }
 
-  }(transformer)
+  private def acceptOrResult(f: Option[DSLinkSessionInfo] => Future[Either[Result, DSAFlow]]): WebSocket = {
+    WebSocket { request =>
+      log.debug(s"WS request received: $request")
+      val dsId = getDsId(request)
+      val clientAuth = getAuth(request)
+      val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
+      log.debug(s"Session info retrieved for $dsId: $sessionInfo")
+
+      val res =
+      if (validateAuth(sessionInfo, clientAuth))
+        f(sessionInfo)
+      else {
+        val failedResult = Result(new ResponseHeader(UNAUTHORIZED
+                                                     , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" +
+                                                                             clientAuth + "'")
+                                                    )
+                                  , HttpEntity.NoEntity
+                                 )
+        Future.successful(Left[Result, DSAFlow](failedResult))
+      }
+      
+      res.map(_.right.map(getTransformer(sessionInfo).transform))
+    }
+  }
+
+  private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: Option[String]): Boolean = {
+    val ci = si.getOrElse(return false).ci
+    val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
+    localAuth == clientAuth
+  }
+
+  private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {
+    val format = sessionInfo.fold(MSGJSON)(si => {
+      chooseFormat(si.ci.formats, (Settings.ServerConfiguration \ "format").as[List[String]])
+    })
+
+    transformers.applyOrElse(format, (_ : String) => jsonTransformer)
+  }
 
   /**
    * Creates a new WebSocket flow bound to a newly created WSActor.
@@ -174,32 +247,46 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                            overflow:    OverflowStrategy) = {
     import akka.actor.Status._
 
-    val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
-      .toMat(Sink.asPublisher(false))(Keep.both).run()(materializer)
+    var (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
+      .toMat(Sink.asPublisher(false))(Keep.both)
+      .run()(materializer)
+
+    val sink = Sink.actorRef(toSocket, Success(()))
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
-    fRoutee map { routee =>
-      val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
-        WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
+    fRoutee flatMap { routee =>
 
-      val fromSocket = actorSystem.actorOf(Props(new Actor {
-        val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+      //TODO should think how move this logic from controller
+      val subscriptions = (routee ? GetSubscriptionSource).mapTo[Future[SubscriptionSourceMessage]].flatten
 
-        def receive = {
-          case Success(_) | Failure(_) => wsActor ! PoisonPill
-          case Terminated(_)           => context.stop(self)
-          case other                   => wsActor ! other
-        }
+      subscriptions map { subscriptionSrcRef =>
 
-        override def supervisorStrategy = OneForOneStrategy() {
-          case _ => SupervisorStrategy.Stop
-        }
-      }))
+        val wsProps = WebSocketActor.props(toSocket, routee, eventDaos,
+          WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
-      Flow.fromSinkAndSource[DSAMessage, DSAMessage](
-        Sink.actorRef(fromSocket, Success(())),
-        Source.fromPublisher(publisher))
+        val fromSocket = actorSystem.actorOf(Props(new Actor {
+          val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+
+          def receive = {
+            case Success(_) | Failure(_) => wsActor ! PoisonPill
+            case Terminated(_)           => context.stop(self)
+            case other                   => wsActor ! other
+          }
+
+          override def supervisorStrategy = OneForOneStrategy() {
+            case _ => SupervisorStrategy.Stop
+          }
+        }))
+
+        subscriptionSrcRef.sourceRef.source.runWith(sink)
+
+        val messageSink = Sink.actorRef(fromSocket, Success(()))
+        val src = Source.fromPublisher(publisher)
+
+        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
+
+      }
     }
   }
 
@@ -209,29 +296,66 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def getDsId(request: RequestHeader) = request.queryString("dsId").head
 
   /**
+    * Extracts `salt` from the requests query string
+    *
+    * @param request
+    * @return
+    */
+  private def getSalt(request: RequestHeader) = request.queryString("salt").head
+
+  /**
+    * Extracts "auth" parameter from URL
+    *
+    * @param request
+    * @return
+    */
+  private def getAuth(request: RequestHeader): Option[String] = {
+    try {
+      Option[String](request.queryString("auth").head)
+    } catch {
+      case _=> Option[String](null)
+    }
+  }
+
+  /**
    * Constructs a connection info instance from the incoming request.
    */
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
     val dsId = getDsId(request)
     val cr = request.body
-    new ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
+    val availableFormats  = Settings.ServerConfiguration("format").as[Seq[String]]
+    val resultFormat = chooseFormat(
+      request.body.formats.getOrElse(List(MSGJSON))
+      , List(availableFormats :_*)
+    )
+    val tempKeys = LocalKeys.generate
+    val tempKey = tempKeys.encodedPublicKey
+    val sharedSecret = RemoteKey.generate(tempKeys, cr.publicKey).sharedSecret
+
+    val saltInc = Random.nextInt()
+    val localSalt: String = s"${saltBase}${saltInc.toHexString}"
+
+    ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
       cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
-      request.remoteAddress, request.host)
+      request.remoteAddress, request.host, resultFormat = resultFormat, tempKey = tempKey
+      , sharedSecret = sharedSecret, salt = localSalt)
   }
 
   /**
    * Builds the authorization hash to be sent to the remote broker.
    */
-  private def buildAuth(tempKey: String, salt: Array[Byte]) = {
+  def buildAuth(tempKey: String, salt: Array[Byte]) = {
     val remoteKey = RemoteKey.generate(keys, tempKey)
     val sharedSecret = remoteKey.sharedSecret
-    // TODO make more scala-like
-    val bytes = Array.ofDim[Byte](salt.length + sharedSecret.length)
-    System.arraycopy(salt, 0, bytes, 0, salt.length)
-    System.arraycopy(sharedSecret, 0, bytes, salt.length, sharedSecret.length)
 
-    val sha = new SHA256.Digest
-    val digested = sha.digest(bytes)
-    UrlBase64.encodeBytes(digested)
+    LocalKeys.saltSharedSecret(salt, sharedSecret)
+    // TODO make more scala-like
+//    val bytes = Array.ofDim[Byte](salt.length + sharedSecret.length)
+//    System.arraycopy(salt, 0, bytes, 0, salt.length)
+//    System.arraycopy(sharedSecret, 0, bytes, salt.length, sharedSecret.length)
+//
+//    val sha = new SHA256.Digest
+//    val digested = sha.digest(bytes)
+//    UrlBase64.encodeBytes(digested)
   }
 }
