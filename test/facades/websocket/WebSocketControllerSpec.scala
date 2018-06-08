@@ -99,11 +99,9 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       val res1Json = Json.parse(res1Str)
 
       val tempKey = (res1Json \ "tempKey").get.as[String]
-//      val salt = (res1Json \ "salt").get.as[String].getBytes("UTF-8")
-
+      
       // ws
       val remoteKey = RemoteKey.generate(clientKeys, tempKey)
-//      val sharedSecret = remoteKey.sharedSecret
 
       val format = MSGJSON
 

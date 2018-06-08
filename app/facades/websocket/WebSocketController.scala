@@ -1,6 +1,5 @@
 package facades.websocket
 
-//import java.io.File
 import java.net.URL
 
 import play.api.http.HttpEntity
@@ -351,13 +350,5 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val sharedSecret = remoteKey.sharedSecret
 
     LocalKeys.saltSharedSecret(salt, sharedSecret)
-    // TODO make more scala-like
-//    val bytes = Array.ofDim[Byte](salt.length + sharedSecret.length)
-//    System.arraycopy(salt, 0, bytes, 0, salt.length)
-//    System.arraycopy(sharedSecret, 0, bytes, salt.length, sharedSecret.length)
-//
-//    val sha = new SHA256.Digest
-//    val digested = sha.digest(bytes)
-//    UrlBase64.encodeBytes(digested)
   }
 }
