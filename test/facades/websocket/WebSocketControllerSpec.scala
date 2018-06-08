@@ -99,24 +99,31 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       val res1Json = Json.parse(res1Str)
 
       val tempKey = (res1Json \ "tempKey").get.as[String]
-      val salt = (res1Json \ "salt").get.as[String].getBytes("UTF-8")
+//      val salt = (res1Json \ "salt").get.as[String].getBytes("UTF-8")
 
       // ws
       val remoteKey = RemoteKey.generate(clientKeys, tempKey)
-      val sharedSecret = remoteKey.sharedSecret
+//      val sharedSecret = remoteKey.sharedSecret
 
-      val authStr = ""
       val format = MSGJSON
 
-      val reqUri = s"/ws?dsId=$dsId&auth=$authStr&format=$format"
+      val reqUri = s"/ws?dsId=$dsId&format=$format"
       val requestWs = FakeRequest("GET", reqUri)
 
       val conn2 = controller.dslinkWSConnect(requestWs)
       val result = Await.result(conn2, 3 seconds)
 
-      // Bellow line was used before, when request had not been completed well. Right now it does OK.
-      // TODO: Uncomment following line and change it to proper assert condition for "OK" case.
-      //      result.left.get.header.status mustBe FORBIDDEN
+      result.isLeft mustBe true
+      result.left.get.header.status mustBe UNAUTHORIZED
+
+      // ws with auth = ""
+      val authStr = ""
+      val reqUri2 = s"/ws?dsId=$dsId&auth=$authStr&format=$format"
+
+      val conn3 = controller.dslinkWSConnect(requestWs)
+      val result2 = Await.result(conn2, 3 seconds)
+      result2.isLeft mustBe true
+      result2.left.get.header.status mustBe UNAUTHORIZED
     }
 
   }

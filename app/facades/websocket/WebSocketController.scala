@@ -224,7 +224,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     }
   }
 
-  private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: String): Boolean = {
+  private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: Option[String]): Boolean = {
     val ci = si.getOrElse(return false).ci
     val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
     localAuth == clientAuth
@@ -309,7 +309,13 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     * @param request
     * @return
     */
-  private def getAuth(request: RequestHeader) = request.queryString("auth").head
+  private def getAuth(request: RequestHeader): Option[String] = {
+    try {
+      Option[String](request.queryString("auth").head)
+    } catch {
+      case _=> Option[String](null)
+    }
+  }
 
   /**
    * Constructs a connection info instance from the incoming request.
