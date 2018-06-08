@@ -129,7 +129,7 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
       val cluster = Cluster(system)
       val replicator = DistributedData(system).replicator
       val ddregistry = system.actorOf(DistributedNodesRegistry.props(replicator, cluster, system))
-      RootNodeActor.singletonStart(system, Some(ddregistry))
+      RootNodeActor.singletonStart(system)
     }
     val probe = TestProbe()(system)
 

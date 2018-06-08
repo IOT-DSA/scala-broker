@@ -118,16 +118,17 @@ trait DSANodeRequestHandler { self:DSANode =>
 
     /* set */
 
-    case SetRequest(rid, "", newValue, _) =>
-      self.value = newValue
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+    case SetRequest(rid, path, newValue, _) =>
+      val name = path.split("/").last
 
-    case SetRequest(rid, name, newValue, _) if name.startsWith("$") =>
-      self.addConfigs(name -> newValue)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+      if(name.startsWith("$")){
+        self.addConfigs(name -> newValue)
+      } else if(name.startsWith("@")) {
+        addAttributes(name -> newValue)
+      } else {
+        self.value = newValue
+      }
 
-    case SetRequest(rid, name, newValue, _) if name.startsWith("@") =>
-      addAttributes(name -> newValue)
       DSAResponse(rid, Some(StreamState.Closed)) :: Nil
 
     /* remove */

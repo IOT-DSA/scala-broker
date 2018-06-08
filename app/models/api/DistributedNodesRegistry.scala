@@ -1,14 +1,16 @@
 package models.api
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props, TypedActor}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, TypedActor}
 import akka.cluster.Cluster
-import akka.cluster.ddata.{GSet, ORSet, ORSetKey}
+import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator.Update
 import akka.cluster.ddata.Replicator._
 import akka.util.Timeout
 import com.google.inject.Inject
 import models.Settings.QueryTimeout
-import models.rpc.DSAValue.{BooleanValue, StringValue}
+import models.akka.StandardActions
+import models.rpc.DSAValue.StringValue
+import models.rpc.{InvokeRequest, RemoveRequest, SetRequest}
 
 import scala.annotation.tailrec
 import scala.concurrent.Future
@@ -27,6 +29,8 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
   replicator ! Subscribe(DataKey, self)
 
   override def receive: Receive = {
+    case RouteMessage(path, message, sender) =>
+      routeMessage(path, message, sender)
     case AddNode(path) =>
       sender ! getOrCreateNode(path)
     case RemoveNode(path) =>
@@ -51,7 +55,8 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
       log.debug("Removed nodes: {}", toRemove)
   }
 
-  def removeNode(path: String): Set[String] = {
+  def removeNode(p: String): Set[String] = {
+    val path = validPath(p)
     val pathAndChildren = registry.keySet.filter(_.contains(path))
     if (pathAndChildren.nonEmpty) {
       pathAndChildren.foreach {
@@ -68,14 +73,44 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
     pathAndChildren
   }
 
+  private def routeMessage(p:String, message:Any, sender:ActorRef): Unit = {
+    val path = validPath(p)
+    val maybeNode = registry.get(path)
+
+    if(maybeNode.isEmpty) {
+      log.error("path {} couldn't be found in distributedDataNode:{}", path)
+      log.info("current keys: {}", registry.keySet.mkString("\n -> "))
+    }
+
+
+    maybeNode.foreach{ node =>
+      val formated = formatMessagePath(message)
+      TypedActor(system).getActorRefFor(node).!(formated)(sender)
+    }
+  }
+
+  private def extractName(path:String):String = {
+    val last = path.split("/").last
+    if(last.startsWith("$") || last.startsWith("@")) last else ""
+  }
+
+  private def formatMessagePath(message:Any):Any = message match {
+    case set:SetRequest => set.copy(path = extractName(set.path))
+    case rm:RemoveRequest => rm.copy(path = extractName(rm.path))
+    case i:InvokeRequest => i.copy(path = extractName(i.path))
+    case anyOther => anyOther
+  }
+
+
   /**
     * create node actor for path in parent / root context
     * if parent is not created - creates it
     *
-    * @param path path
+    * @param p path
     * @return created DSAnode actor reg
     */
-  private[this] def getOrCreateNode(path: String): DSANode = {
+  private[this] def getOrCreateNode(p: String): DSANode = {
+    val path = validPath(p)
     val maybeNode = registry.get(path)
     if (maybeNode.isDefined) Future.successful(maybeNode.get)
 
@@ -83,15 +118,22 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
 
     val node = pPath match {
       case (None, name) =>
-        TypedActor(context)
+        val newOne = TypedActor(context)
           .typedActorOf(DistributedDSANode.props(path, None, new StringValue(""), self, replicator))
+        if(isNotCommon(name)){
+          StandardActions.bindDataRootActions(newOne)
+        }
+        newOne
       case (Some(parent), name) => {
         val parentNode: DSANode = registry.get(parent)
           .getOrElse(getOrCreateNode(parent))
-
         val child = registry.get(path).getOrElse {
-          TypedActor(context)
+          val newOne = TypedActor(context)
             .typedActorOf(DistributedDSANode.props(path, Some(parentNode), new StringValue(""), self, replicator))
+          if(isNotCommon(name)){
+            StandardActions.bindDataNodeActions(newOne)
+          }
+          newOne
         }
         parentNode.addChild(name, child)
         child
@@ -104,11 +146,17 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
 
     node
   }
+
+  private def isNotCommon(name:String):Boolean = !StandardActions.commonActions.contains(name)
+
+  private def validPath(in:String) = if(in.startsWith("/")) in else s"/$in"
 }
 
 object DistributedNodesRegistry {
 
   case class AddNode(path: String)
+
+  case class RouteMessage(path:String, message:Any, sender:ActorRef = ActorRef.noSender)
 
   case class RemoveNode(path: String)
 

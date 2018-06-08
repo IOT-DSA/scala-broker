@@ -12,8 +12,7 @@ import akka.cluster.Cluster
 import akka.pattern.ask
 import akka.routing.{ ActorRefRoutee, ActorSelectionRoutee, Routee }
 import javax.inject.{ Inject, Singleton }
-import models.akka.cluster.ClusterContext
-import models.akka.{ BrokerActors, RichRoutee }
+import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
 import models.bench.AbstractEndpointActor.{ ReqStatsBehavior, RspStatsBehavior }
 import models.bench.BenchmarkRequester.ReqStatsSample
 import models.bench.BenchmarkResponder.RspStatsSample
@@ -26,7 +25,7 @@ import play.api.mvc.{ ControllerComponents, Result }
  */
 @Singleton
 class BenchmarkController @Inject() (actorSystem: ActorSystem,
-                                     clusterContext:   ClusterContext,
+                                     dslinkMgr:   DSLinkManager,
                                      actors:      BrokerActors,
                                      cc:          ControllerComponents) extends BasicController(cc) {
 

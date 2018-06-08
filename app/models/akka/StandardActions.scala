@@ -10,31 +10,45 @@ import models.api.{ DSAAction, DSANode, DSAValueType }
 object StandardActions {
   import DSAValueType._
 
+  case class ActionDescription(name:String, displayName:String, action:DSAAction)
+
+  val ADD_NODE = "addNode"
+  val ADD_VALUE = "addValue"
+  val SET_VALUE = "setValue"
+  val SET_ATTRIBUTE = "setAttribute"
+  val SET_CONFIG = "setConfig"
+  val DELETE_NODE = "deleteNode"
+
+
   /**
    * Adds actions as per broker/dataRoot profile.
    */
-  def bindDataRootActions(node: DSANode) = bindActions(node,
-    ("addNode", "Add Node", AddNode),
-    ("addValue", "Add Value", AddValue))
+  def bindDataRootActions(node: DSANode) = {
+    bindActions(node,
+      commonActions(ADD_NODE),
+      commonActions(ADD_VALUE)
+    )
+  }
 
   /**
    * Adds actions as per broker/dataNode profile.
    */
   def bindDataNodeActions(node: DSANode) = bindActions(node,
-    ("addNode", "Add Node", AddNode),
-    ("addValue", "Add Value", AddValue),
-    ("setValue", "Set Value", SetValue),
-    ("setAttribute", "Set Attribute", SetAttribute),
-    ("setConfig", "Set Config", SetConfig),
-    ("deleteNode", "Delete Node", DeleteNode))
+    commonActions(ADD_NODE),
+    commonActions(ADD_VALUE),
+    commonActions(SET_VALUE),
+    commonActions(SET_ATTRIBUTE),
+    commonActions(SET_CONFIG),
+    commonActions(DELETE_NODE)
+  )
 
   /**
    * Adds actions to the node as children.
    */
-  def bindActions(node: DSANode, actions: (String, String, DSAAction)*) = actions foreach {
-    case (name, displayName, action) => node.addChild(name).foreach { child =>
-      child.displayName = displayName
-      child.action = action
+  def bindActions(node: DSANode, actions: ActionDescription*) = actions foreach {
+    ad => node.addChild(ad.name).foreach { child =>
+      child.displayName = ad.displayName
+      child.action = ad.action
     }
   }
 
@@ -104,4 +118,14 @@ object StandardActions {
     val node = ctx.node.parent.get
     node.parent foreach (_.removeChild(node.name))
   })
+
+
+  val commonActions:Map[String, ActionDescription] = Map(
+    ADD_NODE -> ActionDescription(ADD_NODE, "Add Node", AddNode),
+    ADD_VALUE -> ActionDescription(ADD_VALUE, "Add Value", AddValue),
+    SET_VALUE -> ActionDescription(SET_VALUE, "Set Value", SetValue),
+    SET_ATTRIBUTE -> ActionDescription(SET_ATTRIBUTE, "Set Attribute", SetAttribute),
+    SET_CONFIG -> ActionDescription(SET_CONFIG, "Set Config", SetConfig),
+    DELETE_NODE -> ActionDescription(DELETE_NODE, "Delete Node", DeleteNode)
+  )
 }

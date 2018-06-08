@@ -62,19 +62,40 @@ class DistributedStateRegistrySpec extends WordSpecLike with ClusterKit
           TimeUnit.MILLISECONDS.sleep(500)
 
           val replicaNodes = Await.result((registryReplica ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds)
-          replicaNodes.map(_._1).toSet shouldBe Set("/data", "/data/child")
+          replicaNodes.map(_._1).toSet shouldBe Set(
+            "/data/child/deleteNode",
+            "/data/child/addNode",
+            "/data/child",
+            "/data/child/addValue",
+            "/data/child/setAttribute",
+            "/data/child/setConfig",
+            "/data",
+            "/data/addValue",
+            "/data/child/setValue",
+            "/data/addNode")
 
           Await.result(replicaNodes("/data").child("child"), 2 seconds).get shouldBe replicaNodes("/data/child")
           replicaNodes("/data/child").parent.get shouldBe replicaNodes("/data")
 
           val removed = (registry ? RemoveNode("/data")).mapTo[Set[String]]
-          Await.result(removed, 2 seconds) shouldBe Set("/data", "/data/child")
+          Await.result(removed, 2 seconds) shouldBe Set(
+            "/data/child/deleteNode",
+            "/data/child/addNode",
+            "/data/child",
+            "/data/child/addValue",
+            "/data/child/setAttribute",
+            "/data/child/setConfig",
+            "/data",
+            "/data/addValue",
+            "/data/child/setValue",
+            "/data/addNode")
 
           Await.result((registry ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds).isEmpty shouldBe true
 
           TimeUnit.MILLISECONDS.sleep(500)
 
-          Await.result((registryReplica ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds).isEmpty shouldBe true
+          val state:Map[String, DSANode] = Await.result((registryReplica ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds)
+          state.isEmpty shouldBe true
       }
     }
 

@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.cluster.Cluster
 import akka.cluster.ddata.ReplicatedData
 import models.api.DSAValueType.DSAValueType
-import models.rpc.DSAValue.{DSAMap, DSAVal, obj, array}
+import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
 import akka.cluster.ddata.Replicator._
 import akka.event.Logging
 import akka.pattern.PromiseRef
@@ -13,9 +13,10 @@ import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.{AddNode, GetNodesByPath}
 import akka.pattern.ask
+import models.akka.StandardActions
 import models.rpc.DSAValue
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 class DistributedDSANode(
@@ -91,13 +92,13 @@ class DistributedDSANode(
   }
 
 
-  override def profile: String = data.configs.get("$it")
+  override def profile: String = data.configs.get("$is")
     .map(_.value.asInstanceOf[String])
     .getOrElse("")
 
 
   override def profile_=(p: String): Unit = editProperty { old =>
-    old.copy(configs = old.configs + ("$it" -> p))
+    old.copy(configs = old.configs + ("$is" -> p))
   }
 
 
@@ -133,7 +134,7 @@ class DistributedDSANode(
   override def addChild(name: String): Future[DSANode] = {
     _children.get(name).map(Future.successful).getOrElse {
       (registry ? AddNode(s"$path/$name")).mapTo[DSANode] flatMap { actor =>
-        log.debug(s"Adding child: $name ->  $actor")
+        log.debug("Adding child: {} ->  {}", name, actor)
         addChild(name, actor)
       }
     }
@@ -141,15 +142,7 @@ class DistributedDSANode(
 
 
   override def addChild(name: String, node: DSANode): Future[DSANode] = {
-
-    if (_children.get(name).isDefined) {
-      val df = 123
-    }
-
-    log.debug(s"children before: ${_children}")
-    log.debug(s"Adding child: $name ->  $node")
     _children += (name -> node)
-    log.debug(s"children after: ${_children}")
 
     editProperty({ old =>
       old.copy(children = old.children + name)
@@ -166,9 +159,15 @@ class DistributedDSANode(
 
   override def action: Option[DSAAction] = _action
 
-  override def action_=(a: DSAAction): Unit = _action = Some(a)
+  override def action_=(a: DSAAction): Unit = {
+    _action = Some(a)
+  }
 
-  override def invoke(params: DSAMap): Unit = _action foreach (_.handler(ActionContext(this, params)))
+  override def invoke(params: DSAMap): Unit = {
+    _action foreach { a =>
+      a.handler(ActionContext(this, params))
+    }
+  }
 
   override def subscribe(sid: Int, ref: ActorRef): Unit = editProperty { old =>
     old.copy(subscriptions = old.subscriptions + (sid -> ref))
@@ -264,7 +263,7 @@ class DistributedDSANode(
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
       case u: UpdateResponse[_] ⇒ // ignore
-        log.debug(s"$ownId: state successfully updated: ${u.key}")
+        log.debug("{}: state successfully updated: {}", ownId, u.key)
       case c@Changed(dataKey) ⇒
         updateLocalState(c.get(dataKey))
         log.debug("Current elements: {}", c.get(dataKey))

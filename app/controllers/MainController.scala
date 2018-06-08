@@ -9,7 +9,7 @@ import akka.routing.Routee
 import javax.inject.{Inject, Singleton}
 
 import models.Settings
-import models.akka.{ BrokerActors, RichRoutee }
+import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
 import play.api.mvc.ControllerComponents
 import akka.actor.Address
 import models.akka.cluster.ClusterContext
@@ -19,7 +19,7 @@ import models.akka.cluster.ClusterContext
  */
 @Singleton
 class MainController @Inject() (actorSystem: ActorSystem,
-                                clusterContext:   ClusterContext,
+                                dslinkMgr:   DSLinkManager,
                                 actors:      BrokerActors,
                                 cc:          ControllerComponents) extends BasicController(cc) {
 

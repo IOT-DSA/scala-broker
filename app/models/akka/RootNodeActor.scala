@@ -1,30 +1,25 @@
 package models.akka
 
 import akka.actor._
-import akka.pattern.ask
 import akka.cluster.singleton._
-import akka.util.Timeout
-import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import models.{ RequestEnvelope, ResponseEnvelope }
 import models.api.DSANode
-import models.api.DistributedNodesRegistry.AddNode
-import models.rpc.{DSAError, DSARequest, DSAResponse, ListRequest}
-import models.rpc.DSAValue.{StringValue, array, obj}
-
-import scala.concurrent.Await
+import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
+import models.rpc.DSAValue.{ StringValue, array, obj }
 
 /**
  * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
  */
-class RootNodeActor(ddregistry: Option[ActorRef]) extends Actor with ActorLogging {
+class RootNodeActor extends Actor with ActorLogging {
   import context.dispatcher
   import models.Settings.Nodes._
   import models.rpc.StreamState._
 
   // create children
-  private val dataNode:DSANode = createDataNode
-  private val defsNode:DSANode = createDefsNode
-  private val usersNode:DSANode = createUsersNode
-  private val sysNode:DSANode = createSysNode
+  private val dataNode = createDataNode
+  private val defsNode = createDefsNode
+  private val usersNode = createUsersNode
+  private val sysNode = createSysNode
 
   override def preStart() = log.info("[RootNode] actor initialized")
 
@@ -65,15 +60,7 @@ class RootNodeActor(ddregistry: Option[ActorRef]) extends Actor with ActorLoggin
    * Creates a /data node.
    */
   private def createDataNode = {
-    implicit val timeout = Timeout(Settings.QueryTimeout)
-
-    val dataNode:DSANode = ddregistry match {
-      case Some(registry) =>
-        Await.result((registry ? AddNode("/data")).mapTo[DSANode], Settings.QueryTimeout)
-      case None =>
-        TypedActor(context).typedActorOf(DSANode.props(None), Data)
-    }
-
+    val dataNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode
@@ -122,7 +109,7 @@ class RootNodeActor(ddregistry: Option[ActorRef]) extends Actor with ActorLoggin
    * Creates a /sys node.
    */
   private def createSysNode = {
-    val sysNode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
+    val sysNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
     sysNode.profile = "node"
     sysNode
   }
@@ -137,14 +124,14 @@ object RootNodeActor {
   /**
    * Creates a new instance of [[RootNodeActor]] props.
    */
-  def props(ddregistry:Option[ActorRef]) = Props(new RootNodeActor(ddregistry))
+  def props() = Props(new RootNodeActor())
 
   /**
    * Starts a Singleton Manager and returns the cluster-wide unique instance of [[RootNodeActor]].
    */
-  def singletonStart(implicit system: ActorSystem, ddregistry:Option[ActorRef]): ActorRef = system.actorOf(
+  def singletonStart(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonManager.props(
-      singletonProps = props(ddregistry),
+      singletonProps = props(),
       terminationMessage = PoisonPill,
       settings = ClusterSingletonManagerSettings(system).withRole("backend")),
     name = Root)

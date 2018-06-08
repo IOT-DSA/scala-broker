@@ -24,7 +24,7 @@ class LocalDSLinkManagerSpec extends AbstractActorSpec with Inside {
   val mgr = new LocalDSLinkManager()
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Downstream, mgr.dnlinkProps), Settings.Nodes.Downstream)
   val upstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Upstream, mgr.uplinkProps), Settings.Nodes.Upstream)
-  system.actorOf(RootNodeActor.props(None), Settings.Nodes.Root)
+  system.actorOf(RootNodeActor.props(), Settings.Nodes.Root)
 
   "getDownlinkRoutee" should {
     "return a actor selection routee" in {
