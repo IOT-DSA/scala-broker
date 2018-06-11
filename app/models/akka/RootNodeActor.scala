@@ -60,7 +60,7 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /data node.
    */
   private def createDataNode = {
-    val dataNode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
+    val dataNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode
@@ -70,7 +70,7 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /defs node hierarchy.
    */
   private def createDefsNode = {
-    val defsNode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
+    val defsNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
     defsNode.profile = "node"
     defsNode.addChild("profile").foreach { node =>
       node.profile = "static"
@@ -100,7 +100,7 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /users node.
    */
   private def createUsersNode = {
-    val usersNode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
+    val usersNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
     usersNode.profile = "node"
     usersNode
   }
@@ -109,8 +109,12 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /sys node.
    */
   private def createSysNode = {
-    val sysNode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
+    val sysNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
     sysNode.profile = "node"
+    sysNode.addChild("tokens").foreach { node =>
+      node.profile = "static"
+    }
+
     sysNode
   }
 }

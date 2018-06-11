@@ -1,8 +1,7 @@
 package models.akka
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
-import models.api.{ DSAAction, DSANode, DSAValueType }
+import models.api.{ActionContext, DSAAction, DSANode, DSAValueType}
 
 /**
  * Standard node actions.
@@ -28,6 +27,10 @@ object StandardActions {
     ("setConfig", "Set Config", SetConfig),
     ("deleteNode", "Delete Node", DeleteNode))
 
+  def bindTokenNodeActions(node: DSANode) = bindActions(node,
+    ("delete", "Delete token", DeleteNode)
+    , ("update", "Update token", UpdateToken)
+  )
   /**
    * Adds actions to the node as children.
    */
@@ -41,7 +44,7 @@ object StandardActions {
   /**
    * Adds a child node.
    */
-  val AddNode: DSAAction = DSAAction(ctx => {
+  val AddNode: DSAAction = DSAAction((ctx: ActionContext) => {
     ctx.node.parent foreach { parent =>
       parent.addChild(ctx.args("name").value.toString) foreach { node =>
         node.profile = "broker/dataNode"
@@ -49,6 +52,14 @@ object StandardActions {
       }
     }
   }, "name" -> DSAString)
+
+  /**
+    * Modify current token node
+    */
+  val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) => {
+      aaa
+    }
+  )
 
   /**
    * Adds a value child node.
@@ -68,7 +79,7 @@ object StandardActions {
   /**
    * Sets the node value.
    */
-  val SetValue: DSAAction = DSAAction(ctx => {
+  val SetValue: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
     val value = ctx.args("value")
 

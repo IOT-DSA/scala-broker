@@ -319,6 +319,19 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   /**
+    * Ectracts "token" from http url
+    * @param request
+    * @return
+    */
+  private def getToken(request: RequestHeader): Option[String] = {
+    try {
+      Option[String](request.queryString("token").head)
+    } catch {
+      case _ : Throwable=> Option[String](null)
+    }
+  }
+
+  /**
    * Constructs a connection info instance from the incoming request.
    */
   private def buildConnectionInfo(request: Request[ConnectionRequest]) = {
@@ -335,11 +348,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val saltInc = Random.nextInt()
     val localSalt: String = s"${saltBase}${saltInc.toHexString}"
+    val tokenHash = getToken(request)
 
     ConnectionInfo(dsId, dsId.substring(0, dsId.length - 44), cr.isRequester, cr.isResponder,
       cr.linkData.map(_.toString), cr.version, cr.formats.getOrElse(Nil), cr.enableWebSocketCompression,
       request.remoteAddress, request.host, resultFormat = resultFormat, tempKey = tempKey
-      , sharedSecret = sharedSecret, salt = localSalt)
+      , sharedSecret = sharedSecret, salt = localSalt, tokenHash = tokenHash)
   }
 
   /**

@@ -9,6 +9,7 @@ case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, 
                           linkAddress: String = "", brokerAddress: String = ""
                           , resultFormat: String = models.rpc.DSAMessageSerrializationFormat.MSGJSON
                           , tempKey: String = "", sharedSecret: Array[Byte] = null, salt: String = ""
+                          , tokenHash:Option[String] = None
                          )
 {
 

@@ -74,9 +74,9 @@ object Settings {
   }
 
   /**
-   * Used in Allowed messages sent on handshake.
+   * Used in Allowed messages sent on handshake. Not used any more
    */
-  val Salt = rootConfig.getInt("broker.salt")
+//  val Salt = rootConfig.getInt("broker.salt")
 
   /**
    * Interval to wait for actors' responses.
