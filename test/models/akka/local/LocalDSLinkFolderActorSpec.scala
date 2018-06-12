@@ -23,7 +23,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   
   type FoundLinks = Map[Address, Iterable[String]]
 
-  implicit val timeout = Timeout(3 seconds)
+  implicit val timeout = Timeout(5 seconds)
   val dsId = "link" + "?" * 44
 
   val dslinkMgr = new LocalDSLinkManager()
