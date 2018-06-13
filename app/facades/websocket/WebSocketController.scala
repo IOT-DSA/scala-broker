@@ -156,7 +156,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     log.debug(s"Conn request received at $request : ${request.body}")
 
     val ci = buildConnectionInfo(request)
-//    val linkPath = Settings.Paths.Downstream + "/" + ci.linkName
+
     val json = Settings.ServerConfiguration ++ createHandshakeResponse(ci)
 
     val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
@@ -208,18 +208,18 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
       val res =
-      if (validateAuth(sessionInfo, clientAuth))
-        f(sessionInfo)
-      else {
-        log.warn(s"Authentication failed, auth value is not correct.")
-        val failedResult = Result(new ResponseHeader(UNAUTHORIZED
-                                                     , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" +
-                                                                             clientAuth + "'")
-                                                    )
-                                  , HttpEntity.NoEntity
-                                 )
-        Future.successful(Left[Result, DSAFlow](failedResult))
-      }
+        if (validateAuth(sessionInfo, clientAuth))
+          f(sessionInfo)
+        else {
+          log.warn(s"Authentication failed, auth value is not correct.")
+          val failedResult = Result(new ResponseHeader(UNAUTHORIZED
+                                                       , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" +
+                                                                               clientAuth + "'")
+                                                      )
+                                    , HttpEntity.NoEntity
+                                   )
+          Future.successful(Left[Result, DSAFlow](failedResult))
+        }
       
       res.map(_.right.map(getTransformer(sessionInfo).transform))
     }
