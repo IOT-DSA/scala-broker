@@ -82,6 +82,7 @@ lazy val commonDependencies = Seq(
   "com.typesafe.akka"       %% "akka-cluster-sharding"   % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-slf4j"              % AKKA_VERSION,
   "com.typesafe.akka"       %% "akka-actor-typed"        % AKKA_VERSION,
+  "com.typesafe.akka"       %% "akka-persistence-typed"  % AKKA_VERSION,
   "com.paulgoldbaum"        %% "scala-influxdb-client"   % "0.5.2",
   "org.bouncycastle"         % "bcprov-jdk15on"          % "1.51",
   "com.github.romix.akka"   %% "akka-kryo-serialization" % "0.5.1",
