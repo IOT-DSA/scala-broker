@@ -13,10 +13,8 @@ import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.{AddNode, GetNodesByPath}
 import akka.pattern.ask
-import models.akka.StandardActions
 import models.rpc.DSAValue
 
-import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 class DistributedDSANode(
