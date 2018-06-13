@@ -30,7 +30,7 @@ class RemoteKeySpec extends PlaySpec {
       // Server generates a temporary local key
       val point2 = localKeys.publicKey.getQ
       val tempLocalKey = LocalKeys.generate
-      val point = point2.multiply(tempLocalKey.privateKey.getD) // Q!
+      val point = point2.multiply(tempLocalKey.privateKey.getD)
       val bi = point.normalize.getXCoord.toBigInteger
       val sharedSecret = RemoteKey.normalize(bi.toByteArray())
 
