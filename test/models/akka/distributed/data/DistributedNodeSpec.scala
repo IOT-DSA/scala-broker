@@ -183,8 +183,8 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         left.removeConfig("$config")
         left.removeChild("child1")
 
-        val deleteNat2 = extractUpdates(rightProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
-        val deleteNat1 = extractUpdates(leftProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
+        val deleteNat2 = extractUpdates(rightProbe.expectMsgAllClassOf(3 seconds, classOf[ResponseEnvelope]))
+        val deleteNat1 = extractUpdates(leftProbe.expectMsgAllClassOf(3 seconds, classOf[ResponseEnvelope]))
 
         deleteNat1.size shouldBe deleteNat2.size
         deleteNat1.size shouldBe 3
