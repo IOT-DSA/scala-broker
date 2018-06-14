@@ -211,11 +211,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
         if (validateAuth(sessionInfo, clientAuth))
           f(sessionInfo)
         else {
-          log.warn(s"Authentication failed, auth value is not correct.")
-          val failedResult = Result(new ResponseHeader(UNAUTHORIZED
-                                                       , reasonPhrase = Option(s"Connection failed: DSLink auth is wrong: '" +
-                                                                               clientAuth + "'")
-                                                      )
+          val errorString = s"Authentication failed in request with dsId: '$dsId', auth value '$clientAuth' is not correct."
+          log.error(errorString)
+          val failedResult = Result(new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString))
                                     , HttpEntity.NoEntity
                                    )
           Future.successful(Left[Result, DSAFlow](failedResult))
@@ -300,14 +298,6 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private def getDsId(request: RequestHeader) = request.queryString("dsId").head
 
   /**
-    * Extracts `salt` from the requests query string
-    *
-    * @param request
-    * @return
-    */
-  private def getSalt(request: RequestHeader) = request.queryString("salt").head
-
-  /**
     * Extracts "auth" parameter from URL
     *
     * @param request
@@ -315,7 +305,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     */
   private def getAuth(request: RequestHeader): Option[String] = {
     try {
-      Option[String](request.queryString("auth").head)
+      request.queryString("auth").headOption
     } catch {
       case _ : Throwable=> Option[String](null)
     }
