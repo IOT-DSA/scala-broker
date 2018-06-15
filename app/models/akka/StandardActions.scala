@@ -31,6 +31,11 @@ object StandardActions {
     ("delete", "Delete token", DeleteNode)
     , ("update", "Update token", UpdateToken)
   )
+
+  def bindTokenGroupNodeActions(node: DSANode) = bindActions(node,
+    ("add", "add token", AddNode)
+  )
+
   /**
    * Adds actions to the node as children.
    */

@@ -34,7 +34,7 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
     }
     "start in disconnected state" in {
       whenReady(dslink ? GetLinkInfo) {
-        _ mustBe LinkInfo(ConnectionInfo("", "abc", true, false), false, None, None)
+        x mustBe LinkInfo(ConnectionInfo("", "abc", true, false), false, None, None)
       }
     }
     "connect to endpoint and register with downstream" in {
