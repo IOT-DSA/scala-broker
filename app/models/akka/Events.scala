@@ -25,7 +25,7 @@ case class DSLinkBaseState(endpoint: Option[ActorRef],
 case class RidTargetsRequesterState(rid: Int, target: String)
 case class SidTargetsRequesterState(sid: Int, pathAndQos: PathAndQos)
 case class RemoveTargetByRid(rid: Int)
-case class RemoveTargetBySid(sid: Int)
+case class RemoveTargetBySid(sids: Int*)
 case class LastRidSet(rid: Int)
 
 /**

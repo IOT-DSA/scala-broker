@@ -7,6 +7,7 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import models.akka.Messages._
 import models.metrics.Meter
 import scala.util.control.NonFatal
+import scala.collection.mutable.Set
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
@@ -126,7 +127,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       targetsByRid.remove(event.rid)
     case event: RemoveTargetBySid =>
       log.debug("{}: trying to recover remove action by {}", ownId, event)
-      targetsBySid.remove(event.sid)
+      removeTargetBy(event.sids: _*)
     case event: LastRidSet =>
       log.debug("{}: trying to recover {}", ownId, event)
       lastRid = event.rid
@@ -200,14 +201,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
    */
   private def cleanupStoredTargets(responses: Seq[DSAResponse]) = {
 
-    def cleanupSids(rows: Seq[DSAVal]) = try {
-        for (r <- rows)
-          persist(RemoveTargetBySid(extractSid(r))) { event =>
-            log.debug("{}: removing by SID persisted {}", ownId, event)
-            targetsBySid.remove(event.sid)
-          }
-    } catch {
-      case NonFatal(_) => log.error("{}: subscribe response does not have a valid SID", ownId)
+    def cleanupSids(rows: Seq[DSAVal]) = {
+      val sids = Set[Int]()
+      rows collect extractSid foreach sids.add
+
+      persist(RemoveTargetBySid(sids.toSeq: _*)) { event =>
+        log.debug("{}: removing by SIDs persisted {}", ownId, event)
+        removeTargetBy(event.sids: _*)
+      }
     }
 
     responses filter (_.stream == Some(StreamState.Closed)) foreach {
@@ -221,6 +222,13 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
 
     log.debug("{}: RID targets: {}, SID targets: {}", ownId, targetsByRid.size, targetsBySid.size)
   }
+
+  private def removeTargetBy(sids: Int*) =
+    try {
+      sids foreach targetsBySid.remove
+    } catch {
+      case NonFatal(_) => log.error("{}: subscribe response does not have a valid SID", ownId)
+    }
 
   /**
    * Groups the requests by their target and routes each batch as one envelope.
@@ -295,7 +303,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
         val target = targetsBySid.get(sids.head).get.path
         persist(RemoveTargetBySid(sids.head)) { event =>
           log.debug("{}: removing by SID persisted {}", ownId, event)
-          targetsBySid.remove(event.sid)
+          removeTargetBy(event.sids: _*)
         }
         target
     }
