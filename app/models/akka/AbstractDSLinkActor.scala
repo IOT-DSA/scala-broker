@@ -4,6 +4,7 @@ import org.joda.time.DateTime
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
 import models.metrics.Meter
+import models.util.DsaToAkkaCoder._
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -23,7 +24,7 @@ import models.metrics.Meter
 abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends Actor with Stash with ActorLogging with Meter {
   import Messages._
 
-  protected val linkName = self.path.name
+  protected val linkName = self.path.name.forDsa
   protected val ownId = s"DSLink[$linkName]"
 
   implicit val system = context.system
@@ -51,7 +52,7 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends Actor with St
    * Called on link shut down, notifies the registry and logs the dslink status.
    */
   override def postStop() = {
-    sendToRegistry(UnregisterDSLink(self.path.name))
+    sendToRegistry(UnregisterDSLink(self.path.name.forDsa))
     log.info(s"$ownId: stopped")
   }
 

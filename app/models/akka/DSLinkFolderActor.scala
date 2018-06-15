@@ -2,13 +2,13 @@ package models.akka
 
 import java.util.regex.Pattern
 
-import akka.actor.{ Actor, ActorLogging }
+import akka.actor.{Actor, ActorLogging}
 import akka.routing.Routee
-import models.{ RequestEnvelope, Settings }
+import models.{RequestEnvelope, Settings}
 import models.akka.DSLinkMode.DSLinkMode
-import models.akka.Messages.{ DSLinkNodeStats, LinkState }
+import models.akka.Messages.{DSLinkNodeStats, LinkState}
 import models.akka.responder.SimpleResponderBehavior
-import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
+import models.rpc.{CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage}
 
 /**
  * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.

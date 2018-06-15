@@ -1,10 +1,11 @@
 package models.akka.local
 
-import akka.actor.{ PoisonPill, Props, actorRef2Scala }
-import akka.routing.{ ActorRefRoutee, Routee }
-import models.akka.{ DSLinkManager, DSLinkFolderActor, IsNode, rows }
+import akka.actor.{PoisonPill, Props, actorRef2Scala}
+import akka.routing.{ActorRefRoutee, Routee}
+import models.akka.{DSLinkFolderActor, DSLinkManager, IsNode, rows}
 import models.akka.Messages._
 import models.rpc.DSAValue._
+import models.util.DsaToAkkaCoder._
 
 /**
  * Actor for local DSA link folder node, such as `/upstream` or `/downstream`.
@@ -58,9 +59,9 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
    * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
    */
   protected def getOrCreateDSLink(name: String): Routee = {
-    val child = context.child(name) getOrElse {
+    val child = context.child(name.forAkka) getOrElse {
       log.info("{}: creating a new dslink '{}'", ownId, name)
-      context.actorOf(linkProps, name)
+      context.actorOf(linkProps, name.forAkka)
     }
     ActorRefRoutee(child)
   }
@@ -69,7 +70,7 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
    * Terminates the specified DSLink actors.
    */
   protected def removeDSLinks(names: String*) = {
-    names map context.child collect { case Some(ref) => ref } foreach (_ ! PoisonPill)
+    names map(_.forAkka) map context.child collect { case Some(ref) => ref } foreach (_ ! PoisonPill)
   }
 
   /**
