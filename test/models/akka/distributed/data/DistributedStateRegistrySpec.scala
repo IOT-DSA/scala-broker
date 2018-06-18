@@ -77,6 +77,7 @@ class DistributedStateRegistrySpec extends WordSpecLike with ClusterKit
           Await.result(replicaNodes("/data").child("child"), 2 seconds).get shouldBe replicaNodes("/data/child")
           replicaNodes("/data/child").parent.get shouldBe replicaNodes("/data")
 
+
           val removed = (registry ? RemoveNode("/data")).mapTo[Set[String]]
           Await.result(removed, 2 seconds) shouldBe Set(
             "/data/child/deleteNode",
