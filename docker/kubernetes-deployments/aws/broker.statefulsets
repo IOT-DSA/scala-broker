@@ -22,8 +22,8 @@ spec:
             - cloud-broker-internal.default.svc.cluster.local
       containers:
       - name: broker-cluster
-        image: iotdsa/broker-scala:0.4.0-SNAPSHOT
-        imagePullPolicy: Never
+        image: 582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala
+        imagePullPolicy: Always
         serviceName: "cloud-broker-internal"
         ports:
         - containerPort: 9000
