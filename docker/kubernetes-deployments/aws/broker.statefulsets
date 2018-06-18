@@ -22,7 +22,7 @@ spec:
             - cloud-broker-internal.default.svc.cluster.local
       containers:
       - name: broker-cluster
-        image: 582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala:latest"
         imagePullPolicy: Always
         serviceName: "cloud-broker-internal"
         ports:
