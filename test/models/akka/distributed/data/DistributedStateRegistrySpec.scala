@@ -92,9 +92,13 @@ class DistributedStateRegistrySpec extends WordSpecLike with ClusterKit
 
           Await.result((registry ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds).isEmpty shouldBe true
 
-          TimeUnit.MILLISECONDS.sleep(500)
+          TimeUnit.MILLISECONDS.sleep(2000)
 
           val state:Map[String, DSANode] = Await.result((registryReplica ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds)
+
+          if(!state.isEmpty){
+            val stop = 123;
+          }
           state.isEmpty shouldBe true
       }
     }
