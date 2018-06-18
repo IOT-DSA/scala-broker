@@ -59,7 +59,7 @@ metadata:
   labels:
     app: cloud-broker-metrics
 spec:
-  clusterIP: 10.97.200.242
+  clusterIP: 10.100.200.1
   ports:
   - name: grafana
     port: 80

@@ -76,7 +76,7 @@ metadata:
   labels:
     app: cloud-broker-cluster
 spec:
-  clusterIP: 10.96.0.3
+  clusterIP: 10.100.0.3
   ports:
   - name: dsabroker-webinterface
     port: 9000
