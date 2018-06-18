@@ -1,8 +1,8 @@
 package models.akka
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
-import models.api.{ DSAAction, DSANode, DSAValueType }
+import models.api.{DSAAction, DSANode, DSAValueType}
+import models.rpc.DSAValue
 
 /**
  * Standard node actions.
@@ -29,12 +29,24 @@ object StandardActions {
     ("deleteNode", "Delete Node", DeleteNode))
 
   /**
-   * Adds actions to the node as children.
-   */
+    * Adds actions to the node as children.
+    */
   def bindActions(node: DSANode, actions: (String, String, DSAAction)*) = actions foreach {
     case (name, displayName, action) => node.addChild(name).foreach { child =>
       child.displayName = displayName
       child.action = action
+      child.profile = "node"
+      child.addConfigs("$invokable" -> "write")
+
+      val params = action.params map{ p =>
+        DSAValue.obj(
+          ("name", p._1),
+          ("type", p._2.toString)
+        )
+      }
+
+
+      child.addConfigs("$params" -> DSAValue.array(params:_*))
     }
   }
 
