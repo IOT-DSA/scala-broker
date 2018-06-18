@@ -173,7 +173,6 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         val notifications1 = extractUpdates(leftProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
 
         notifications1.size shouldBe notifications2.size
-        notifications1.size shouldBe 3
 
         left.removeAttribute("@attribute")
         left.removeConfig("$config")
@@ -183,7 +182,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         val deleteNat1 = extractUpdates(leftProbe.expectMsgAllClassOf(4 seconds, classOf[ResponseEnvelope]))
 
         deleteNat1.size shouldBe deleteNat2.size
-        deleteNat1.size shouldBe 3
+
     }
 
 
