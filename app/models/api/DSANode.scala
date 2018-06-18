@@ -4,12 +4,12 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
-import DSAValueType.{DSADynamic, DSAValueType}
-import akka.actor.{ActorRef, TypedActor, TypedProps}
-import akka.event.Logging
-import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import DSAValueType.DSAValueType
+import akka.actor.{ActorRef, TypedProps}
+import models.ResponseEnvelope
 import models.rpc._
-import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, longToNumericValue, obj}
+import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, obj}
+import models.util.LoggingAdapterInside
 
 /**
  * A structural unit in Node API.
@@ -70,7 +70,7 @@ object DSANode {
 }
 
 
-trait DSANodeSubscriptions { self:DSANode =>
+trait DSANodeSubscriptions { self:DSANode with LoggingAdapterInside =>
 
   protected var _sids:Map[Int, ActorRef]
   protected var _rids:Map[Int, ActorRef]
@@ -86,6 +86,7 @@ trait DSANodeSubscriptions { self:DSANode =>
         val update = obj("sid" -> sid, "value" -> value, "ts" -> ts)
         val response = ResponseEnvelope(DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil)
         ref ! response
+        log.debug("notify subscription updates:\\{} \\to: \\{} -> {}", value, sid, ref)
     }
   }
 
@@ -93,7 +94,9 @@ trait DSANodeSubscriptions { self:DSANode =>
     * Sends DSAResponse instances to actors listening to LIST updates.
     */
   def notifyListActors(updates: DSAVal*) = _rids foreach {
-    case (rid, ref) => ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
+    case (rid, ref) =>
+      ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
+      log.debug("notify list updates:\\{} \\to: \\{} -> {}", updates, rid, ref)
   }
 
   /**

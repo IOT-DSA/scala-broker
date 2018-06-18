@@ -5,6 +5,7 @@ import akka.event.Logging
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
+import models.util.LoggingAdapterInside
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
@@ -16,6 +17,7 @@ import scala.concurrent.duration.Duration
 class InMemoryDSANode(val parent: Option[DSANode])
   extends DSANode
     with DSANodeRequestHandler
+    with LoggingAdapterInside
     with DSANodeSubscriptions
     with TypedActor.Receiver
     with TypedActor.PreStart

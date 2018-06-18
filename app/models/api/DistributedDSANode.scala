@@ -3,10 +3,10 @@ package models.api
 import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.cluster.Cluster
 import akka.cluster.ddata.ReplicatedData
-import models.api.DSAValueType.DSAValueType
+import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
 import akka.cluster.ddata.Replicator._
-import akka.event.Logging
+import akka.event.{Logging, LoggingAdapter}
 import akka.pattern.PromiseRef
 import akka.util.Timeout
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
@@ -14,6 +14,7 @@ import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.{AddNode, GetNodesByPath}
 import akka.pattern.ask
 import models.rpc.DSAValue
+import models.util.LoggingAdapterInside
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,6 +29,7 @@ class DistributedDSANode(
   with TypedActor.PreStart
   with TypedActor.PostStop
   with DSANodeSubscriptions
+  with LoggingAdapterInside
   with DSANodeRequestHandler {
 
   val dataKey = DistributedDSANodeKey(path)
@@ -71,7 +73,7 @@ class DistributedDSANode(
     .get("$type")
     .map(_.value.asInstanceOf[String])
     .map(DSAValueType.byName)
-    .getOrElse(DSAValueType.DSAString)
+    .getOrElse(DSADynamic)
   )
 
   override def valueType_=(vt: DSAValueType): Unit = editProperty { old =>
@@ -82,7 +84,7 @@ class DistributedDSANode(
   override def displayName: Future[String] = Future.successful(
     data.configs.get("$name")
       .map(_.value.asInstanceOf[String])
-      .getOrElse("")
+      .getOrElse(name)
   )
 
   override def displayName_=(name: String): Unit = editProperty { old =>
@@ -92,7 +94,7 @@ class DistributedDSANode(
 
   override def profile: String = data.configs.get("$is")
     .map(_.value.asInstanceOf[String])
-    .getOrElse("")
+    .getOrElse("node")
 
 
   override def profile_=(p: String): Unit = editProperty { old =>
@@ -214,13 +216,14 @@ class DistributedDSANode(
 
           val updates = newChildren ++ attrUpdates ++ confUpdates ++ deleted
 
-          if (!updates.isEmpty) {
-            notifyListActors(updates)
-          }
+
 
           _sids = newData.subscriptions.filter(kv => isLocal(kv._2))
           _rids = newData.listSubscriptions.filter(kv => isLocal(kv._2))
           if (data.value != newData.value) notifySubscribeActors(newData.value)
+          if (!updates.isEmpty) {
+            notifyListActors(updates.toArray:_*)
+          }
           data = newData
           log.debug("data replicated: {}", data)
         })

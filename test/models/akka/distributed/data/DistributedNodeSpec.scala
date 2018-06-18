@@ -167,11 +167,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
           e <- envelops
           resp <- e.responses
           update <- resp.updates.getOrElse(List())
-          unpacked <- update match {
-            case v: DSAValue[DSAArray] => v.value.toList
-            case anyOther => List(anyOther)
-          }
-        } yield unpacked
+        } yield update
 
         val notifications2 = extractUpdates(rightProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
         val notifications1 = extractUpdates(leftProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
