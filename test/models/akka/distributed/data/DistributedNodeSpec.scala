@@ -5,7 +5,6 @@ import java.util.concurrent.TimeUnit
 import akka.testkit.TestProbe
 import models.ResponseEnvelope
 import models.api.DSAValueType
-import models.rpc.DSAValue
 import models.rpc.DSAValue._
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
 
@@ -159,7 +158,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
         TimeUnit.SECONDS.sleep(1)
 
-        left.addChild("child1")
+        left.addChild("childListTestNode")
         left.addConfigs("config" -> StringValue("!!!"))
         left.addAttributes("attribute" -> StringValue("!!!"))
 
@@ -175,17 +174,16 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         notifications1.size shouldBe notifications2.size
 
         left.removeAttribute("@attribute")
+        TimeUnit.SECONDS.sleep(1)
         left.removeConfig("$config")
-        left.removeChild("child1")
+        TimeUnit.SECONDS.sleep(1)
+        left.removeChild("childListTestNode")
 
         val deleteNat2 = extractUpdates(rightProbe.expectMsgAllClassOf(4 seconds, classOf[ResponseEnvelope]))
         val deleteNat1 = extractUpdates(leftProbe.expectMsgAllClassOf(4 seconds, classOf[ResponseEnvelope]))
 
         deleteNat1.size shouldBe deleteNat2.size
-
     }
-
-
   }
 
 
