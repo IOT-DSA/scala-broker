@@ -159,8 +159,14 @@ class DistributedDSANode(
 
   override def action: Option[DSAAction] = _action
 
-  override def action_=(a: DSAAction): Unit = {
+  override def action_=(a: DSAAction) = {
     _action = Some(a)
+    val params =  a.params map {
+      case (pName, pType) => obj("name" -> pName, "type" -> pType.toString)
+    }
+    _configs += ("$params" -> params)
+    _configs += ("$invokable" -> "write")
+    profile = "static"
   }
 
   override def invoke(params: DSAMap): Unit = {
