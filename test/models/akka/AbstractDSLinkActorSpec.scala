@@ -32,6 +32,7 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
     "register with downstream" in {
       downProbe.expectMsg(RegisterDSLink(linkName, DSLinkMode.Requester, false))
     }
+    Thread.sleep(500)
     "start in disconnected state" in {
       whenReady(dslink ? GetLinkInfo) {
         _ mustBe LinkInfo(ConnectionInfo("", linkName, true, false), false, None, None)
