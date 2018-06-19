@@ -35,7 +35,6 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
       node.displayName = "data"
   }
 
-
   log.info("Clustered DSLink Manager created")
 
   /**
