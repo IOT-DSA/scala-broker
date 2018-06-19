@@ -164,8 +164,7 @@ class DistributedDSANode(
     val params =  a.params map {
       case (pName, pType) => obj("name" -> pName, "type" -> pType.toString)
     }
-    _configs += ("$params" -> params)
-    _configs += ("$invokable" -> "write")
+    addConfigs("$params" -> params, "$invokable" -> "write")
     profile = "static"
   }
 
