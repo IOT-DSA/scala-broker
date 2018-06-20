@@ -2,25 +2,26 @@ package models.akka.local
 
 import akka.actor.{PoisonPill, Props, actorRef2Scala}
 import akka.routing.{ActorRefRoutee, Routee}
-import models.akka.{DSLinkFolderActor, DSLinkManager, IsNode, rows}
+import akka.stream.scaladsl.Source
 import models.akka.Messages._
+import models.akka.{DSLinkFolderActor, IsNode, rows}
 import models.rpc.DSAValue._
 import models.util.DsaToAkkaCoder._
 
 /**
- * Actor for local DSA link folder node, such as `/upstream` or `/downstream`.
- */
+  * Actor for local DSA link folder node, such as `/upstream` or `/downstream`.
+  */
 class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (String, DSAVal)*)
   extends DSLinkFolderActor(linkPath) {
 
   /**
-   * Handles incoming messages.
-   */
+    * Handles incoming messages.
+    */
   def receive = responderBehavior orElse mgmtHandler
 
   /**
-   * Handles control messages.
-   */
+    * Handles control messages.
+    */
   val mgmtHandler: Receive = {
 
     case GetOrCreateDSLink(name) =>
@@ -56,8 +57,8 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   }
 
   /**
-   * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
-   */
+    * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
+    */
   protected def getOrCreateDSLink(name: String): Routee = {
     val child = context.child(name.forAkka) getOrElse {
       log.info("{}: creating a new dslink '{}'", ownId, name)
@@ -67,32 +68,32 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   }
 
   /**
-   * Terminates the specified DSLink actors.
-   */
+    * Terminates the specified DSLink actors.
+    */
   protected def removeDSLinks(names: String*) = {
     names map(_.forAkka) map context.child collect { case Some(ref) => ref } foreach (_ ! PoisonPill)
   }
 
   /**
-   * Generates a list of values in response to LIST request.
-   */
-  protected def listNodes: Iterable[ArrayValue] = {
+    * Generates a list of values in response to LIST request.
+    */
+  protected def listNodes: Source[ArrayValue, _] = {
     val configs = rows(IsNode) ++ rows(extraConfigs: _*)
 
     val children = links.keys map (name => array(name, obj(IsNode)))
 
-    configs ++ children
+    Source(configs ++ children)
   }
 }
 
 /**
- * Factory for [[LocalDSLinkFolderActor]] instances.
- */
+  * Factory for [[LocalDSLinkFolderActor]] instances.
+  */
 object LocalDSLinkFolderActor {
 
   /**
-   * Creates a new props for [[LocalDSLinkFolderActor]].
-   */
+    * Creates a new props for [[LocalDSLinkFolderActor]].
+    */
   def props(linkPath: String, linkProps: Props, extraConfigs: (String, DSAVal)*) =
     Props(new LocalDSLinkFolderActor(linkPath, linkProps, extraConfigs: _*))
 }
