@@ -1,32 +1,26 @@
 package models.akka
 
 
+import akka.actor.ActorRef
+import akka.actor.Status.Success
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete, StreamRefs}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import models.akka.Messages._
+import models.metrics.Meter
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
-import org.joda.time.DateTime
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
-import models.metrics.EventDaos
 import org.reactivestreams.Publisher
-import akka.pattern.pipe
 import models.akka.QoSState._
-
-import scala.concurrent.Future
 
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
-trait RequesterBehavior { me: AbstractDSLinkActor =>
+trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
 
   implicit val materializer = ActorMaterializer()
-
-  protected def eventDaos: EventDaos
-  
   protected def dslinkMgr: DSLinkManager
 
   //state actore to store different dslink state with persistance etc
@@ -34,7 +28,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
     maxCapacity = Settings.Subscriptions.queueCapacity
   ), "stateKeeper")
-  
+
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
   private val targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
@@ -55,7 +49,6 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
       processRequests(requests)
       requests.lastOption foreach (req => lastRid = req.rid)
     case e @ ResponseEnvelope(responses) =>
-
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
 
@@ -71,14 +64,15 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
         sendToEndpoint(ResponseEnvelope(other))
       }
 
-    case GetSubscriptionSource =>
-      getSubscriptionSource pipeTo sender()
+    case SubscriptionSourceMessage(actorRef) =>
+      getSubscriptionSource(actorRef)
 
   }
 
   // requester mixin for disconnected behavior
   val requesterDisconnected: Receive = {
-    case GetSubscriptionSource => sender ! getSubscriptionSource
+    case SubscriptionSourceMessage(actorRef) =>
+      getSubscriptionSource(actorRef)
     case e @ ResponseEnvelope(responses) =>
 
       log.debug("{}: received {}", ownId, e)
@@ -108,16 +102,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource:Future[SubscriptionSourceMessage] = {
+  private def getSubscriptionSource(actor:ActorRef) = {
+
+    log.info("new subscription source connected: {}", actor)
+
     val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
-      .via(channel)
-      .toMat(Sink.asPublisher(false))(Keep.both)
-      .run()
+      .via(channel).toMat(Sink.actorRef(actor, Success(())))(Keep.both).run()
 
     toSocket = toSocketVal
-    Source.fromPublisher(publisher).runWith(StreamRefs.sourceRef()) map {
-      SubscriptionSourceMessage(_)
-    }
   }
 
   /**
@@ -226,8 +218,9 @@ trait RequesterBehavior { me: AbstractDSLinkActor =>
     else
       "broker"
 
-    eventDaos.requestEventDao.saveRequestBatchEvents(DateTime.now, linkName, connInfo.linkAddress,
-      tgtLinkName, requests: _*)
+    meterTags(tagsForConnection("out.requests.batch")(connInfo):_*)
+    incrementTagsNTimes(tagsForConnection("out.requests.batch.requests")(connInfo):_*)(requests.size)
+
   }
 
   /**

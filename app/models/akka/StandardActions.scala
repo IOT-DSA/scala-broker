@@ -14,7 +14,7 @@ object StandardActions {
    */
   def bindDataRootActions(node: DSANode) = bindActions(node,
     ("addNode", "Add Node", AddNode),
-    ("addValue", "Add Value", AddValue))
+    ("addValue", "Add VSalue", AddValue))
 
   /**
    * Adds actions as per broker/dataNode profile.
@@ -33,7 +33,7 @@ object StandardActions {
   )
 
   def bindTokenGroupNodeActions(node: DSANode) = bindActions(node,
-    ("add", "add token", AddNode)
+    ("addToken", "Add token node", AddToken)
   )
 
   /**
@@ -59,12 +59,27 @@ object StandardActions {
   }, "name" -> DSAString)
 
   /**
+    * Adds a Token node.
+    */
+  val AddToken: DSAAction = DSAAction((ctx: ActionContext) => {
+    ctx.node.parent foreach { parent =>
+      val name = ctx.args("name").value.toString
+      parent.addChild(name) foreach { node =>
+        node.profile = "broker/TokenNode"
+        bindTokenNodeActions(node)
+      }
+    }
+  }, "name" -> DSAString)
+
+  /**
     * Modify current token node
     */
   val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) => {
-      aaa
-    }
-  )
+    val node = ctx.node.parent.get
+    val value = ctx.args("value")
+
+    node.value = value
+  }, "value" -> DSAString)
 
   /**
    * Adds a value child node.

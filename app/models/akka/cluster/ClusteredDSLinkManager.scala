@@ -6,13 +6,12 @@ import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRe
 import akka.routing.Routee
 import akka.util.Timeout
 import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
-import models.metrics.EventDaos
 import akka.actor.Props
 
 /**
  * Uses Akka Cluster Sharding to communicate with DSLinks.
  */
-class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(implicit val system: ActorSystem) extends DSLinkManager {
+class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSystem) extends DSLinkManager {
   import models.Settings._
 
   implicit val timeout = Timeout(QueryTimeout)
