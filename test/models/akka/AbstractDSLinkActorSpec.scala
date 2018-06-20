@@ -34,8 +34,9 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
     }
     Thread.sleep(500)
     "start in disconnected state" in {
-      whenReady(dslink ? GetLinkInfo) {
-        _ mustBe LinkInfo(ConnectionInfo("", linkName, true, false), false, None, None)
+      whenReady(dslink ? GetLinkInfo) { x =>
+        val y = x.asInstanceOf[LinkInfo].ci
+        x mustBe LinkInfo(ConnectionInfo("", linkName, true, false, sharedSecret = y.sharedSecret), false, None, None)
       }
     }
     "connect to endpoint and register with downstream" in {
