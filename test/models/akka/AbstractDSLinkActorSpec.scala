@@ -33,8 +33,9 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       downProbe.expectMsg(RegisterDSLink("abc", DSLinkMode.Requester, false))
     }
     "start in disconnected state" in {
-      whenReady(dslink ? GetLinkInfo) {
-        _ mustBe LinkInfo(ConnectionInfo("", "abc", true, false), false, None, None)
+      whenReady(dslink ? GetLinkInfo) { x =>
+        val y = x.asInstanceOf[LinkInfo].ci
+        x mustBe LinkInfo(ConnectionInfo("", "abc", true, false, sharedSecret = y.sharedSecret), false, None, None)
       }
     }
     "connect to endpoint and register with downstream" in {
