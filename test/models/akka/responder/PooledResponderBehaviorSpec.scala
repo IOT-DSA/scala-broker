@@ -9,6 +9,7 @@ import models.{ RequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages }
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
+import models.util.DsaToAkkaCoder._
 
 /**
  * PooledResponderBehavior test suite.
@@ -19,7 +20,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   val ci = ConnectionInfo("", "", false, true)
 
-  val responder = system.actorOf(Props(new Responder()), "R")
+  val responder = system.actorOf(Props(new Responder()), "R 1".forAkka)
 
   val ws = TestProbe()
 
@@ -29,15 +30,15 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   "PooledResponderBehavior" should {
     "handle List requests" in {
-      responder.tell(RequestEnvelope(List(ListRequest(101, "/downstream/R/blah"))), requesters(1).ref)
+      responder.tell(RequestEnvelope(List(ListRequest(101, "/downstream/R 1/blah"))), requesters(1).ref)
       ws.expectMsg(RequestEnvelope(List(ListRequest(1, "/blah"))))
 
       val rsp1 = DSAResponse(rid = 1, updates = Some(List(obj("a" -> "b"))))
       ws.reply(ResponseMessage(1, None, List(rsp1)))
       requesters(1).expectMsg(ResponseEnvelope(List(rsp1.copy(rid = 101))))
 
-      responder.tell(RequestEnvelope(List(ListRequest(201, "/downstream/R/blah"))), requesters(2).ref)
-      responder.tell(RequestEnvelope(List(ListRequest(301, "/downstream/R/blah"))), requesters(3).ref)
+      responder.tell(RequestEnvelope(List(ListRequest(201, "/downstream/R 1/blah"))), requesters(2).ref)
+      responder.tell(RequestEnvelope(List(ListRequest(301, "/downstream/R 1/blah"))), requesters(3).ref)
       requesters(2).expectMsg(ResponseEnvelope(List(rsp1.copy(rid = 201))))
       requesters(3).expectMsg(ResponseEnvelope(List(rsp1.copy(rid = 301))))
 
@@ -55,19 +56,19 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       responder.tell(RequestEnvelope(List(CloseRequest(301))), requesters(3).ref)
       ws.expectMsg(RequestEnvelope(List(CloseRequest(1))))
 
-      responder.tell(RequestEnvelope(List(ListRequest(401, "/downstream/R/blah"))), requesters(4).ref)
+      responder.tell(RequestEnvelope(List(ListRequest(401, "/downstream/R 1/blah"))), requesters(4).ref)
       ws.expectMsg(RequestEnvelope(List(ListRequest(2, "/blah"))))
 
       responder.tell(RequestEnvelope(List(CloseRequest(401))), requesters(4).ref)
       ws.expectMsg(RequestEnvelope(List(CloseRequest(2))))
     }
     "handle Set requests" in {
-      responder.tell(RequestEnvelope(List(SetRequest(111, "/downstream/R/blah", 5))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(SetRequest(211, "/downstream/R/blah", 3))), requesters(2).ref)
+      responder.tell(RequestEnvelope(List(SetRequest(111, "/downstream/R 1/blah", 5))), requesters(1).ref)
+      responder.tell(RequestEnvelope(List(SetRequest(211, "/downstream/R 1/blah blah", 3))), requesters(2).ref)
 
       ws.receiveN(2).toSet mustBe Set(
         RequestEnvelope(List(SetRequest(3, "/blah", 5))),
-        RequestEnvelope(List(SetRequest(4, "/blah", 3))))
+        RequestEnvelope(List(SetRequest(4, "/blah blah", 3))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(3, Some(Closed)), DSAResponse(4, Some(Closed)))))
 
@@ -75,8 +76,8 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 211, stream = Some(Closed)))))
     }
     "handle Remove requests" in {
-      responder.tell(RequestEnvelope(List(RemoveRequest(121, "/downstream/R/blah"))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(RemoveRequest(321, "/downstream/R/blah"))), requesters(3).ref)
+      responder.tell(RequestEnvelope(List(RemoveRequest(121, "/downstream/R 1/blah"))), requesters(1).ref)
+      responder.tell(RequestEnvelope(List(RemoveRequest(321, "/downstream/R 1/blah"))), requesters(3).ref)
 
       ws.receiveN(2).toSet mustBe Set(
         RequestEnvelope(List(RemoveRequest(5, "/blah"))),
@@ -88,8 +89,8 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(3).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 321, stream = Some(Closed)))))
     }
     "handle non-streaming Invoke requests" in {
-      responder.tell(RequestEnvelope(List(InvokeRequest(131, "/downstream/R/blah"))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(InvokeRequest(231, "/downstream/R/blah"))), requesters(2).ref)
+      responder.tell(RequestEnvelope(List(InvokeRequest(131, "/downstream/R 1/blah"))), requesters(1).ref)
+      responder.tell(RequestEnvelope(List(InvokeRequest(231, "/downstream/R 1/blah"))), requesters(2).ref)
 
       ws.receiveN(2).toSet mustBe Set(
         RequestEnvelope(List(InvokeRequest(7, "/blah"))),
@@ -101,8 +102,8 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 231, stream = Some(Closed)))))
     }
     "handle streaming Invoke requests" in {
-      responder.tell(RequestEnvelope(List(InvokeRequest(141, "/downstream/R/blah"))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(InvokeRequest(241, "/downstream/R/blah"))), requesters(2).ref)
+      responder.tell(RequestEnvelope(List(InvokeRequest(141, "/downstream/R 1/blah"))), requesters(1).ref)
+      responder.tell(RequestEnvelope(List(InvokeRequest(241, "/downstream/R 1/blah"))), requesters(2).ref)
 
       ws.receiveN(2).toSet mustBe Set(
         RequestEnvelope(List(InvokeRequest(9, "/blah"))),
@@ -127,13 +128,13 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
     }
     "handle Subscribe requests" in {
       responder.tell(RequestEnvelope(List(SubscribeRequest(151, List(
-        SubscriptionPath("/downstream/R/blahA", 1001))))), requesters(1).ref)
+        SubscriptionPath("/downstream/R 1/blahA", 1001))))), requesters(1).ref)
 
       ws.expectMsg(RequestEnvelope(List(SubscribeRequest(11, List(
         SubscriptionPath("/blahA", 1))))))
 
       responder.tell(RequestEnvelope(List(SubscribeRequest(251, List(
-        SubscriptionPath("/downstream/R/blahB", 2001))))), requesters(2).ref)
+        SubscriptionPath("/downstream/R 1/blahB", 2001))))), requesters(2).ref)
 
       ws.expectMsg(RequestEnvelope(List(SubscribeRequest(12, List(
         SubscriptionPath("/blahB", 2))))))
@@ -157,7 +158,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
         updates = Some(List(obj("sid" -> 2001, "data" -> 222)))))))
 
       responder.tell(RequestEnvelope(List(SubscribeRequest(351, List(
-        SubscriptionPath("/downstream/R/blahA", 3001))))), requesters(3).ref)
+        SubscriptionPath("/downstream/R 1/blahA", 3001))))), requesters(3).ref)
 
       requesters(3).receiveN(2).toSet mustBe Set(
         ResponseEnvelope(List(DSAResponse(rid = 351, stream = Some(Closed)))),

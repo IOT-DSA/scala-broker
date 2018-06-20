@@ -133,10 +133,10 @@ class SimpleResponderBehaviorSpec extends AbstractActorSpec {
         SubscriptionPath("/blahA", 1))))))
 
       responder.tell(RequestEnvelope(List(SubscribeRequest(251, List(
-        SubscriptionPath("/downstream/R/blahB", 2001))))), requesters(2).ref)
+        SubscriptionPath("/downstream/R/blahB blhaB", 2001))))), requesters(2).ref)
 
       ws.expectMsg(RequestEnvelope(List(SubscribeRequest(12, List(
-        SubscriptionPath("/blahB", 2))))))
+        SubscriptionPath("/blahB blhaB", 2))))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 11, stream = Some(Closed)))))
       val rsp1 = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> 1, "data" -> 111))))
