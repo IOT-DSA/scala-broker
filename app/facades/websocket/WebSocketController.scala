@@ -303,11 +303,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     * @return
     */
   private def getAuth(request: RequestHeader): Option[String] = {
-    try {
-      request.queryString("auth").headOption
-    } catch {
-      case _ : Throwable=> Option[String](null)
-    }
+    request.queryString("auth").headOption
   }
 
   /**
