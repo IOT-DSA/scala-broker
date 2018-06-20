@@ -2,15 +2,16 @@ package models.akka
 
 import java.util.regex.Pattern
 
-import akka.actor.{ ActorLogging }
 import akka.persistence.PersistentActor
+import akka.actor.ActorLogging
 import akka.routing.Routee
-import models.{ RequestEnvelope, Settings }
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
 import models.akka.DSLinkMode.DSLinkMode
-import models.akka.Messages.{ DSLinkNodeStats, LinkState }
+import models.akka.Messages.{DSLinkNodeStats, LinkState}
 import models.akka.responder.SimpleResponderBehavior
-import models.akka.responder.ResponderBehavior
 import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
+import models.{RequestEnvelope, Settings}
 
 /**
  * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.
@@ -48,6 +49,8 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
       log.debug("{}: trying to recover {}", ownId, event)
       links -= event.name
   }
+
+  implicit val mat = ActorMaterializer()
 
   /**
    * Terminates the actor system if the actor's path does not match `/user/<path>`.
@@ -97,17 +100,17 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   }
 
   /**
-   * Processes a DSA payload and forwards the results to [[ResponderBehavior]].
+   * Processes a DSA payload and forwards the results to [[models.akka.responder.ResponderBehavior]].
    */
   protected def sendToEndpoint(msg: Any): Unit = msg match {
-    case RequestEnvelope(requests) => requests flatMap processRequest foreach responderBehavior
+    case RequestEnvelope(requests) => requests foreach handleRequest
     case _                         => log.warning("Unknown message received: {}", msg)
   }
 
   /**
    * Generates response for LIST request.
    */
-  protected def listNodes: Iterable[ArrayValue]
+  protected def listNodes: Source[ArrayValue, _]
 
   /**
    * Creates/accesses a new DSLink actor and emits an update, if there is an active LIST request.
@@ -122,19 +125,16 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   /**
    * Processes an incoming request and produces a list of response envelopes, if any.
    */
-  protected def processRequest(request: DSARequest): TraversableOnce[ResponseMessage] = request match {
+  protected def handleRequest(request: DSARequest): Unit = request match {
     case ListRequest(rid, "/") =>
       listRid = Some(rid)
-      listNodes grouped Settings.ChildrenPerListResponse map { rows =>
+      val messages = listNodes grouped Settings.ChildrenPerListResponse map { rows =>
         val response = DSAResponse(rid = rid, stream = Some(Open), updates = Some(rows.toList))
         ResponseMessage(-1, None, List(response))
       }
-    case CloseRequest(_) =>
-      listRid = None
-      Nil
-    case _ =>
-      log.error(s"Invalid request - $request")
-      Nil
+      messages.runForeach(self.forward)
+    case CloseRequest(_) => listRid = None
+    case _ => log.error(s"Invalid request - $request")
   }
 
   /**
