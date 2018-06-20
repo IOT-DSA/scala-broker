@@ -23,11 +23,6 @@ object Settings {
   val BrokerName = rootConfig.getString("broker.name")
 
   /**
-    * Broker private key filename
-    */
-  val BrokerKeyFilename = rootConfig.getString("broker.server-config.keyFilename")
-
-  /**
    * DSA Server Configuration.
    */
   val ServerConfiguration = {
