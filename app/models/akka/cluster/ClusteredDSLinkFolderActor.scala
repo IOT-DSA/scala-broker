@@ -1,77 +1,94 @@
 package models.akka.cluster
 
-import scala.concurrent.Await
-
-import akka.actor.{ Identify, PoisonPill, Props, actorRef2Scala }
-import akka.pattern.{ ask, pipe }
+import models.akka.{ DSLinkCreated, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered }
+import akka.actor.{Identify, PoisonPill, Props, actorRef2Scala}
+import akka.pattern.pipe
 import akka.routing.Routee
-import models.akka.{ DSLinkFolderActor, IsNode, RichRoutee, rows }
+import akka.stream.scaladsl.Source
 import models.akka.Messages._
-import models.rpc.DSAValue.{ ArrayValue, DSAVal, StringValue, array, obj }
+import models.akka.{DSLinkFolderActor, IsNode, RichRoutee, rows}
+import models.rpc.DSAValue.{ArrayValue, DSAVal, StringValue, array, obj}
+
+import scala.concurrent.Future
 
 /**
- * Actor for clustered DSA link folder node, such as `/upstream` or `/downstream`.
- */
+  * Actor for clustered DSA link folder node, such as `/upstream` or `/downstream`.
+  */
 class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee, extraConfigs: (String, DSAVal)*)
   extends DSLinkFolderActor(linkPath) with ClusteredActor {
 
   import context.dispatcher
 
+  override def persistenceId = linkPath
+
   /**
    * Handles incoming messages.
    */
-  def receive = responderBehavior orElse mgmtHandler
+  override def receiveCommand = responderBehavior orElse mgmtHandler
 
   /**
-   * Handler for messages coming from peer nodes.
-   */
+    * Handles events recovering when starting.
+    */
+  override def receiveRecover = dslinkFolderRecover orElse responderRecover
+
+  /**
+    * Handler for messages coming from peer nodes.
+    */
   private val peerMsgHandler: Receive = {
 
-    case RegisterDSLink(name, mode, connected)     => notifyOnRegister(name)
+    case RegisterDSLink(name, mode, connected) => notifyOnRegister(name)
 
-    case GetDSLinkNames                            => sender ! links.keys.toList
+    case GetDSLinkNames => sender ! links.keys.toList
 
-    case UnregisterDSLink(name)                    => notifyOnRemove(name)
+    case UnregisterDSLink(name) => notifyOnRemove(name)
 
     case DSLinkStateChanged(name, mode, connected) => changeLinkState(name, mode, connected, false)
 
-    case GetDSLinkStats                            => sender ! buildDSLinkNodeStats
+    case GetDSLinkStats => sender ! buildDSLinkNodeStats
 
-    case FindDSLinks(regex, limit, offset)         => sender ! findDSLinks(regex, limit, offset)
+    case FindDSLinks(regex, limit, offset) => sender ! findDSLinks(regex, limit, offset)
 
-    case RemoveDisconnectedDSLinks                 => removeDisconnectedDSLinks
+    case RemoveDisconnectedDSLinks => removeDisconnectedDSLinks
   }
 
   /**
-   * Handles control messages.
-   */
+    * Handles control messages.
+    */
   val mgmtHandler: Receive = {
 
     case PeerMessage(msg) => peerMsgHandler(msg)
 
     case GetOrCreateDSLink(name) =>
-      log.info("{}: requested DSLink '{}'", ownId, name)
-      sender ! getOrCreateDSLink(name)
+      persist(DSLinkCreated(name)) { event =>
+        log.info("{}: requested DSLink '{}'", ownId, event.name)
+        sender ! getOrCreateDSLink(event.name)
+      }
 
     case msg @ RegisterDSLink(name, mode, connected) =>
-      links += (name -> LinkState(mode, connected))
-      tellPeers(PeerMessage(msg))
-      log.info("{}: registered DSLink '{}'", ownId, name)
+      persist(DSLinkRegistered(name, mode, connected)) { event =>
+        links += (event.name -> LinkState(event.mode, event.connected))
+        tellPeers(PeerMessage(msg))
+        log.info("{}: registered DSLink '{}'", ownId, event.name)
+      }
 
     case GetDSLinkNames =>
       val nodeLinks = askPeers[Iterable[String]](PeerMessage(GetDSLinkNames)) map (_ flatMap (_._2))
       nodeLinks pipeTo sender
 
     case RemoveDSLink(name) =>
-      removeDSLinks(name)
-      log.info("{}: rrdered to remove DSLink '{}'", ownId, name)
+      persist(DSLinkRemoved(name)) { event =>
+        removeDSLinks(event.names: _*)
+        log.info("{}: ordered to remove DSLink '{}'", ownId, event.names)
+      }
 
     case msg @ UnregisterDSLink(name) =>
-      links -= name
-      tellPeers(PeerMessage(msg))
-      log.info("{}: removed DSLink '{}'", ownId, name)
+      persist(DSLinkUnregistered(name)) { event =>
+        links -= event.name
+        tellPeers(PeerMessage(msg))
+        log.info("{}: removed DSLink '{}'", ownId, event.name)
+      }
 
-    case evt @ DSLinkStateChanged(name, mode, connected) =>
+    case evt@DSLinkStateChanged(name, mode, connected) =>
       log.info("{}: DSLink state changed: '{}'", ownId, evt)
       tellPeers(PeerMessage(evt))
 
@@ -89,8 +106,8 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
   }
 
   /**
-   * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
-   */
+    * Creates/accesses a new DSLink actor and returns a [[Routee]] instance for it.
+    */
   protected def getOrCreateDSLink(name: String): Routee = {
     val routee = linkProxy(name)
     routee ! Identify
@@ -98,36 +115,40 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
   }
 
   /**
-   * Terminates the specified DSLink actors.
-   */
+    * Terminates the specified DSLink actors.
+    */
   protected def removeDSLinks(names: String*) = names map linkProxy foreach (_ ! PoisonPill)
 
   /**
-   * Creates a list of values in response to LIST request by querying peer nodes
-   * and contatenating their list with its own.
-   */
-  protected def listNodes: Iterable[ArrayValue] = {
-    val configs = rows(IsNode) ++ rows(extraConfigs: _*)
+    * Creates a stream of values in response to LIST request by querying peer nodes
+    * and concatenating their lists with its own.
+    */
+  protected def listNodes: Source[ArrayValue, _] = {
 
-    val otherLinks = askPeers[Iterable[String]](PeerMessage(GetDSLinkNames), false)
-    val children = otherLinks map (_.flatMap(_._2)) map { names =>
-      (links.keys ++ names) map (name => array(name, obj(IsNode)))
+    def toImmutable[A](elements: Iterable[A]) = new scala.collection.immutable.Iterable[A] {
+      override def iterator: Iterator[A] = elements.toIterator
     }
 
-    // TODO this NEEDS TO and WILL be changed, no blocking!!!
-    // leaving for now as it will require changes in multiple spots
-    Await.result(children.map(configs ++ _), timeout.duration)
+    val configs = rows(IsNode) ++ rows(extraConfigs: _*)
+
+    val otherLinks = queryPeers[Iterable[String]](PeerMessage(GetDSLinkNames), false)
+
+    val children = otherLinks.map(_._2) + Future.successful(links.keys)
+
+    val sources = children.map(names => Source.fromFuture(names).mapConcat(toImmutable))
+
+    Source(configs) ++ sources.foldLeft(Source.empty[String])(_ ++ _).map(name => array(name, obj(IsNode)))
   }
 }
 
 /**
- * Factory for [[ClusteredDSLinkFolderActor]] instances.
- */
+  * Factory for [[ClusteredDSLinkFolderActor]] instances.
+  */
 object ClusteredDSLinkFolderActor {
 
   /**
-   * Creates a new props for [[ClusteredDSLinkFolderActor]].
-   */
+    * Creates a new props for [[ClusteredDSLinkFolderActor]].
+    */
   def props(linkPath: String, linkProxy: (String) => Routee, extraConfigs: (String, DSAVal)*) =
     Props(new ClusteredDSLinkFolderActor(linkPath, linkProxy, extraConfigs: _*))
 }

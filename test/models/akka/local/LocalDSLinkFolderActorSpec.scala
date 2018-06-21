@@ -1,17 +1,14 @@
 package models.akka.local
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.Inside
-
-import akka.actor.actorRef2Scala
+import akka.actor.{Address, PoisonPill, actorRef2Scala}
 import akka.pattern.ask
 import akka.routing.ActorRefRoutee
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
-import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
-import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
-import akka.actor.Address
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.akka.{AbstractActorSpec, DSLinkMode, IsNode, rows}
+import models.rpc.{CloseRequest, DSAResponse, ListRequest}
 
 /**
  * LocalDSLinkFolderActor test suite.
@@ -20,11 +17,11 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   import models.Settings._
   import models.akka.Messages._
   import models.rpc.DSAValue._
-  
-  type FoundLinks = Map[Address, Iterable[String]]
 
-  implicit val timeout = Timeout(3 seconds)
-  val dsId = "link" + "?" * 44
+  type FoundLinks = Map[Address, Iterable[String]]
+  
+  implicit val timeout = Timeout(5 seconds)
+  var downstreamRecovered: akka.actor.ActorRef =_
 
   val dslinkMgr = new LocalDSLinkManager()
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(
@@ -38,6 +35,8 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
         link.ref.path.parent mustBe downstream.path
         link.ref.path.name mustBe "aaa"
       }
+    }
+    "create one more dslink" in {
       whenReady(downstream ? GetOrCreateDSLink("bbb")) { result =>
         result mustBe a[ActorRefRoutee]
         val link = result.asInstanceOf[ActorRefRoutee]
@@ -56,20 +55,29 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   }
 
   "RegisterDSLink" should {
-    "record link names" in {
+    "record a link name" in {
       downstream ! RegisterDSLink("aaa", DSLinkMode.Requester, false)
+    }
+    "record one more link name" in {
       downstream ! RegisterDSLink("bbb", DSLinkMode.Requester, false)
+    }
+  }
+
+  "DSLinkStateChanged" should {
+    "become responder" in {
       downstream ! DSLinkStateChanged("bbb", DSLinkMode.Responder, false)
       whenReady((downstream ? GetDSLinkNames).mapTo[Iterable[String]]) {
         _.toSet mustBe Set("aaa", "bbb")
       }
     }
-//    "record link stats" in {
-//      Thread.sleep(500)
-//      whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
-//        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 0, 1, 0, 0))
-//      }
-//    }
+  }
+
+  "GetDSLinkStats" should {
+    "record link stats" in {
+      whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
+        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 0, 1, 0, 0))
+      }
+    }
   }
 
   "DSLinkStateChanged" should {
@@ -78,6 +86,8 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
         _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 1, 0, 0, 0))
       }
+    }
+    "handle change dslink state again" in {
       downstream ! DSLinkStateChanged("bbb", DSLinkMode.Responder, false)
       whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
         _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 1, 0, 1, 0, 0))
@@ -99,7 +109,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       downstream ! RequestEnvelope(List(ListRequest(1, "/downstream")))
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
-//          list mustBe rows(IsNode, "downstream" -> true, "aaa" -> obj(IsNode), "bbb" -> obj(IsNode))
+          list.toSet mustBe rows(IsNode, "downstream" -> true, "aaa" -> obj(IsNode), "bbb" -> obj(IsNode)).toSet
       }
     }
     "send updates on added nodes" in {
@@ -128,12 +138,24 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
     }
   }
 
-  "RemoveDisconnectedDSLinks" should {
-    "remove all disconnected dslinks" in {
-      downstream ! RemoveDisconnectedDSLinks
+  "PoisonPill" should {
+    "kill downstream and then try to recover it" in {
+      downstream ! PoisonPill
       Thread.sleep(500)
-      whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
-        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 0, 0, 0, 0, 0))
+      downstreamRecovered = system.actorOf(LocalDSLinkFolderActor.props(
+        Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
+      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 2, 0, 1, 0, 0))
+      }
+    }
+  }
+
+  "RemoveDisconnectedDSLinks" should {
+    "remove all disconnected dslinks after the state recovering" in {
+      downstreamRecovered ! RemoveDisconnectedDSLinks
+      Thread.sleep(500)
+      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 0, 0, 0, 0, 0))
       }
     }
   }
