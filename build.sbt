@@ -50,6 +50,7 @@ EclipseKeys.withJavadoc := true
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
 resolvers += "velvia maven" at "http://dl.bintray.com/velvia/maven"
+resolvers += Resolver.bintrayRepo("tanukkii007", "maven")
 
 scalacOptions ++= Seq(
   "-feature",
@@ -132,7 +133,8 @@ lazy val commonDependencies = Seq(
   "io.kamon" %% "kamon-statsd" % "1.0.0",
   "io.kamon" %% "kamon-system-metrics" % "1.0.0",
   "io.kamon" %% "kamon-core" % "1.0.0",
-  "io.kamon" %% "kamon-zipkin" % "1.0.0"
+  "io.kamon" %% "kamon-zipkin" % "1.0.0",
+  "com.github.TanUkkii007" %% "akka-cluster-custom-downing" % "0.0.12"
 )
 
 // akka and play test dependencies

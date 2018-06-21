@@ -49,8 +49,8 @@ class MainController @Inject() (actorSystem: ActorSystem,
     val dslinkStats = getDSLinkCounts
     val uplinkStats = getUplinkCounts
     for {
-      down <- dslinkStats
-      up <- uplinkStats
+      down <- dslinkStats.recover{case e => DSLinkStats(Map.empty)}
+      up <- uplinkStats.recover{case e => DSLinkStats(Map.empty)}
     } yield Ok(views.html.cluster(mode, startedAt, nodes.map(ni => (ni.address -> ni)).toMap, down, up))
   }
 
@@ -60,6 +60,8 @@ class MainController @Inject() (actorSystem: ActorSystem,
   def dataExplorer = Action.async { implicit request =>
     getDownUpCount map {
       case (down, up) => Ok(views.html.data(Some(down), Some(up)))
+    } recover {
+      case e => Ok(views.html.data(None, None))
     }
   }
 
