@@ -94,9 +94,8 @@ object StandardActions {
     val node = ctx.node
     val group = ctx.args("Group")
 
-    node.configs map { cfgMap =>
-      cfgMap("$$group") = group
-    }
+    node.addConfigs("$$group" -> group)
+
   }, "Group" -> DSAString)
 
   /**
