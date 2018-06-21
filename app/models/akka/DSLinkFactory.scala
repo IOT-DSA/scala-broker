@@ -5,7 +5,7 @@ import models.akka.responder.{PooledResponderBehavior, ResponderBehavior, Simple
 import akka.routing.Routee
 
 /**
- * Combines [[AbstractDSLinkActor] with Requester behavior and abstract Responder behavior
+ * Combines [[AbstractDSLinkActor]] with Requester behavior and abstract Responder behavior
  * (to be provided by the subclasses).
  */
 abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends AbstractDSLinkActor(registry)
@@ -20,6 +20,13 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
     stopRequester
     super.postStop
   }
+
+  override def persistenceId = linkPath
+
+  /**
+   * Recovers DSLink state from the event journal.
+   */
+  override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover
 
   override def disconnected: Receive = super.disconnected orElse requesterDisconnected orElse toStash
 
