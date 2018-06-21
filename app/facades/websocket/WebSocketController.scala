@@ -66,7 +66,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   private val msgpackTransformer = msgpackMessageFlowTransformer[DSAMessage, DSAMessage]
 
   val transformers = Map(
-      MSGJSON->jsonTransformer
+      MSGJSON-> jsonTransformer
     , MSGPACK-> msgpackTransformer
   )
 

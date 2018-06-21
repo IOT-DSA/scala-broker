@@ -3,6 +3,8 @@ package models.akka
 import scala.concurrent.ExecutionContext.Implicits.global
 import models.api.{ActionContext, DSAAction, DSANode, DSAValueType}
 
+import scala.concurrent.Future
+
 /**
  * Standard node actions.
  */
@@ -60,26 +62,42 @@ object StandardActions {
 
   /**
     * Adds a Token node.
+    * TODO: Check the case when 'Group' is not exist in the param
+    * TODO: Add 'TimeRange', 'Count', 'Managed' params
     */
   val AddToken: DSAAction = DSAAction((ctx: ActionContext) => {
-    ctx.node.parent foreach { parent =>
-      val name = ctx.args("name").value.toString
-      parent.addChild(name) foreach { node =>
-        node.profile = "broker/TokenNode"
-        bindTokenNodeActions(node)
+
+    val node = ctx.node
+    val groupName = ctx.args("Group").value.toString
+
+    val fToken: Future[String] = models.util.Tokens.makeToken(node);
+
+    for (
+      token <- fToken
+    )
+    {
+      val tokenId = token.substring(0, 16);
+      node.addChild(tokenId) foreach { child =>
+        child.profile = "broker/TokenNode"
+        child.addConfigs("$$group" -> groupName)
+        child.addConfigs("$$token" -> token)
+        bindTokenNodeActions(child)
       }
     }
-  }, "name" -> DSAString)
+
+  }, "Group" -> DSAString)
 
   /**
     * Modify current token node
     */
   val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) => {
-    val node = ctx.node.parent.get
-    val value = ctx.args("value")
+    val node = ctx.node
+    val group = ctx.args("Group")
 
-    node.value = value
-  }, "value" -> DSAString)
+    node.configs map { cfgMap =>
+      cfgMap("$$group") = group
+    }
+  }, "Group" -> DSAString)
 
   /**
    * Adds a value child node.
