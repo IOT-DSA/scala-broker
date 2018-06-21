@@ -7,6 +7,7 @@ import akka.routing.Routee
 import akka.util.Timeout
 import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
 import akka.actor.Props
+import models.util.DsaToAkkaCoder._
 
 /**
  * Uses Akka Cluster Sharding to communicate with DSLinks.
@@ -23,22 +24,22 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
   /**
    * Returns a [[ShardedRoutee]] instance for the specified downlink.
    */
-  def getDownlinkRoutee(name: String): Routee = ShardedRoutee(dnlinkRegion, name)
+  def getDownlinkRoutee(dsaName: String): Routee = ShardedRoutee(dnlinkRegion, dsaName)
 
   /**
    * Returns a [[ShardedRoutee]] instance for the specified uplink.
    */
-  def getUplinkRoutee(name: String): Routee = ShardedRoutee(uplinkRegion, name)
+  def getUplinkRoutee(dsaName: String): Routee = ShardedRoutee(uplinkRegion, dsaName)
 
   /**
    * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.
    */
-  def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = path match {
+  def dsaSend(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = dsaPath match {
     case Paths.Downstream                          => system.actorSelection("/user" + Paths.Downstream) ! message
-    case path if path.startsWith(Paths.Downstream) => getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
+    case dsaPath if dsaPath.startsWith(Paths.Downstream) => getDownlinkRoutee(dsaPath.drop(Paths.Downstream.size + 1)) ! message
     case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ! message
-    case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
-    case path                                      => RootNodeActor.childProxy(path)(system) ! message
+    case dsaPath if dsaPath.startsWith(Paths.Upstream)   => getUplinkRoutee(dsaPath.drop(Paths.Upstream.size + 1)) ! message
+    case dsaPath                                      => RootNodeActor.childProxy(dsaPath)(system) ! message
   }
 
   /**
