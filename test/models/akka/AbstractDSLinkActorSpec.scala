@@ -1,9 +1,7 @@
 package models.akka
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.Inside
-
 import akka.actor.{ PoisonPill, Props }
 import akka.pattern.ask
 import akka.routing.{ ActorRefRoutee, Routee }
@@ -18,29 +16,32 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
   import Messages._
 
   implicit val timeout = Timeout(5 seconds)
-  val dsId = "link" + "?" * 44
 
-  val ci = ConnectionInfo(dsId, "abc def", true, false)
+  val linkName = "link-abc-1"
+
+  val ci = ConnectionInfo("link" + "?" * 44, linkName, true, false, Some("link-data-some-val"), "version777",
+    List("format1", "format2"), true, "link address 1-2-3", "broker address 3-2-1")
 
   val downProbe = TestProbe()
 
-  val dslink = TestActorRef[LinkActor](Props(new LinkActor(ActorRefRoutee(downProbe.ref))), "abc def")
+  val dslink = TestActorRef[LinkActor](Props(new LinkActor(ActorRefRoutee(downProbe.ref))), linkName)
 
   val Seq(endpoint1, endpoint2, endpoint3) = (1 to 3) map (_ => watch(TestProbe().ref))
 
   "AbstractDSLinkActor" should {
     "register with downstream" in {
-      downProbe.expectMsg(RegisterDSLink("abc def", DSLinkMode.Requester, false))
+      downProbe.expectMsg(RegisterDSLink(linkName, DSLinkMode.Requester, false))
     }
+    Thread.sleep(500)
     "start in disconnected state" in {
       whenReady(dslink ? GetLinkInfo) { x =>
         val y = x.asInstanceOf[LinkInfo].ci
-        x mustBe LinkInfo(ConnectionInfo("", "abc def", true, false, sharedSecret = y.sharedSecret), false, None, None)
+        x mustBe LinkInfo(ConnectionInfo("", linkName, true, false, sharedSecret = y.sharedSecret), false, None, None)
       }
     }
     "connect to endpoint and register with downstream" in {
       dslink ! ConnectEndpoint(endpoint1, ci)
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, true))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       whenReady(dslink ? GetLinkInfo)(inside(_) {
         case LinkInfo(connInfo, true, Some(_), None) => connInfo mustBe ci
       })
@@ -48,21 +49,21 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
     "connect to another endpoint" in {
       dslink ! ConnectEndpoint(endpoint2, ci)
       expectTerminated(endpoint1)
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, false))
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, true))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
     }
     "disconnect from endpoint" in {
       dslink ! DisconnectEndpoint(false)
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, false))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
       whenReady(dslink ? GetLinkInfo)(inside(_) {
         case LinkInfo(connInfo, false, Some(_), Some(_)) => connInfo mustBe ci
       })
     }
     "disconnect from endpoint and kill it" in {
       dslink ! ConnectEndpoint(endpoint3, ci)
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, true))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       dslink ! DisconnectEndpoint(true)
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, false))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
       whenReady(dslink ? GetLinkInfo)(inside(_) {
         case LinkInfo(connInfo, false, Some(_), Some(_)) => connInfo mustBe ci
       })
@@ -70,16 +71,31 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
     }
     "respond to endpoint termination" in {
       dslink ! ConnectEndpoint(endpoint2, ci)
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, true))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       endpoint2 ! PoisonPill
-      downProbe.expectMsg(DSLinkStateChanged("abc def", DSLinkMode.Requester, false))
+      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
       whenReady(dslink ? GetLinkInfo)(inside(_) {
         case LinkInfo(connInfo, false, Some(_), Some(_)) => connInfo mustBe ci
       })
     }
     "unregister from backend" in {
       dslink ! PoisonPill
-      downProbe.expectMsg(UnregisterDSLink("abc def"))
+      downProbe.expectMsg(UnregisterDSLink(linkName))
+    }
+
+    "recover self state" in {
+      val dslinkRecovered = TestActorRef[LinkActor](Props(new LinkActor(ActorRefRoutee(downProbe.ref))), linkName)
+      downProbe.expectMsg(RegisterDSLink(linkName, DSLinkMode.Requester, false))
+      Thread.sleep(500)
+      whenReady(dslinkRecovered ? GetLinkInfo)(inside(_) {
+        case LinkInfo(connInfo, _, _, _) => connInfo mustBe ci
+      })
+
+      // finally kill it
+      dslinkRecovered ! PoisonPill
+      downProbe.expectMsg(UnregisterDSLink(linkName))
+
+      // TODO Create test cases to check lastConnected and lastDisconnected dates
     }
   }
 }
@@ -88,8 +104,12 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
  * Common definitions for [[AbstractDSLinkActorSpec]].
  */
 object AbstractDSLinkActorSpec {
+
   /**
    * Test actor.
    */
-  class LinkActor(registry: Routee) extends AbstractDSLinkActor(registry)
+  class LinkActor(registry: Routee) extends AbstractDSLinkActor(registry) {
+    override def persistenceId = self.path.name
+    override def receiveRecover = recoverBaseState
+  }
 }

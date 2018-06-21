@@ -1,9 +1,13 @@
 package models.akka.responder
 
 import scala.util.control.NonFatal
+import akka.persistence.PersistentActor
+
 import akka.actor._
 import kamon.Kamon
 import models._
+import models.akka.{ ResponsesProcessed, RequestsProcessed }
+
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -11,7 +15,7 @@ import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: Actor with ActorLogging =>
+trait ResponderBehavior { me: PersistentActor with ActorLogging =>
   import RidRegistry._
 
   protected def linkPath: String
@@ -40,17 +44,35 @@ trait ResponderBehavior { me: Actor with ActorLogging =>
   val responderBehavior: Receive = {
     case env @ RequestEnvelope(requests) =>
       log.info("{}: received {} from {}", ownId, env, sender)
-      val result = processRequests(requests)
-      if (!result.requests.isEmpty)
-        sendToEndpoint(RequestEnvelope(result.requests))
-      if (!result.responses.isEmpty)
-        sender ! ResponseEnvelope(result.responses)
+      persist(RequestsProcessed(requests)) { event =>
+        val result = processRequests(event.requests)
+        if (!result.requests.isEmpty)
+          sendToEndpoint(RequestEnvelope(result.requests))
+        if (!result.responses.isEmpty)
+          sender ! ResponseEnvelope(result.responses)
+      }
 
     case m @ ResponseMessage(_, _, responses) =>
       log.debug("{}: received {}", ownId, m)
-      processResponses(responses) foreach {
-        case (to, rsps) => to ! ResponseEnvelope(rsps)
+      persist(ResponsesProcessed(responses)) { event =>
+        processResponses(event.responses) foreach {
+          case (to, rsps) => to ! ResponseEnvelope(rsps)
+        }
       }
+  }
+
+  /**
+    * Recovers events of responder behavior from the journal.
+    */
+  val responderRecover: Receive = {
+    case event: RequestsProcessed =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      // TODO has to be improved to separate the functionality
+      processRequests(event.requests)
+    case event: ResponsesProcessed =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      // TODO has to be improved to separate the functionality
+      processResponses(event.responses)
   }
 
   /**

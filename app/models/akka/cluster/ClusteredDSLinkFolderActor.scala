@@ -1,5 +1,6 @@
 package models.akka.cluster
 
+import models.akka.{ DSLinkCreated, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered }
 import akka.actor.{Identify, PoisonPill, Props, actorRef2Scala}
 import akka.pattern.pipe
 import akka.routing.Routee
@@ -18,10 +19,17 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
   import context.dispatcher
 
+  override def persistenceId = linkPath
+
   /**
-    * Handles incoming messages.
+   * Handles incoming messages.
+   */
+  override def receiveCommand = responderBehavior orElse mgmtHandler
+
+  /**
+    * Handles events recovering when starting.
     */
-  def receive = responderBehavior orElse mgmtHandler
+  override def receiveRecover = dslinkFolderRecover orElse responderRecover
 
   /**
     * Handler for messages coming from peer nodes.
@@ -51,26 +59,34 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
     case PeerMessage(msg) => peerMsgHandler(msg)
 
     case GetOrCreateDSLink(name) =>
-      log.info("{}: requested DSLink '{}'", ownId, name)
-      sender ! getOrCreateDSLink(name)
+      persist(DSLinkCreated(name)) { event =>
+        log.info("{}: requested DSLink '{}'", ownId, event.name)
+        sender ! getOrCreateDSLink(event.name)
+      }
 
-    case msg@RegisterDSLink(name, mode, connected) =>
-      links += (name -> LinkState(mode, connected))
-      tellPeers(PeerMessage(msg))
-      log.info("{}: registered DSLink '{}'", ownId, name)
+    case msg @ RegisterDSLink(name, mode, connected) =>
+      persist(DSLinkRegistered(name, mode, connected)) { event =>
+        links += (event.name -> LinkState(event.mode, event.connected))
+        tellPeers(PeerMessage(msg))
+        log.info("{}: registered DSLink '{}'", ownId, event.name)
+      }
 
     case GetDSLinkNames =>
       val nodeLinks = askPeers[Iterable[String]](PeerMessage(GetDSLinkNames)) map (_ flatMap (_._2))
       nodeLinks pipeTo sender
 
     case RemoveDSLink(name) =>
-      removeDSLinks(name)
-      log.info("{}: rrdered to remove DSLink '{}'", ownId, name)
+      persist(DSLinkRemoved(name)) { event =>
+        removeDSLinks(event.names: _*)
+        log.info("{}: ordered to remove DSLink '{}'", ownId, event.names)
+      }
 
-    case msg@UnregisterDSLink(name) =>
-      links -= name
-      tellPeers(PeerMessage(msg))
-      log.info("{}: removed DSLink '{}'", ownId, name)
+    case msg @ UnregisterDSLink(name) =>
+      persist(DSLinkUnregistered(name)) { event =>
+        links -= event.name
+        tellPeers(PeerMessage(msg))
+        log.info("{}: removed DSLink '{}'", ownId, event.name)
+      }
 
     case evt@DSLinkStateChanged(name, mode, connected) =>
       log.info("{}: DSLink state changed: '{}'", ownId, evt)

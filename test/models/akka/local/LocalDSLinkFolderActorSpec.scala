@@ -1,10 +1,8 @@
 package models.akka.local
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.Inside
-
-import akka.actor.actorRef2Scala
+import akka.actor.{Address, PoisonPill, actorRef2Scala}
 import akka.pattern.ask
 import akka.routing.ActorRefRoutee
 import akka.util.Timeout
@@ -21,11 +19,11 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   import models.Settings._
   import models.akka.Messages._
   import models.rpc.DSAValue._
-  
+
   type FoundLinks = Map[Address, Iterable[String]]
 
   implicit val timeout = Timeout(5 seconds)
-  val dsId = "link" + "?" * 44
+  var downstreamRecovered: akka.actor.ActorRef =_
 
   val dslinkMgr = new LocalDSLinkManager()
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(
@@ -143,12 +141,24 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
     }
   }
 
-  "RemoveDisconnectedDSLinks" should {
-    "remove all disconnected dslinks" in {
-      downstream ! RemoveDisconnectedDSLinks
+  "PoisonPill" should {
+    "kill downstream and then try to recover it" in {
+      downstream ! PoisonPill
       Thread.sleep(500)
-      whenReady((downstream ? GetDSLinkStats).mapTo[DSLinkStats]) {
-        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstream.path.address, 0, 0, 0, 0, 0, 0))
+      downstreamRecovered = system.actorOf(LocalDSLinkFolderActor.props(
+        Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
+      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 2, 0, 1, 0, 0))
+      }
+    }
+  }
+
+  "RemoveDisconnectedDSLinks" should {
+    "remove all disconnected dslinks after the state recovering" in {
+      downstreamRecovered ! RemoveDisconnectedDSLinks
+      Thread.sleep(500)
+      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 0, 0, 0, 0, 0))
       }
     }
   }

@@ -196,6 +196,8 @@ object SimpleResponderBehaviorSpec {
    */
   class Responder() extends AbstractDSLinkActor(NoRoutee) with SimpleResponderBehavior {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
+    override def persistenceId = linkPath
     override def connected = super.connected orElse responderBehavior
+    override def receiveRecover = recoverBaseState orElse responderRecover
   }
 }
