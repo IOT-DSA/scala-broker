@@ -6,6 +6,7 @@ import models.{ RequestEnvelope, ResponseEnvelope }
 import models.api.DSANode
 import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ StringValue, array, obj }
+import models.util.DsaToAkkaCoder._
 
 /**
  * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
@@ -158,7 +159,7 @@ object RootNodeActor {
   /**
    * Returns a proxy for a child node of the singleton [[RootNodeActor]].
    */
-  def childProxy(path: String)(implicit system: ActorSystem): ActorRef = system.actorOf(
+  def childProxy(dsaPath: String)(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonProxy.props("/user/" + Root,
-      settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + path)))
+      settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + dsaPath.forAkka)))
 }
