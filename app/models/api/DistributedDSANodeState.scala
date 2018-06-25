@@ -12,8 +12,8 @@ final case class DistributedDSANodeState(
                                           attributes:LWWMap[String, DSAValue[_]],
                                           subscriptions:LWWMap[Int, ActorRef],
                                           listSubscriptions:LWWMap[Int, ActorRef],
-                                          children: ORSet[String]
-                                  ) extends ReplicatedData {
+                                          children: LWWMap[String, DSANodeDescription]
+                                        ) extends ReplicatedData {
 
   type T = DistributedDSANodeState
 
@@ -35,7 +35,7 @@ object DistributedDSANodeState{
     LWWMap.empty,
     LWWMap.empty,
     LWWMap.empty,
-    ORSet.empty
+    LWWMap.empty
   )
 
 }

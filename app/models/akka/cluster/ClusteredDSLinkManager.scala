@@ -5,10 +5,10 @@ import akka.cluster.Cluster
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.routing.Routee
 import akka.util.Timeout
-import models.akka.{DSLinkManager, RichRoutee, RootNodeActor, StandardActions}
+import models.akka.{DSLinkManager, RichRoutee, RootNodeActor}
 import akka.actor.Props
 import akka.cluster.ddata.DistributedData
-import models.api.{DSANode, DistributedNodesRegistry}
+import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
 import akka.pattern.ask
 
@@ -29,9 +29,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), "distributedNodesRegistry")
 
 
-  (distrubutedNodeRegistry ? AddNode("data")).mapTo[DSANode] foreach{
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/data", Some("broker/dataRoot")))).mapTo[DSANode] foreach{
     node =>
-      node.profile = "broker/dataRoot"
       node.displayName = "data"
   }
 

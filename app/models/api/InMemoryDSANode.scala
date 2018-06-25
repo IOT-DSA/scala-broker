@@ -83,11 +83,23 @@ class InMemoryDSANode(val parent: Option[DSANode])
   }
 
   protected var _children = Map.empty[String, DSANode]
-  def children = Future.successful(_children.toMap)
-  def child(name: String) = children map (_.get(name))
-  def addChild(name: String) = synchronized {
+  def children = Future.successful(_children)
+
+  def child(name: String): Future[Option[DSANode]] = children map (_.get(name))
+
+  def addChild(name: String, profile:Option[String] = None, valueType:Option[DSAValueType] = None) = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
-    val child = TypedActor(TypedActor.context).typedActorOf(props, name)
+    val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name)
+    profile foreach{child.profile = _}
+    valueType.foreach(child.valueType = _)
+    addChild(name, child)
+  }
+
+  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = {
+    val props = DSANode.props(Some(TypedActor.self))
+    val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name)
+    child.addConfigs(paramsAndConfigs.filter(_._1.startsWith("$")):_*)
+    child.addAttributes(paramsAndConfigs.filter(_._1.startsWith("@")):_*)
     addChild(name, child)
   }
 
@@ -109,12 +121,6 @@ class InMemoryDSANode(val parent: Option[DSANode])
   def action = _action
   def action_=(a: DSAAction) = {
     _action = Some(a)
-    val params =  a.params map {
-      case (pName, pType) => obj("name" -> pName, "type" -> pType.toString)
-    }
-    _configs += ("$params" -> params)
-    _configs += ("$invokable" -> "write")
-    profile = "static"
   }
 
   def invoke(params: DSAMap) = _action foreach (_.handler(ActionContext(this, params)))

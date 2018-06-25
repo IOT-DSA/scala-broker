@@ -3,10 +3,11 @@ package models.akka
 import scala.concurrent.ExecutionContext.Implicits.global
 import models.api.{DSAAction, DSANode, DSAValueType}
 import models.rpc.DSAValue
+import models.rpc.DSAValue.{DSAVal, obj}
 
 /**
- * Standard node actions.
- */
+  * Standard node actions.
+  */
 object StandardActions {
   import DSAValueType._
 
@@ -21,8 +22,8 @@ object StandardActions {
 
 
   /**
-   * Adds actions as per broker/dataRoot profile.
-   */
+    * Adds actions as per broker/dataRoot profile.
+    */
   def bindDataRootActions(node: DSANode) = {
     bindActions(node,
       commonActions(ADD_NODE),
@@ -31,8 +32,8 @@ object StandardActions {
   }
 
   /**
-   * Adds actions as per broker/dataNode profile.
-   */
+    * Adds actions as per broker/dataNode profile.
+    */
   def bindDataNodeActions(node: DSANode) = bindActions(node,
     commonActions(ADD_NODE),
     commonActions(ADD_VALUE),
@@ -43,45 +44,53 @@ object StandardActions {
   )
 
   /**
-   * Adds actions to the node as children.
-   */
+    * Adds actions to the node as children.
+    */
   def bindActions(node: DSANode, actions: ActionDescription*) = actions foreach {
-    ad => node.addChild(ad.name).foreach { child =>
-      child.displayName = ad.displayName
-      child.action = ad.action
+    ad =>
+      val params = ad.action.params map {
+        case (pName, pType) => obj("name" -> pName, "type" -> pType.toString)
+      }
+      val configs:Map[String, DSAVal] = Map(
+        "$params" -> params,
+        "$invokable" -> "write",
+        "$is" -> "static",
+        "$name" -> ad.displayName
+      )
+
+      node.addChild(ad.name, configs.toSeq:_*).foreach { child =>
+        child.action = ad.action
     }
   }
 
   /**
-   * Adds a child node.
-   */
+    * Adds a child node.
+    */
   val AddNode: DSAAction = DSAAction(ctx => {
     ctx.node.parent foreach { parent =>
-      parent.addChild(ctx.args("name").value.toString) foreach { node =>
-        node.profile = "broker/dataNode"
+      parent.addChild(ctx.args("name").value.toString, Some("broker/dataNode")) foreach { node =>
         bindDataNodeActions(node)
       }
     }
   }, "name" -> DSAString)
 
   /**
-   * Adds a value child node.
-   */
+    * Adds a value child node.
+    */
   val AddValue: DSAAction = DSAAction(ctx => {
     val parent = ctx.node.parent.get
     val name = ctx.args("name").value.toString
     val dataType = ctx.args("type").value.toString
 
-    parent.addChild(name) foreach { node =>
-      node.profile = "broker/dataNode"
+    parent.addChild(name, Some("broker/dataNode")) foreach { node =>
       node.valueType = DSAValueType.withName(dataType)
       bindDataNodeActions(node)
     }
   }, "name" -> DSAString, "type" -> DSAString)
 
   /**
-   * Sets the node value.
-   */
+    * Sets the node value.
+    */
   val SetValue: DSAAction = DSAAction(ctx => {
     val node = ctx.node.parent.get
     val value = ctx.args("value")
@@ -90,8 +99,8 @@ object StandardActions {
   }, "value" -> DSADynamic)
 
   /**
-   * Sets a node attibute.
-   */
+    * Sets a node attibute.
+    */
   val SetAttribute: DSAAction = DSAAction(ctx => {
     val node = ctx.node.parent.get
     val name = ctx.args("name").value.toString
@@ -101,8 +110,8 @@ object StandardActions {
   }, "name" -> DSAString, "value" -> DSADynamic)
 
   /**
-   * Sets a node config.
-   */
+    * Sets a node config.
+    */
   val SetConfig: DSAAction = DSAAction(ctx => {
     val node = ctx.node.parent.get
     val name = ctx.args("name").value.toString
@@ -112,8 +121,8 @@ object StandardActions {
   }, "name" -> DSAString, "value" -> DSADynamic)
 
   /**
-   * Deletes node.
-   */
+    * Deletes node.
+    */
   val DeleteNode: DSAAction = DSAAction(ctx => {
     val node = ctx.node.parent.get
     node.parent foreach (_.removeChild(node.name))

@@ -7,12 +7,12 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.DistributedData
 import com.typesafe.config.ConfigFactory
 import models.api.DistributedNodesRegistry.AddNode
-import models.api.{DSANode, DistributedNodesRegistry}
-import org.scalatest.{GivenWhenThen}
+import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
+import org.scalatest.GivenWhenThen
 import akka.pattern.ask
 import akka.util.Timeout
 
-import scala.concurrent.{Await}
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 trait ClusterKit { self: GivenWhenThen =>
@@ -34,8 +34,8 @@ trait ClusterKit { self: GivenWhenThen =>
             val leftRegistry = leftTools.system.actorOf(DistributedNodesRegistry.props(leftTools.replicator, leftTools.cluster, leftTools.system), "left")
             val rightRegistry = rightTools.system.actorOf(DistributedNodesRegistry.props(rightTools.replicator, rightTools.cluster, rightTools.system), "right")
 
-            val l = (leftRegistry ? AddNode("/data")).mapTo[DSANode]
-            val r = (rightRegistry ? AddNode("/data")).mapTo[DSANode]
+            val l = (leftRegistry ? AddNode(DSANodeDescription.init("data", Some("broker/dataRoot")))).mapTo[DSANode]
+            val r = (rightRegistry ? AddNode(DSANodeDescription.init("data", Some("broker/dataRoot")))).mapTo[DSANode]
 
             val lrFuture = for {
               left <- l
@@ -63,8 +63,8 @@ trait ClusterKit { self: GivenWhenThen =>
             val leftRegistry = leftTools.system.actorOf(DistributedNodesRegistry.props(leftTools.replicator, leftTools.cluster, leftTools.system), "left")
             val rightRegistry = rightTools.system.actorOf(DistributedNodesRegistry.props(rightTools.replicator, rightTools.cluster, rightTools.system), "right")
 
-            val l = (leftRegistry ? AddNode("/data")).mapTo[DSANode]
-            val r = (rightRegistry ? AddNode("/data")).mapTo[DSANode]
+            val l = (leftRegistry ? AddNode(DSANodeDescription.init("data", Some("broker/dataRoot")))).mapTo[DSANode]
+            val r = (rightRegistry ? AddNode(DSANodeDescription.init("data", Some("broker/dataRoot")))).mapTo[DSANode]
 
             val lrFuture = for {
               left <- l

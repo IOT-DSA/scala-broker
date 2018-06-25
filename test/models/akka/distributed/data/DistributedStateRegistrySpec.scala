@@ -2,10 +2,11 @@ package models.akka.distributed.data
 
 import java.util.concurrent.TimeUnit
 
-import models.api.{DSANode, DistributedNodesRegistry}
+import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
 import akka.pattern.ask
 import models.api.DistributedNodesRegistry.{AddNode, GetNodes, RemoveNode}
+import org.msgpack.value.StringValue
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -27,12 +28,12 @@ class DistributedStateRegistrySpec extends WordSpecLike with ClusterKit
           val registryReplica = system2.actorOf(DistributedNodesRegistry.props(replicator2, node2, system2), "registryReplica")
 
           When("Parent \"/data\" dsnode created")
-          val created = Await.result((registry ? AddNode("/data")).mapTo[DSANode], 2 seconds)
+          val created = Await.result((registry ? AddNode(DSANodeDescription.init("/data", Some("broker/dataRoot")))).mapTo[DSANode], 2 seconds)
 
           val nodes = Await.result((registry ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds)
 
           And("Child \"/data/child\" dsnode created")
-          val createdChild = Await.result((registry ? AddNode("/data/child")).mapTo[DSANode], 2 seconds)
+          val createdChild = Await.result((registry ? AddNode(DSANodeDescription.init("/data/child", Some("broker/dataNode")))).mapTo[DSANode], 2 seconds)
 
           val nodes1 = Await.result((registry ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds)
 
@@ -97,9 +98,8 @@ class DistributedStateRegistrySpec extends WordSpecLike with ClusterKit
 
           val state:Map[String, DSANode] = Await.result((registryReplica ? GetNodes()).mapTo[Map[String, DSANode]], 2 seconds)
 
-          if(!state.isEmpty){
-            val stop = 123;
-          }
+          createdChild.profile shouldBe "broker/dataNode"
+          replicaNodes("/data/child").profile shouldBe "broker/dataNode"
           state.isEmpty shouldBe true
       }
     }

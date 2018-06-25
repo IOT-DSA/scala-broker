@@ -12,8 +12,8 @@ import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, obj}
 import models.util.LoggingAdapterInside
 
 /**
- * A structural unit in Node API.
- */
+  * A structural unit in Node API.
+  */
 trait DSANode {
   def parent: Option[DSANode]
   def name: String
@@ -43,7 +43,8 @@ trait DSANode {
 
   def children: Future[Map[String, DSANode]]
   def child(name: String): Future[Option[DSANode]]
-  def addChild(name: String): Future[DSANode]
+  def addChild(name: String, profile:Option[String] = None, valueType:Option[DSAValueType] = None): Future[DSANode]
+  def addChild(name: String, paramsAndConfigs:(String, DSAVal)*): Future[DSANode]
   def addChild(name: String, node: DSANode): Future[DSANode]
   def removeChild(name: String): Unit
 

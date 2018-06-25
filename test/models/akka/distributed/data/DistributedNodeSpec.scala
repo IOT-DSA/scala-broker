@@ -2,9 +2,12 @@ package models.akka.distributed.data
 
 import java.util.concurrent.TimeUnit
 
+import akka.actor.{ActorSystem, TypedActor}
 import akka.testkit.TestProbe
 import models.ResponseEnvelope
-import models.api.DSAValueType
+import models.api.{DSANodeDescription, DSAValueType, DistributedDSANode}
+import models.api.DistributedDSANode.DistributedDSANodeData
+import models.rpc.DSAValue
 import models.rpc.DSAValue._
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
 
@@ -18,7 +21,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
   "Distributed data nodes" should {
 
     "change value, valueType, profile, displayName" in withDistributedNodes("2555", "2556") { case (left, right) =>
-
+      TimeUnit.SECONDS.sleep(5)
       When("change value on String in first node")
       left.valueType = DSAValueType.DSAString
       left.value = "new value"
@@ -30,6 +33,8 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
       Then("value should be changed in right")
       val rightValue = Await.result(right.value, 2 seconds)
       val rightType = Await.result(right.valueType, 2 seconds)
+
+
 
       Await.result(right.displayName, 2 seconds) shouldBe "Clark Kent"
       right.profile shouldBe "someProfile"
@@ -65,19 +70,26 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
       leftAttr.toList shouldBe rightAttr.toList
 
+      When("change attribute in first node")
+      left.addAttributes(("@first" -> "changedVal"))
+      TimeUnit.MILLISECONDS.sleep(500)
+
+      Then("other node should have same")
+      Await.result(right.attribute("@first"), 1 second).get shouldBe StringValue("changedVal")
+
       When("remove attribute")
       left.removeAttribute("@first")
 
       TimeUnit.MILLISECONDS.sleep(500)
 
-      Then("attribute should be deleted from other node")
-      Await.result(right.attribute("@first"), 1 second) shouldBe None
+      Then("attribute should be droped to initial value")
+      Await.result(right.attribute("@first"), 1 second).get shouldBe StringValue("firstVal")
 
     }
 
     "add delete and change configs" in withDistributedNodes("2555", "2556") { case (left, right) =>
 
-      When("create attribute in first node")
+      When("create config in first node")
       left.addConfigs(("$first" -> "firstVal"), ("second" -> 123))
 
       TimeUnit.MILLISECONDS.sleep(500)
@@ -91,19 +103,31 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
       leftAttr.toList shouldBe rightAttr.toList
 
-      When("remove attribute")
-      left.removeAttribute("$first")
+      When("change config in first node")
+      left.addConfigs(("$first" -> "changedVal"))
 
       TimeUnit.MILLISECONDS.sleep(500)
 
-      Then("attribute should be deleted from other node")
-      Await.result(right.attribute("$first"), 1 second) shouldBe None
+      Then("other node should have same")
+      Await.result(right.config("$first"), 1 second).get shouldBe StringValue("changedVal")
+
+      When("remove config")
+      left.removeConfig("$first")
+
+      TimeUnit.MILLISECONDS.sleep(500)
+
+      Then("config should be dropped to initial value")
+      Await.result(right.config("$first"), 1 second).get shouldBe StringValue("firstVal")
 
     }
 
     "create and delete children" in withDistributedNodes("2555", "2556") { case (left, right) =>
 
-      val child1 = Await.result(left.addChild("child1"), 1 second)
+      import DSAValue._
+
+      val data:Seq[(String, DSAVal)] = Seq(("$is"->  "broker/dataNode"), ("@attr" -> "attr"))
+
+      val child1 = Await.result(left.addChild("child1", data:_*), 1 second)
       val child2 = Await.result(left.addChild("child2"), 1 second)
       val grandChild = Await.result(child1.addChild("grandChild"), 1 second)
 
@@ -115,7 +139,27 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
       rightChildren.get("child2").isDefined shouldBe true
 
       rightChildren("child1").parent shouldBe Some(right)
+
+      child1.profile shouldBe "broker/dataNode"
+      rightChildren("child1").profile shouldBe "broker/dataNode"
+
       Await.result(rightChildren("child1").children, 1 second)("grandChild").parent.get shouldBe rightChildren.get("child1").get
+    }
+
+    "description initialized properly" in {
+
+      val conf:DSAVal = "confValue"
+      val attr:DSAVal = "attrValue"
+
+      val map:Map[String, DSAVal] = Map(
+        "$conf" -> conf,
+        "@attr" -> attr
+      )
+
+      val data = DistributedDSANode.initialData(DSANodeDescription("/somePath", map), "")
+
+      data.configs.get("$conf") shouldBe Some(conf)
+      data.attributes.get("@attr") shouldBe Some(attr)
     }
 
     "send subscriptions to local actors on value update" in withDistributedNodesExtended("2555", "2556") {
@@ -162,6 +206,8 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         left.addConfigs("config" -> StringValue("!!!"))
         left.addAttributes("attribute" -> StringValue("!!!"))
 
+        TimeUnit.SECONDS.sleep(1)
+
         def extractUpdates(envelops: Seq[ResponseEnvelope]) = for {
           e <- envelops
           resp <- e.responses
@@ -170,6 +216,8 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
         val notifications2 = extractUpdates(rightProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
         val notifications1 = extractUpdates(leftProbe.expectMsgAllClassOf(2 seconds, classOf[ResponseEnvelope]))
+
+        TimeUnit.SECONDS.sleep(1)
 
         notifications1.size shouldBe notifications2.size
 
