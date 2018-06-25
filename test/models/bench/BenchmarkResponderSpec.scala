@@ -54,8 +54,8 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
         case ResponseMessage(3, None, List(
           DSAResponse(13, Some(StreamState.Closed), _, _, _),
           DSAResponse(0, Some(StreamState.Open), Some(row :: Nil), _, _))) =>
-          row.asInstanceOf[MapValue].value("sid") mustBe (101: NumericValue)
-          row.asInstanceOf[DSAValue.MapValue].value("value") mustBe (0: NumericValue)
+            row.asInstanceOf[MapValue].value("sid") mustBe (101: NumericValue)
+            row.asInstanceOf[DSAValue.MapValue].value("value") mustBe (0: NumericValue)
       }
     }
     "emit statistics" in {

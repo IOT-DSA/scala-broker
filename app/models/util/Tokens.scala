@@ -12,14 +12,15 @@ object Tokens {
     val token = createToken()
     val tokenId = token.substring(0, 16);
 
-    dsaNode.child(tokenId).flatMap {
+    val r = dsaNode.child(tokenId).flatMap {
         case None => Future(token)
         case _ => makeToken(dsaNode)
     }
+    r
   }
 
   def createToken(): String = {
-    val tokenCodes = Array[Byte](48)
+    val tokenCodes = Array.ofDim[Byte](48)
     var i = 0;
     while (i < 48) {
       val n = Random.nextInt(Byte.MaxValue)

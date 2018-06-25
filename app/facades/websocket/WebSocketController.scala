@@ -255,7 +255,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
-    fRoutee map   { routee =>
+    fRoutee map { routee =>
 
       val (subscriptionsPusher, subscriptionsPublisher) = Source.actorRef[SubscriptionSourceMessage](bufferSize, overflow)
         .toMat(Sink.asPublisher(false))(Keep.both)
@@ -265,29 +265,29 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
       val subscriptionSrcRef = Source.fromPublisher(subscriptionsPublisher)
 
-        val wsProps = WebSocketActor.props(toSocket, routee,
-          WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
+      val wsProps = WebSocketActor.props(toSocket, routee,
+        WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
-        val fromSocket = actorSystem.actorOf(Props(new Actor {
-          val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+      val fromSocket = actorSystem.actorOf(Props(new Actor {
+        val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
 
-          def receive = {
-            case Success(_) | Failure(_) => wsActor ! PoisonPill
-            case Terminated(_)           => context.stop(self)
-            case other                   => wsActor ! other
-          }
+        def receive = {
+          case Success(_) | Failure(_) => wsActor ! PoisonPill
+          case Terminated(_)           => context.stop(self)
+          case other                   => wsActor ! other
+        }
 
-          override def supervisorStrategy = OneForOneStrategy() {
-            case _ => SupervisorStrategy.Stop
-          }
-        }))
+        override def supervisorStrategy = OneForOneStrategy() {
+          case _ => SupervisorStrategy.Stop
+        }
+      }))
 
-        subscriptionSrcRef.runWith(sink)
+      subscriptionSrcRef.runWith(sink)
 
-        val messageSink = Sink.actorRef(fromSocket, Success(()))
-        val src = Source.fromPublisher(publisher)
+      val messageSink = Sink.actorRef(fromSocket, Success(()))
+      val src = Source.fromPublisher(publisher)
 
-        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
+      Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
     }
   }
 

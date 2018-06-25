@@ -119,6 +119,7 @@ class RootNodeActor extends Actor with ActorLogging {
     // , we are not creating user's groupToken
     sysNode.addChild("tokens").foreach { node =>
       node.profile = "node"
+      node.displayName = "Node for all tokens"
       StandardActions.bindTokenGroupNodeActions(node)
     }
 

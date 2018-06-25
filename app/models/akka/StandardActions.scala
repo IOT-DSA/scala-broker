@@ -45,6 +45,7 @@ object StandardActions {
     case (name, displayName, action) => node.addChild(name).foreach { child =>
       child.displayName = displayName
       child.action = action
+      child.profile = "node"
     }
   }
 
@@ -67,7 +68,7 @@ object StandardActions {
     */
   val AddToken: DSAAction = DSAAction((ctx: ActionContext) => {
 
-    val node = ctx.node
+    val node = ctx.node.parent.get
     val groupName = ctx.args("Group").value.toString
 
     val fToken: Future[String] = models.util.Tokens.makeToken(node);
@@ -79,8 +80,9 @@ object StandardActions {
       val tokenId = token.substring(0, 16);
       node.addChild(tokenId) foreach { child =>
         child.profile = "broker/TokenNode"
-        child.addConfigs("$$group" -> groupName)
-        child.addConfigs("$$token" -> token)
+        child.addConfigs("group" -> groupName)
+        child.addConfigs("token" -> token)
+        child.addConfigs("is" -> "node")
         bindTokenNodeActions(child)
       }
     }
@@ -91,10 +93,10 @@ object StandardActions {
     * Modify current token node
     */
   val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) => {
-    val node = ctx.node
+    val node = ctx.node.parent.get
     val group = ctx.args("Group")
 
-    node.addConfigs("$$group" -> group)
+    node.addConfigs("group" -> group)
 
   }, "Group" -> DSAString)
 
