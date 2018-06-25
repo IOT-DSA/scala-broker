@@ -1,23 +1,28 @@
 package models
 
-
 import scala.collection.Seq
+import scala.concurrent.{ExecutionContext, Future}
+
 import _root_.akka.actor.ActorSystem
 import _root_.akka.cluster.Cluster
+import _root_.akka.management.AkkaManagement
+
 import javax.inject.{Inject, Provider, Singleton}
 
 import kamon.Kamon
 import kamon.statsd.StatsDReporter
 import kamon.system.SystemMetrics
 import kamon.zipkin.ZipkinReporter
+
 import models.akka.{BrokerActors, DSLinkManager}
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
 import models.handshake.LocalKeys
+
 import play.api.{Configuration, Environment}
 import play.api.inject.{ApplicationLifecycle, Module}
 
-import scala.concurrent.{ExecutionContext, Future}
+
 
 /**
  * Provides module bindings.
@@ -29,7 +34,8 @@ class MainModule extends Module {
       bind[DSLinkManager].toProvider[DSLinkManagerProvider],
       bind[LocalKeys].to(LocalKeys.getFromClasspath("/keys")),
       bind[BrokerActors].toSelf.eagerly,
-      bind[StatsDConnection].toSelf.eagerly())
+      bind[StatsDConnection].toSelf.eagerly,
+      bind[AkkaClusterManagement].toSelf.eagerly)
   }
 }
 
@@ -62,4 +68,21 @@ class StatsDConnection @Inject()(lifecycle: ApplicationLifecycle) {
     }(ExecutionContext.global)
   })
 
+}
+
+/**
+  * Simple Akka Management server initialization.
+  * TODO Probably we should use TSL(HTTPS) and Basic Authentication.
+  */
+@Singleton
+class AkkaClusterManagement @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem) {
+
+  private val httpClusterManagement = AkkaManagement(actorSystem)
+  httpClusterManagement.start()
+
+  lifecycle.addStopHook(() => {
+    Future {
+      httpClusterManagement.stop()
+    } (ExecutionContext.global)
+  })
 }
