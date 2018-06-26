@@ -94,7 +94,7 @@ object StandardActions {
     */
   val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
-    val group = ctx.args("Group")
+    val group = ctx.args("Group").value.toString
 
     node.addConfigs("group" -> group)
 
