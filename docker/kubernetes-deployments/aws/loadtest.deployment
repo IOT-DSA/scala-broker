@@ -1,0 +1,22 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-load
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-load
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-load
+    spec:
+      subdomain: "cloud-broker-internal"
+      containers:
+      - name: loadtest
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/loadtest"
+        imagePullPolicy: Always
+        env:
+          - name: BROKER_URLS
+            value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
