@@ -23,4 +23,4 @@ spec:
         imagePullPolicy: Always
         env:
           - name: BROKER_URLS
-            value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
+            value: "cloud-broker-cluster-0:9000,cloud-broker-cluster-1:9000,cloud-broker-cluster-2:9000"
