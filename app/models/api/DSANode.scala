@@ -13,6 +13,7 @@ import akka.event.Logging
 import models.{ RequestEnvelope, ResponseEnvelope, Settings }
 import models.rpc._
 import models.rpc.DSAValue.{ DSAMap, DSAVal, StringValue, array, longToNumericValue, obj }
+import models.util.DsaToAkkaCoder._
 
 /**
  * A structural unit in Node API.
@@ -69,7 +70,7 @@ class DSANodeImpl(val parent: Option[DSANode])
 
   protected val log = Logging(TypedActor.context.system, getClass)
 
-  val name = TypedActor.context.self.path.name
+  val name = TypedActor.context.self.path.name.forDsa
   val path = parent.map(_.path).getOrElse("") + "/" + name
 
   protected def ownId = s"[$path]"
@@ -130,7 +131,7 @@ class DSANodeImpl(val parent: Option[DSANode])
   def child(name: String) = children map (_.get(name))
   def addChild(name: String) = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
-    val child = TypedActor(TypedActor.context).typedActorOf(props, name)
+    val child = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
     _children += name -> child
     log.debug(s"$ownId: added child '$name'")
     notifyListActors(array(name, obj("$is" -> "node")))
