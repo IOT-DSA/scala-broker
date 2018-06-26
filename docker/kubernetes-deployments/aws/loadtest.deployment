@@ -8,17 +8,14 @@ spec:
     matchLabels:
       app: cloud-broker-load
   template:
-    spec:
-      subdomain: "cloud-broker-internal"
-      podManagementPolicy: Parallel
-      dnsPolicy: ClusterFirst
-      dnsConfig:
-          searches:
-            - cloud-broker-internal.default.svc.cluster.local
     metadata:
       labels:
         app: cloud-broker-load
     spec:
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        searches:
+          - cloud-broker-internal.default.svc.cluster.local
       subdomain: "cloud-broker-internal"
       containers:
       - name: loadtest
