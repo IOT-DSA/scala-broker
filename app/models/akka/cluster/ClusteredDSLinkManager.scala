@@ -1,11 +1,11 @@
 package models.akka.cluster
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ ActorRef, ActorSystem }
 import akka.cluster.Cluster
-import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
+import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
 import akka.routing.Routee
 import akka.util.Timeout
-import models.akka.{DSLinkManager, RichRoutee, RootNodeActor}
+import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
 import akka.actor.Props
 import akka.cluster.ddata.DistributedData
 import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
@@ -39,12 +39,12 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
   /**
    * Returns a [[ShardedRoutee]] instance for the specified downlink.
    */
-  def getDownlinkRoutee(name: String): Routee = ShardedRoutee(dnlinkRegion, name)
+  def getDownlinkRoutee(dsaName: String): Routee = ShardedRoutee(dnlinkRegion, dsaName)
 
   /**
    * Returns a [[ShardedRoutee]] instance for the specified uplink.
    */
-  def getUplinkRoutee(name: String): Routee = ShardedRoutee(uplinkRegion, name)
+  def getUplinkRoutee(dsaName: String): Routee = ShardedRoutee(uplinkRegion, dsaName)
 
   /**
    * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.

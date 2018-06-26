@@ -8,9 +8,10 @@ import models.akka.Messages._
 import akka.pattern.ask
 import akka.util.Timeout
 import models.akka.local.LocalDSLinkManager
-import models.rpc.{DSAResponse, ListRequest, RequestMessage}
 import org.scalatest.Inside
 import scala.concurrent.duration.DurationInt
+import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
+import models.util.DsaToAkkaCoder._
 
 /**
  * RequesterBehavior test suite.
@@ -31,7 +32,7 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
 
   val downstreamProbe = TestProbe()
   class DownstreamActor extends Actor {
-    val abc = context.actorOf(Props(new AbcActor), "abc")
+    val abc = context.actorOf(Props(new AbcActor), "abc def".forAkka)
     def receive = { case msg => downstreamProbe.ref ! msg }
   }
   val downstreamActor = system.actorOf(Props(new DownstreamActor), "downstream")
@@ -64,7 +65,7 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
       downstreamProbe.expectMsg(RequestEnvelope(requests))
     }
     "route requests to links" in {
-      val requests = List(ListRequest(1, "/downstream/abc"))
+      val requests = List(ListRequest(1, "/downstream/abc def"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
       abcProbe.expectMsg(RequestEnvelope(requests))
     }

@@ -9,9 +9,11 @@ import akka.routing.Routee
 import javax.inject.{Inject, Singleton}
 
 import models.Settings
-import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
+import models.akka.{BrokerActors, DSLinkManager, RichRoutee}
 import play.api.mvc.ControllerComponents
 import akka.actor.Address
+
+import scala.util.control.NonFatal
 
 /**
  * Handles main web requests.
@@ -47,8 +49,8 @@ class MainController @Inject() (actorSystem: ActorSystem,
     val dslinkStats = getDSLinkCounts
     val uplinkStats = getUplinkCounts
     for {
-      down <- dslinkStats
-      up <- uplinkStats
+      down <- dslinkStats.recover{case NonFatal(e) => DSLinkStats(Map.empty)}
+      up <- uplinkStats.recover{case NonFatal(e) => DSLinkStats(Map.empty)}
     } yield Ok(views.html.cluster(mode, startedAt, nodes.map(ni => (ni.address -> ni)).toMap, down, up))
   }
 
@@ -58,6 +60,8 @@ class MainController @Inject() (actorSystem: ActorSystem,
   def dataExplorer = Action.async { implicit request =>
     getDownUpCount map {
       case (down, up) => Ok(views.html.data(Some(down), Some(up)))
+    } recover {
+      case e => Ok(views.html.data(None, None))
     }
   }
 
