@@ -4,12 +4,12 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.cluster.Cluster
-import akka.cluster.ddata.{ReplicatedData, Replicator}
+import akka.cluster.ddata.ReplicatedData
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
 import akka.cluster.ddata.Replicator._
 import akka.event.Logging
-import akka.pattern.{AskPromiseRef, PromiseRef, ask}
+import akka.pattern.{PromiseRef, ask}
 import akka.util.Timeout
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
@@ -17,8 +17,8 @@ import models.api.DistributedNodesRegistry.{AddNode, GetNodesByDescription}
 import models.rpc.DSAValue
 import models.util.LoggingAdapterInside
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.{TimeUnit, _}
 
 case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = Map()) {
   def profile: Option[String] = attrAndConf.get("$is").flatMap(strType _)
