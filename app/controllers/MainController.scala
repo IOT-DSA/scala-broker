@@ -1,18 +1,19 @@
 package controllers
 
 import scala.concurrent.Future
-
 import org.joda.time.DateTime
-
 import akka.actor.ActorSystem
-import akka.cluster.{ Cluster, MemberStatus }
+import akka.cluster.{Cluster, MemberStatus}
 import akka.pattern.ask
 import akka.routing.Routee
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
+
 import models.Settings
-import models.akka.{ BrokerActors, DSLinkManager, RichRoutee }
+import models.akka.{BrokerActors, DSLinkManager, RichRoutee}
 import play.api.mvc.ControllerComponents
 import akka.actor.Address
+
+import scala.util.control.NonFatal
 
 /**
  * Handles main web requests.
@@ -49,8 +50,8 @@ class MainController @Inject() (actorSystem: ActorSystem,
     val dslinkStats = getDSLinkCounts
     val uplinkStats = getUplinkCounts
     for {
-      down <- dslinkStats.recover{case e => DSLinkStats(Map.empty)}
-      up <- uplinkStats.recover{case e => DSLinkStats(Map.empty)}
+      down <- dslinkStats.recover{case NonFatal(e) => DSLinkStats(Map.empty)}
+      up <- uplinkStats.recover{case NonFatal(e) => DSLinkStats(Map.empty)}
     } yield Ok(views.html.cluster(mode, startedAt, nodes.map(ni => (ni.address -> ni)).toMap, down, up))
   }
 
