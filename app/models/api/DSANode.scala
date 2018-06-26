@@ -77,7 +77,6 @@ trait DSANodeSubscriptions { self:DSANode with LoggingAdapterInside =>
   protected var _sids:Map[Int, ActorRef]
   protected var _rids:Map[Int, ActorRef]
 
-
   /**
     * Sends DSAResponse instances to actors listening to SUBSCRIBE updates.
     */
