@@ -9,6 +9,7 @@ import models.util.LoggingAdapterInside
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
+import models.util.DsaToAkkaCoder._
 
 
 /**
@@ -25,7 +26,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
 
   protected val log = Logging(TypedActor.context.system, getClass)
 
-  val name = TypedActor.context.self.path.name
+  val name = TypedActor.context.self.path.name.forDsa
   val path = parent.map(_.path).getOrElse("") + "/" + name
 
   protected def ownId = s"[$path]"
@@ -89,7 +90,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
 
   def addChild(name: String, profile:Option[String] = None, valueType:Option[DSAValueType] = None) = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
-    val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name)
+    val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
     profile foreach{child.profile = _}
     valueType.foreach(child.valueType = _)
     addChild(name, child)
@@ -97,7 +98,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
 
   override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = {
     val props = DSANode.props(Some(TypedActor.self))
-    val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name)
+    val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
     child.addConfigs(paramsAndConfigs.filter(_._1.startsWith("$")):_*)
     child.addAttributes(paramsAndConfigs.filter(_._1.startsWith("@")):_*)
     addChild(name, child)

@@ -10,6 +10,7 @@ import models.ResponseEnvelope
 import models.rpc._
 import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, obj}
 import models.util.LoggingAdapterInside
+import models.util.DsaToAkkaCoder._
 
 /**
   * A structural unit in Node API.
