@@ -30,17 +30,17 @@ trait DSLinkManager {
   /**
    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
    */
-  def getDownlinkRoutee(name: String): Routee
+  def getDownlinkRoutee(dsaName: String): Routee
 
   /**
    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
    */
-  def getUplinkRoutee(name: String): Routee
+  def getUplinkRoutee(dsaName: String): Routee
   
   /**
    * Sends a message to its DSA destination using actor selection.
    */
-  def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit
+  def dsaSend(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit
 
   /**
    * An instance of downlink actor props, according to the

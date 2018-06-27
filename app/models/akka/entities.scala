@@ -7,7 +7,10 @@ case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, 
                           linkData: Option[String] = None, version: String = "",
                           formats: List[String] = Nil, compression: Boolean = false,
                           linkAddress: String = "", brokerAddress: String = ""
-                          , resultFormat: String = models.rpc.DSAMessageSerrializationFormat.MSGJSON) {
+                          , resultFormat: String = models.rpc.DSAMessageSerrializationFormat.MSGJSON
+                          , tempKey: String = "", sharedSecret: Array[Byte] = Array.emptyByteArray, salt: String = ""
+                         )
+{
   val mode = (isRequester, isResponder) match {
     case (true, true)  => DSLinkMode.Dual
     case (true, false) => DSLinkMode.Requester
