@@ -16,7 +16,7 @@ object StandardActions {
    */
   def bindDataRootActions(node: DSANode) = bindActions(node,
     ("addNode", "Add Node", AddNode),
-    ("addValue", "Add VSalue", AddValue))
+    ("addValue", "Add Value", AddValue))
 
   /**
    * Adds actions as per broker/dataNode profile.
