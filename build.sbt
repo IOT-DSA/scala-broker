@@ -50,6 +50,7 @@ EclipseKeys.withJavadoc := true
 // building
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
 resolvers += "velvia maven" at "http://dl.bintray.com/velvia/maven"
+resolvers += Resolver.bintrayRepo("tanukkii007", "maven")
 
 scalacOptions ++= Seq(
   "-feature",
@@ -110,32 +111,33 @@ lazy val commonDependencies = Seq(
   ehcache,
   jdbc,
   ws,
-  "com.typesafe.play"           %% "play-json"               % JSON_VERSION,
-  "com.typesafe.play"           %% "play-json-joda"          % JSON_VERSION,
-  "com.typesafe.akka"           %% "akka-cluster"            % AKKA_VERSION,
-  "com.typesafe.akka"           %% "akka-cluster-metrics"    % AKKA_VERSION,
-  "com.typesafe.akka"           %% "akka-cluster-tools"      % AKKA_VERSION,
-  "com.typesafe.akka"           %% "akka-cluster-sharding"   % AKKA_VERSION,
-  "com.typesafe.akka"           %% "akka-slf4j"              % AKKA_VERSION,
-  "com.typesafe.akka"           %% "akka-persistence"        % AKKA_VERSION,
-  "org.fusesource.leveldbjni"    % "leveldbjni-all"          % "1.8",
-  "com.paulgoldbaum"            %% "scala-influxdb-client"   % "0.5.2",
-  "org.bouncycastle"             % "bcprov-jdk15on"          % "1.51",
-  "com.github.romix.akka"       %% "akka-kryo-serialization" % "0.5.1",
-  "com.h2database"               % "h2"                      % "1.4.193",
-  "com.typesafe.play"           %% "anorm"                   % "2.5.3",
-  "com.maxmind.geoip2"           % "geoip2"                  % "2.10.0",
-  "ch.qos.logback"               % "logback-classic"         % "1.2.3",
-  "io.netty"                     % "netty-codec-http"        % "4.0.41.Final" force(),
-  "io.netty"                     % "netty-handler"           % "4.0.41.Final" force(),
-  "org.msgpack"                 %% "msgpack-scala"           % "0.8.13",
-  "org.json4s"                  %% "json4s-native"           % "3.5.0",
-  "io.kamon"                    %% "kamon-akka-remote-2.5"   % "1.0.0",
-  "io.kamon"                    %% "kamon-akka-2.5"          % "1.0.0",
-  "io.kamon"                    %% "kamon-statsd"            % "1.0.0",
-  "io.kamon"                    %% "kamon-system-metrics"    % "1.0.0",
-  "io.kamon"                    %% "kamon-core"              % "1.0.0",
-  "io.kamon"                    %% "kamon-zipkin"            % "1.0.0"
+  "com.typesafe.play"           %% "play-json"                   % JSON_VERSION,
+  "com.typesafe.play"           %% "play-json-joda"              % JSON_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster"                % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster-metrics"        % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster-tools"          % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-cluster-sharding"       % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-slf4j"                  % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-persistence"            % AKKA_VERSION,
+  "org.fusesource.leveldbjni"    % "leveldbjni-all"              % "1.8",
+  "com.paulgoldbaum"            %% "scala-influxdb-client"       % "0.5.2",
+  "org.bouncycastle"             % "bcprov-jdk15on"              % "1.51",
+  "com.github.romix.akka"       %% "akka-kryo-serialization"     % "0.5.1",
+  "com.h2database"               % "h2"                          % "1.4.193",
+  "com.typesafe.play"           %% "anorm"                       % "2.5.3",
+  "com.maxmind.geoip2"           % "geoip2"                      % "2.10.0",
+  "ch.qos.logback"               % "logback-classic"             % "1.2.3",
+  "io.netty"                     % "netty-codec-http"            % "4.0.41.Final" force(),
+  "io.netty"                     % "netty-handler"               % "4.0.41.Final" force(),
+  "org.msgpack"                 %% "msgpack-scala"               % "0.8.13",
+  "org.json4s"                  %% "json4s-native"               % "3.5.0",
+  "io.kamon"                    %% "kamon-akka-remote-2.5"       % "1.0.0",
+  "io.kamon"                    %% "kamon-akka-2.5"              % "1.0.0",
+  "io.kamon"                    %% "kamon-statsd"                % "1.0.0",
+  "io.kamon"                    %% "kamon-system-metrics"        % "1.0.0",
+  "io.kamon"                    %% "kamon-core"                  % "1.0.0",
+  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
+  "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12"
 )
 
 // akka and play test dependencies
