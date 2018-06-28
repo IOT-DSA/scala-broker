@@ -17,7 +17,8 @@ class DeadLettersGuard extends Actor with ActorLogging {
           r =>
             DSAResponse(r.rid, Some(StreamState.Closed), None, None, Some(DSAError(
               msg = Some(s"Unable to handle request"),
-              detail = Some(s"""Couldn't deliver request: ${r.method} to actor ${requested.path}
+              detail = Some(
+                s"""Couldn't deliver request: ${r.method} to actor ${requested.path}
                                possible reasons:
                                 - path doesn't exist
                                 - dslink owns this path been terminated or disconnected
@@ -28,11 +29,13 @@ class DeadLettersGuard extends Actor with ActorLogging {
 
         toAnswer ! ResponseEnvelope(responses)
       }
+      case _ =>
     }
+    case _ =>
 
   }
 }
 
-object DeadLettersGuard{
+object DeadLettersGuard {
   def props = Props(new DeadLettersGuard())
 }
