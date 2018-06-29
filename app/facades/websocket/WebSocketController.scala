@@ -216,7 +216,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           val failedResult = Result(new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString))
                                     , HttpEntity.NoEntity
                                    )
-          Future.successful(Left[Result, DSAFlow](failedResult))
+          Future.successful(Left(failedResult))
         }
 
       res.map(_.right.map(getTransformer(sessionInfo).transform))

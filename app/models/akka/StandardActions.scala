@@ -14,14 +14,14 @@ object StandardActions {
   /**
    * Adds actions as per broker/dataRoot profile.
    */
-  def bindDataRootActions(node: DSANode) = bindActions(node,
+  def bindDataRootActions(node: DSANode) = bindActions(node, None,
     ("addNode", "Add Node", AddNode),
     ("addValue", "Add Value", AddValue))
 
   /**
    * Adds actions as per broker/dataNode profile.
    */
-  def bindDataNodeActions(node: DSANode) = bindActions(node,
+  def bindDataNodeActions(node: DSANode) = bindActions(node, None,
     ("addNode", "Add Node", AddNode),
     ("addValue", "Add Value", AddValue),
     ("setValue", "Set Value", SetValue),
@@ -29,23 +29,26 @@ object StandardActions {
     ("setConfig", "Set Config", SetConfig),
     ("deleteNode", "Delete Node", DeleteNode))
 
-  def bindTokenNodeActions(node: DSANode) = bindActions(node,
-    ("delete", "Delete token", DeleteNode)
+  def bindTokenNodeActions(node: DSANode) =
+    bindActions(node, Option("config")
+    , ("delete", "Delete token", DeleteNode)
     , ("update", "Update token", UpdateToken)
   )
 
-  def bindTokenGroupNodeActions(node: DSANode) = bindActions(node,
-    ("addToken", "Add token node", AddToken)
+  def bindTokenGroupNodeActions(node: DSANode) =
+    bindActions(node, Option("config")
+    , ("add", "Add token node", AddToken)
   )
 
   /**
    * Adds actions to the node as children.
    */
-  def bindActions(node: DSANode, actions: (String, String, DSAAction)*) = actions foreach {
+  def bindActions(node: DSANode, invokable: Option[String], actions: (String, String, DSAAction)*) = actions foreach {
     case (name, displayName, action) => node.addChild(name).foreach { child =>
       child.displayName = displayName
       child.action = action
       child.profile = "node"
+      invokable foreach { perm => child.addConfigs("invokable"-> perm) }
     }
   }
 
@@ -69,7 +72,12 @@ object StandardActions {
   val AddToken: DSAAction = DSAAction((ctx: ActionContext) => {
 
     val node = ctx.node.parent.get
-    val groupName = ctx.args("Group").value.toString
+    val groupName = ctx.args.getOrElse("Role"
+      , ctx.args("Group").value).toString
+    val timeRange = ctx.args.getOrElse("Time_Range", "").toString
+    val count = ctx.args.getOrElse("Count", "").toString
+    val maxSession = ctx.args.getOrElse("Max_Session", "").toString
+    val managed = ctx.args.getOrElse("Managed", "").toString
 
     val fToken: Future[String] = models.util.Tokens.makeToken(node);
 
@@ -80,9 +88,18 @@ object StandardActions {
       val tokenId = token.substring(0, 16);
       node.addChild(tokenId) foreach { child =>
         child.profile = "broker/TokenNode"
-        child.addConfigs("group" -> groupName)
-        child.addConfigs("token" -> token)
-        child.addConfigs("is" -> "node")
+        child.addConfigs(
+          ("group" -> groupName)
+          , ("token" -> token)
+          , ("is" -> "node")
+        )
+        child.addConfigs(
+          ("timeRange"->timeRange)
+          , ("count"->count)
+          , ("maxSession"->maxSession)
+          , ("managed"->managed)
+
+        )
         bindTokenNodeActions(child)
       }
     }
