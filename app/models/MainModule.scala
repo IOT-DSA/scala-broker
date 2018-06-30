@@ -10,7 +10,7 @@ import kamon.Kamon
 import kamon.statsd.StatsDReporter
 import kamon.system.SystemMetrics
 import kamon.zipkin.ZipkinReporter
-import models.akka.{BrokerActors, DSLinkManager}
+import models.akka.{BrokerActors, DSLinkManager, DeadLettersGuard, SystemGuard}
 import models.akka.cluster.ClusteredDSLinkManager
 import models.akka.local.LocalDSLinkManager
 import models.handshake.LocalKeys
@@ -29,6 +29,7 @@ class MainModule extends Module {
       bind[DSLinkManager].toProvider[DSLinkManagerProvider],
       bind[LocalKeys].to(LocalKeys.getFromClasspath("/keys")),
       bind[BrokerActors].toSelf.eagerly,
+      bind[SystemGuard].toSelf.eagerly,
       bind[StatsDConnection].toSelf.eagerly())
   }
 }

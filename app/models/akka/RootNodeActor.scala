@@ -136,14 +136,14 @@ object RootNodeActor {
   /**
    * Creates a new instance of [[RootNodeActor]] props.
    */
-  def props = Props(new RootNodeActor)
+  def props() = Props(new RootNodeActor())
 
   /**
    * Starts a Singleton Manager and returns the cluster-wide unique instance of [[RootNodeActor]].
    */
   def singletonStart(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonManager.props(
-      singletonProps = props,
+      singletonProps = props(),
       terminationMessage = PoisonPill,
       settings = ClusterSingletonManagerSettings(system).withRole("backend")),
     name = Root)

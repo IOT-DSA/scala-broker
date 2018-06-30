@@ -44,7 +44,6 @@ import play.api.http.Status.UNAUTHORIZED
 class WebSocketController @Inject() (actorSystem:  ActorSystem,
                                      materializer: Materializer,
                                      cache:        SyncCacheApi,
-                                     dslinkMgr:    DSLinkManager,
                                      actors:       BrokerActors,
                                      wsc:          WSClient,
                                      keys:         LocalKeys,

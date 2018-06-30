@@ -27,7 +27,6 @@ class MainController @Inject() (actorSystem: ActorSystem,
   import models.akka.Messages._
 
   val isClusterMode = actorSystem.hasExtension(Cluster)
-
   val downstream = actors.downstream
   val upstream = actors.upstream
 
