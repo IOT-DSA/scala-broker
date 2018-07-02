@@ -150,7 +150,9 @@ lazy val playTestDependencies = Seq(
 lazy val testDependencies = Seq(
   "org.scalatest"           %% "scalatest"               % "3.0.4"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.13.5"        % "test",
-  "org.mockito"              % "mockito-core"            % "2.13.0"        % "test"
+  "org.mockito"              % "mockito-core"            % "2.13.0"        % "test",
+  "com.typesafe.akka"       %% "akka-testkit"            % AKKA_VERSION    % "test",
+  "com.typesafe.akka"       %% "akka-multi-node-testkit" % AKKA_VERSION    % "test"
 )
 
 // dependencies for it module
@@ -161,7 +163,6 @@ lazy val itDependencies = Seq(
   "org.iot-dsa" % "dslink" % "0.18.3" % "test",
   "io.projectreactor" % "reactor-core" % "3.1.6.RELEASE" % "test",
   "io.projectreactor" %% "reactor-scala-extensions" % "0.3.4" % "test"
-
 )
 
 lazy val msgpackDependencies = Seq(

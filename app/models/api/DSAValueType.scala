@@ -13,4 +13,14 @@ object DSAValueType extends Enumeration {
   val DSAObject = Value("map")
   val DSABinary = Value("binary")
   val DSADynamic = Value("dynamic")
+
+  def byName(name:String) = name match{
+    case "string" => DSAString
+    case "number" => DSANumber
+    case "bool" => DSABoolean
+    case "array" => DSAArray
+    case "map" => DSAObject
+    case "binary" => DSABinary
+    case "dynamic" => DSADynamic
+  }
 }
