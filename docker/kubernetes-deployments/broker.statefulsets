@@ -7,7 +7,7 @@ spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster
-  replicas: 2
+  replicas: 1
   serviceName: cloud-broker-internal
   template:
     metadata:
