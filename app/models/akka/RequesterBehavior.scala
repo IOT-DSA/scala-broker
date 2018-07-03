@@ -6,6 +6,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import models.akka.Messages._
 import models.metrics.Meter
+
 import scala.util.control.NonFatal
 import scala.collection.mutable.Set
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
@@ -30,8 +31,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   ), "stateKeeper")
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
-  private val targetsByRid = collection.mutable.Map.empty[Int, String]
-  private val targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
+  private var targetsByRid = collection.mutable.Map.empty[Int, String]
+  private var targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
 
   private var lastRid: Int = 0
 
@@ -47,7 +48,10 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     case m @ RequestMessage(msg, ack, requests) =>
       log.debug("{}: received {}", ownId, m)
       processRequests(requests)
-      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
+      requests.lastOption foreach (req => persist(LastRidSet(req.rid)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
+        lastRid = event.rid
+        saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid)) })
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
@@ -66,7 +70,6 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
 
     case SubscriptionSourceMessage(actorRef) =>
       getSubscriptionSource(actorRef)
-
   }
 
   // requester mixin for disconnected behavior
@@ -117,20 +120,25 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     */
   val requesterRecover: Receive = {
     case event: RidTargetsRequesterState =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       targetsByRid.put(event.rid, event.target)
     case event: SidTargetsRequesterState =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       targetsBySid.put(event.sid, event.pathAndQos)
     case event: RemoveTargetByRid =>
-      log.debug("{}: trying to recover remove action by {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       targetsByRid.remove(event.rid)
     case event: RemoveTargetBySid =>
-      log.debug("{}: trying to recover remove action by {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       removeTargetBy(event.sids: _*)
     case event: LastRidSet =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       lastRid = event.rid
+    case offeredSnapshot: RequesterBehaviorState =>
+      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
+      targetsByRid = offeredSnapshot.targetsByRid
+      targetsBySid = offeredSnapshot.targetsBySid
+      lastRid = offeredSnapshot.lastRid
   }
 
   /**
@@ -206,8 +214,9 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       rows collect extractSid foreach sids.add
 
       persist(RemoveTargetBySid(sids.toSeq: _*)) { event =>
-        log.debug("{}: removing by SIDs persisted {}", ownId, event)
+        log.debug("{}: persisting {}", ownId, event)
         removeTargetBy(event.sids: _*)
+        saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid))
       }
     }
 
@@ -215,8 +224,9 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       case DSAResponse(0, _, Some(updates), _, _)   => cleanupSids(updates)
       case DSAResponse(rid, _, _, _, _) if rid != 0 =>
         persist(RemoveTargetByRid(rid)) { event =>
-          log.debug("{}: removing by RID persisted {}", ownId, event)
+          log.debug("{}: persisting {}", ownId, event)
           targetsByRid.remove(event.rid)
+          saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid))
         }
     }
 
@@ -265,13 +275,15 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   private def cacheRequestTarget(request: DSARequest, target: String) = request match {
     case r @ (_: ListRequest | _: InvokeRequest) =>
       persist(RidTargetsRequesterState(r.rid, target)) { event =>
-        log.debug("{}: RID targets persisted {}", ownId, event)
+        log.debug("{}: persisting {}", ownId, event)
         targetsByRid.put(event.rid, event.target)
+        saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid))
       }
     case r: SubscribeRequest =>
       persist(SidTargetsRequesterState(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))) { event =>
-        log.debug("{}: SID targets persisted {}", ownId, event)
+        log.debug("{}: persisting {}", ownId, event)
         targetsBySid.put(event.sid, event.pathAndQos)
+        saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid))
       }
     case _ => // do nothing
   }
@@ -302,8 +314,9 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       case UnsubscribeRequest(_, sids) =>
         val target = targetsBySid.get(sids.head).get.path
         persist(RemoveTargetBySid(sids.head)) { event =>
-          log.debug("{}: removing by SID persisted {}", ownId, event)
+          log.debug("{}: persisting {}", ownId, event)
           removeTargetBy(event.sids: _*)
+          saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid))
         }
         target
     }
@@ -312,8 +325,9 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       case CloseRequest(rid) =>
         val target = targetsByRid.get(rid).get
         persist(RemoveTargetByRid(rid)) { event =>
-          log.debug("{}: removing by RID persisted {}", ownId, event)
+          log.debug("{}: persisting {}", ownId, event)
           targetsByRid.remove(event.rid)
+          saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid))
         }
         target
     }

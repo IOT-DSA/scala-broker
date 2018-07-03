@@ -24,16 +24,16 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
   override def persistenceId = linkPath
 
   /**
-   * Recovers DSLink state from the event journal.
+   * Recovers DSLink state from the event journal or snapshot.
    */
-  override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover
+  override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover  orElse recoverDSLinkSnapshot
 
-  override def disconnected: Receive = super.disconnected orElse requesterDisconnected orElse toStash
+  override def disconnected: Receive = super.disconnected orElse requesterDisconnected orElse toStash orElse snapshotReceiver
 
   /**
    * Handles messages in CONNECTED state.
    */
-  override def connected = super.connected orElse requesterBehavior orElse responderBehavior
+  override def connected = super.connected orElse requesterBehavior orElse responderBehavior orElse snapshotReceiver
 }
 
 /**

@@ -2,12 +2,10 @@ package models.akka.responder
 
 import scala.util.control.NonFatal
 import akka.persistence.PersistentActor
-
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{ ResponsesProcessed, RequestsProcessed }
-
+import models.akka.{DSLinkStateSnapshotter, RequestsProcessed, ResponsesProcessed}
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -15,7 +13,7 @@ import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: PersistentActor with ActorLogging =>
+trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor with ActorLogging =>
   import RidRegistry._
 
   protected def linkPath: String
@@ -312,4 +310,6 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    * Sends a message to the endpoint, if connected.
    */
   protected def sendToEndpoint(msg: Any): Unit
+
+//  protected def saveResponderBehaviorSnapshot(state: ResponderBehaviorState): Unit
 }

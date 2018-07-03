@@ -1,12 +1,11 @@
 package models.akka.cluster
 
-import models.akka.{ DSLinkCreated, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered }
+import models.akka.{DSLinkCreated, DSLinkFolderActor, DSLinkFolderState, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered, IsNode, RichRoutee, rows}
 import akka.actor.{Identify, PoisonPill, Props, actorRef2Scala}
 import akka.pattern.pipe
 import akka.routing.Routee
 import akka.stream.scaladsl.Source
 import models.akka.Messages._
-import models.akka.{DSLinkFolderActor, IsNode, RichRoutee, rows}
 import models.rpc.DSAValue.{ArrayValue, DSAVal, StringValue, array, obj}
 
 import scala.concurrent.Future
@@ -60,13 +59,16 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
     case GetOrCreateDSLink(name) =>
       persist(DSLinkCreated(name)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         log.info("{}: requested DSLink '{}'", ownId, event.name)
         sender ! getOrCreateDSLink(event.name)
       }
 
     case msg @ RegisterDSLink(name, mode, connected) =>
       persist(DSLinkRegistered(name, mode, connected)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         links += (event.name -> LinkState(event.mode, event.connected))
+        saveSnapshot(DSLinkFolderState(links, listRid))
         tellPeers(PeerMessage(msg))
         log.info("{}: registered DSLink '{}'", ownId, event.name)
       }
@@ -77,13 +79,16 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
     case RemoveDSLink(name) =>
       persist(DSLinkRemoved(name)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         removeDSLinks(event.names: _*)
         log.info("{}: ordered to remove DSLink '{}'", ownId, event.names)
       }
 
     case msg @ UnregisterDSLink(name) =>
       persist(DSLinkUnregistered(name)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         links -= event.name
+        saveSnapshot(DSLinkFolderState(links, listRid))
         tellPeers(PeerMessage(msg))
         log.info("{}: removed DSLink '{}'", ownId, event.name)
       }

@@ -37,17 +37,24 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
 
   val dslinkFolderRecover: Receive = {
     case event: DSLinkCreated =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       getOrCreateDSLink(event.name)
     case event: DSLinkRemoved =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       removeDSLinks(event.names: _*)
     case event: DSLinkRegistered =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       links += (event.name -> LinkState(event.mode, event.connected))
     case event: DSLinkUnregistered =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       links -= event.name
+    case event: ListRidUpdated =>
+      log.debug("{}: recovering with event {}", ownId, event)
+      listRid = event.listRid
+    case offeredSnapshot: DSLinkFolderState =>
+      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
+      links = offeredSnapshot.links
+      listRid = offeredSnapshot.listRid
   }
 
   implicit val mat = ActorMaterializer()
@@ -67,7 +74,9 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   protected def removeDisconnectedDSLinks = {
     val disconnected = links.filterNot(_._2.connected).keys.toSeq
     persist(DSLinkRemoved(disconnected: _*)) { event =>
+      log.debug("{}: persisting {}", ownId, event)
       removeDSLinks(event.names: _*)
+      saveSnapshot(DSLinkFolderState(links, listRid))
       log.info("{}: removed {} disconnected DSLinks", ownId, event.names.size)
     }
   }
@@ -127,13 +136,22 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
    */
   protected def handleRequest(request: DSARequest): Unit = request match {
     case ListRequest(rid, "/") =>
-      listRid = Some(rid)
-      val messages = listNodes grouped Settings.ChildrenPerListResponse map { rows =>
-        val response = DSAResponse(rid = rid, stream = Some(Open), updates = Some(rows.toList))
-        ResponseMessage(-1, None, List(response))
+      persist(ListRidUpdated(Some(rid))) { event =>
+        log.debug("{}: persisting {}", ownId, event)
+        listRid = event.listRid
+        saveSnapshot(DSLinkFolderState(links, listRid))
+        val messages = listNodes grouped Settings.ChildrenPerListResponse map { rows =>
+          val response = DSAResponse(rid = event.listRid.get, stream = Some(Open), updates = Some(rows.toList))
+          ResponseMessage(-1, None, List(response))
+        }
+        messages.runForeach(self.forward)
       }
-      messages.runForeach(self.forward)
-    case CloseRequest(_) => listRid = None
+    case CloseRequest(_) =>
+      persist(ListRidUpdated(None)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
+        listRid = event.listRid
+        saveSnapshot(DSLinkFolderState(links, listRid))
+      }
     case _ => log.error(s"Invalid request - $request")
   }
 
@@ -160,7 +178,9 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
     links.get(name) match {
       case Some(_) =>
         persist(DSLinkRegistered(name, mode, connected)) { event =>
+          log.debug("{}: persisting {}", ownId, event)
           links += (event.name -> LinkState(event.mode, event.connected))
+          saveSnapshot(DSLinkFolderState(links, listRid))
           log.info("{}: DSLink '{}' state changed to: mode={}, connected={}", ownId, event.name, event.mode, event.connected)
         }
       case None if warnIfNotFound =>
