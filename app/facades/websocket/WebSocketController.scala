@@ -6,9 +6,6 @@ import play.api.http.HttpEntity
 
 import scala.concurrent.Future
 import scala.util.Random
-import org.joda.time.DateTime
-import org.bouncycastle.jcajce.provider.digest.SHA256
-
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
@@ -36,6 +33,8 @@ import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
 import play.api.http.Status.UNAUTHORIZED
+
+import scala.util.control.NonFatal
 
 /**
  * Establishes WebSocket DSLink connections
@@ -119,13 +118,14 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val sessionInfo = DSLinkSessionInfo(ci, sessionId)
     val dsaFlow = createWSFlow(sessionInfo, actors.upstream, BufferSize, OnOverflow)
 
-    dsaFlow map { flow =>
+    dsaFlow flatMap { flow =>
       val inFlow = Flow[Message].collect {
         case TextMessage.Strict(s) => Json.parse(s).as[DSAMessage]
       }
       val wsFlow = inFlow.viaMat(flow)(Keep.right).map(msg => TextMessage.Strict(Json.toJson(msg).toString))
 
-      val (upgradeResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(url), wsFlow)
+      val (upgradeResponse, closed) = Http()
+        .singleWebSocketRequest(WebSocketRequest(url), wsFlow)
 
       val connected = upgradeResponse.map { upgrade =>
         if (upgrade.response.status == StatusCodes.SwitchingProtocols)
@@ -134,9 +134,14 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           throw new RuntimeException(s"Connection failed: ${upgrade.response.status}")
       }
 
-      connected.onComplete(status => log.info(s"Upstream connection completed: $status"))
-
-      Ok("Upstream connection established")
+      connected.map(tryDone => {
+        log.info(s"Upstream connection completed: $tryDone")
+        Ok("Upstream connection established")
+      }).recover{
+        case NonFatal(e) =>
+          log.error(s"Upstream connection failed: ${e.getMessage}", e)
+          InternalServerError(s"Unable to connect: ${e.getMessage}")
+      }
     }
   }
 
