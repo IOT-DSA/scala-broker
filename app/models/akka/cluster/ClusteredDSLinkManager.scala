@@ -7,7 +7,10 @@ import akka.routing.Routee
 import akka.util.Timeout
 import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
 import akka.actor.Props
-import models.util.DsaToAkkaCoder._
+import akka.cluster.ddata.DistributedData
+import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
+import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
+import akka.pattern.ask
 
 /**
  * Uses Akka Cluster Sharding to communicate with DSLinks.
@@ -15,9 +18,21 @@ import models.util.DsaToAkkaCoder._
 class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSystem) extends DSLinkManager {
   import models.Settings._
 
+  implicit val ctx = system.dispatcher
+
   implicit val timeout = Timeout(QueryTimeout)
 
   private val cluster = Cluster(system)
+
+  private val replicator = DistributedData(system).replicator
+  private val distrubutedNodeRegistry:ActorRef = system
+    .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), "distributedNodesRegistry")
+
+
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/data", Some("broker/dataRoot")))).mapTo[DSANode] foreach{
+    node =>
+      node.displayName = "data"
+  }
 
   log.info("Clustered DSLink Manager created")
 
@@ -34,12 +49,14 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
   /**
    * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.
    */
-  def dsaSend(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = dsaPath match {
+  def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = path match {
     case Paths.Downstream                          => system.actorSelection("/user" + Paths.Downstream) ! message
-    case dsaPath if dsaPath.startsWith(Paths.Downstream) => getDownlinkRoutee(dsaPath.drop(Paths.Downstream.size + 1)) ! message
+    case path if path.startsWith(Paths.Downstream) => getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
     case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ! message
-    case dsaPath if dsaPath.startsWith(Paths.Upstream)   => getUplinkRoutee(dsaPath.drop(Paths.Upstream.size + 1)) ! message
-    case dsaPath                                      => RootNodeActor.childProxy(dsaPath)(system) ! message
+    case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
+    case Paths.Data                                => routeToDistributed(path, message)
+    case path if path.startsWith(Paths.Data)       => routeToDistributed(path, message)
+    case path                                      => RootNodeActor.childProxy(path)(system) ! message
   }
 
   /**
@@ -76,4 +93,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     else
       sharding.start(typeName, linkProps, ClusterShardingSettings(system), extractEntityId, extractShardId)
   }
+
+  private def routeToDistributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Unit =
+    distrubutedNodeRegistry ! RouteMessage(path, message, sender)
+
 }
