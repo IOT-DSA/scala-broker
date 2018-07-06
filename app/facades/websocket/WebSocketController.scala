@@ -8,7 +8,6 @@ import scala.concurrent.Future
 import scala.util.Random
 import org.joda.time.DateTime
 import org.bouncycastle.jcajce.provider.digest.SHA256
-
 import akka.Done
 import akka.actor._
 import akka.pattern.ask
@@ -20,10 +19,9 @@ import akka.stream.{Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
-
 import models.Settings
-import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
-import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, RootNodeActor}
+import models.akka.Messages.{GetOrCreateDSLink, GetTokens, RemoveDSLink}
 import models.akka.QoSState.SubscriptionSourceMessage
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
@@ -206,10 +204,20 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
+      // TODO: reimplement it in scala style
       val res =
-        if (validateAuth(sessionInfo, clientAuth))
-          f(sessionInfo)
-        else {
+        if (validateAuth(sessionInfo, clientAuth)) {
+          if (checkToken(sessionInfo))
+            f(sessionInfo)
+          else {
+            val errorString = s"Token check failed"
+            log.error(errorString)
+            val failedResult = Result(new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString))
+              , HttpEntity.NoEntity
+            )
+            Future.successful(Left(failedResult))
+          }
+        } else {
           val errorString = s"Authentication failed in request with dsId: '$dsId', auth value '$clientAuth' is not correct."
           log.error(errorString)
           val failedResult = Result(new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString))
@@ -226,6 +234,17 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     si.map(_.ci).fold(false) { ci =>
       val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
       clientAuth.getOrElse("") == localAuth
+    }
+  }
+
+  private def checkToken(si: Option[DSLinkSessionInfo]): Boolean = {
+    si.map(_.ci).fold(false) { ci =>
+      val token = ci.tokenHash
+      val tokensActor = RootNodeActor.childProxy("/sys/tokens")
+
+      val fActiveTokens = tokensActor ? GetTokens
+      fActiveTokens.foreach(item => log.debug("!!!!!!!!!!!!!11" + item.toString))
+      true
     }
   }
 

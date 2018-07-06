@@ -23,7 +23,9 @@ import models.util.DsaToAkkaCoder._
  * becomes connected again.
  */
 
-abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor with Stash with ActorLogging with Meter {
+abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor
+  with Stash with ActorLogging with Meter {
+
   import Messages._
 
   protected val linkName = self.path.name.forDsa

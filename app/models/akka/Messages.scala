@@ -138,4 +138,9 @@ object Messages {
     else
       s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more...,$sid,$qos))"
   }
+
+  /**
+    * Sent to the Tokens node and returns list of child tokens
+    */
+  case class GetTokens()
 }

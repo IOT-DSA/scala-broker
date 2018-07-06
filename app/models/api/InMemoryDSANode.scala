@@ -2,6 +2,7 @@ package models.api
 
 import akka.actor.{ActorRef, TypedActor, TypedProps}
 import akka.event.Logging
+import models.akka.Messages.GetTokens
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
@@ -143,8 +144,12 @@ class InMemoryDSANode(val parent: Option[DSANode])
       log.info(s"$ownId: received $e")
       val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
-
-    case msg @ _ => log.error("Unknown message: " + msg)
+    case GetTokens =>
+      log.info(s"$ownId: GetTokens received")
+      val response = List("a1", "a2", "a3")
+      sender ! response
+    case msg @ _ =>
+      log.error("Unknown message: " + msg)
   }
 
 
