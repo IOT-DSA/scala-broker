@@ -146,7 +146,14 @@ class InMemoryDSANode(val parent: Option[DSANode])
       sender ! ResponseEnvelope(responses)
     case GetTokens =>
       log.info(s"$ownId: GetTokens received")
-      val response = List("a1", "a2", "a3")
+//      val response = List("123456789123456789123456789", "a2", "a3")
+
+      val fResponse = children.map { m =>
+        m.values.filter(node => node.action.isEmpty).map(_.name)
+          .toList
+      }
+
+      val response = Await.result(fResponse, Duration.Inf)
       sender ! response
     case msg @ _ =>
       log.error("Unknown message: " + msg)

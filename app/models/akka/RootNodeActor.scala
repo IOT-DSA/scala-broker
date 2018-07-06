@@ -2,10 +2,11 @@ package models.akka
 
 import akka.actor._
 import akka.cluster.singleton._
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.api.DSANode
-import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
-import models.rpc.DSAValue.{ StringValue, array, obj }
+import models.akka.StandardActions.bindTokenNodeActions
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.api.{ActionContext, DSANode}
+import models.rpc.{DSAError, DSARequest, DSAResponse, ListRequest}
+import models.rpc.DSAValue.{StringValue, array, obj}
 import models.util.DsaToAkkaCoder._
 
 /**
@@ -121,6 +122,25 @@ class RootNodeActor extends Actor with ActorLogging {
       node.profile = "node"
       node.displayName = "Tokens"
       StandardActions.bindTokenGroupNodeActions(node)
+
+      // Add default token
+      val tokenId = "1234567891234567"
+      node.addChild(tokenId) foreach { child =>
+        child.profile = "broker/TokenNode"
+        child.addConfigs(
+          ("group" -> "config")
+          , ("token" -> "tokenId")
+          , ("is" -> "broker/Token")
+        )
+        child.addConfigs(
+          ("$$count"->null)
+          , ("$$managed"->false)
+          , ("$$maxSession"->null)
+          , ("$$timeRange"->null)
+
+        )
+        bindTokenNodeActions(child)
+      }
     }
 
     // Add root node for roles

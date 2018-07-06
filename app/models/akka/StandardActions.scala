@@ -242,7 +242,7 @@ object StandardActions {
       }
     }
   }
-    , Map[String, DSAVal]("name"->"Group", "type"->DSAString)
+    , Map[String, DSAVal]("name"->"Group", "type"->DSAString, "editor"->"enum[none,list,read,write,config]")
     , Map[String, DSAVal]("name"->"TimeRange", "type"->DSAString, "editor"->"daterange", "writable"->"config")
     , Map[String, DSAVal]("name"->"Count", "type"->DSANumber)
     , Map[String, DSAVal]("name"->"MaxSession", "type"->DSANumber)

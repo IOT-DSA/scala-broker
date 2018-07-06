@@ -81,6 +81,13 @@ object Settings {
   val Salt = rootConfig.getInt("broker.salt")
 
   /**
+    * Used to disable token checking and permission validation. Set 'true' for disabling
+    */
+  val AllowAllLinks = if (rootConfig.hasPath("broker.allowAllLinks"))
+                        rootConfig.getBoolean("broker.allowAllLinks")
+                      else true
+
+  /**
    * Interval to wait for actors' responses.
    */
   val QueryTimeout = rootConfig.getDuration("broker.query.timeout").getSeconds.seconds

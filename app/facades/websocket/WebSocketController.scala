@@ -34,6 +34,8 @@ import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
 import play.api.http.Status.UNAUTHORIZED
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 /**
  * Establishes WebSocket DSLink connections
@@ -238,14 +240,32 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   private def checkToken(si: Option[DSLinkSessionInfo]): Boolean = {
-    si.map(_.ci).fold(false) { ci =>
+    // TODO: uncomment following 2 lines
+//    if (Settings.AllowAllLinks)
+//      return true
+
+    si.map(_.ci).fold( { log.warn("Token is absent!"); false } ) { ci =>
       val token = ci.tokenHash
       val tokensActor = RootNodeActor.childProxy("/sys/tokens")
 
+      if (token.isEmpty)
+        log.warn("Token is absent!")
+
       val fActiveTokens = tokensActor ? GetTokens
-      fActiveTokens.foreach(item => log.debug("!!!!!!!!!!!!!11" + item.toString))
-      true
+      val fExist = fActiveTokens.map {
+        item =>
+          log.debug("Available tokens are: " + item.toString)
+          val tokenId = token.flatMap(a => Option(a.substring(0, 16)))
+          item.asInstanceOf[List[String]].contains(tokenId.getOrElse(None))
+      }
+
+      // TODO: try to avoid Await here
+      val res = Await.result(fExist, Duration.Inf)
+
+      res
     }
+
+//    true
   }
 
   private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {
