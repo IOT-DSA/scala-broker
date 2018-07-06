@@ -23,12 +23,12 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
   /**
    * Handles incoming messages.
    */
-  override def receiveCommand = responderBehavior orElse mgmtHandler
+  override def receiveCommand = responderBehavior orElse mgmtHandler orElse snapshotReceiver
 
   /**
     * Handles events recovering when starting.
     */
-  override def receiveRecover = dslinkFolderRecover orElse responderRecover
+  override def receiveRecover = dslinkFolderRecover orElse responderRecover orElse simpleResponderRecover orElse recoverDSLinkSnapshot
 
   /**
     * Handler for messages coming from peer nodes.

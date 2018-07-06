@@ -26,27 +26,37 @@ class GroupCallRecord {
  */
 abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
 
-  private var bindings = Map.empty[Int, GroupCallRecord]
+  private var _bindings = Map.empty[Int, GroupCallRecord]
+
+  /**
+    * Returns all bindings especially for quick snapshotting.
+    */
+  def getBindings: Map[Int, GroupCallRecord] = _bindings
+
+  /**
+    * Sets bindings to quick restore the state from snapshot.
+    */
+  def setBindings(bindings: Map[Int, GroupCallRecord]): Unit = _bindings = bindings
 
   /**
    * Looks for the call record containing the specified origin.
    */
-  def lookupTargetId(origin: Origin): Option[Int] = bindings.find(_._2.origins.contains(origin)).map(_._1)
+  def lookupTargetId(origin: Origin): Option[Int] = _bindings.find(_._2.origins.contains(origin)).map(_._1)
 
   /**
    * Removes the entry for the specified target Id.
    */
-  def remove(targetId: Int): Unit = bindings -= targetId
+  def remove(targetId: Int): Unit = _bindings -= targetId
 
   /**
    * Returns the origins for the specified target Id, or an empty set if the key is not found.
    */
-  def getOrigins(targetId: Int): Set[Origin] = bindings.get(targetId).map(_.origins).getOrElse(Set.empty)
+  def getOrigins(targetId: Int): Set[Origin] = _bindings.get(targetId).map(_.origins).getOrElse(Set.empty)
 
   /**
    * Returns the last response for the specified target Id, or None if not found.
    */
-  def getLastResponse(targetId: Int): Option[DSAResponse] = bindings.get(targetId).flatMap(_.lastResponse)
+  def getLastResponse(targetId: Int): Option[DSAResponse] = _bindings.get(targetId).flatMap(_.lastResponse)
 
   /**
    * Sets the last response for the specified target Id.
@@ -66,11 +76,11 @@ abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
    * Removes the origin from the collection of recipients it belongs to. Returns `Some(targetId)`
    * if the call record can be removed (i.e. no listeners left), or None otherwise.
    */
-  def removeOrigin(origin: Origin): Option[Int] = bindings.find(_._2.origins contains origin) flatMap {
+  def removeOrigin(origin: Origin): Option[Int] = _bindings.find(_._2.origins contains origin) flatMap {
     case (targetId, record) =>
       record.removeOrigin(origin)
       if (record.origins isEmpty) {
-        bindings -= targetId
+        _bindings -= targetId
         Some(targetId)
       } else None
   }
@@ -79,9 +89,9 @@ abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
    * Retrieves a record by the key from the binding map. If the key is not found, insert a new
    * blank record into the map.
    */
-  protected def getOrInsert(targetId: Int): GroupCallRecord = bindings.getOrElse(targetId, {
+  protected def getOrInsert(targetId: Int): GroupCallRecord = _bindings.getOrElse(targetId, {
     val wcr = new GroupCallRecord
-    bindings += targetId -> wcr
+    _bindings += targetId -> wcr
     wcr
   })
 

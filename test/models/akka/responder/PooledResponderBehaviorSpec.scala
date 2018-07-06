@@ -198,7 +198,7 @@ object PooledResponderBehaviorSpec {
   class Responder() extends AbstractDSLinkActor(NoRoutee) with PooledResponderBehavior {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def persistenceId = linkPath
-    override def connected = super.connected orElse responderBehavior
-    override def receiveRecover = recoverBaseState orElse responderRecover
+    override def connected = super.connected orElse responderBehavior orElse snapshotReceiver
+    override def receiveRecover = recoverBaseState orElse responderRecover orElse pooledResponderRecover orElse recoverDSLinkSnapshot
   }
 }

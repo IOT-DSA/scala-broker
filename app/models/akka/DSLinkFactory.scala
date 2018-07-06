@@ -26,7 +26,7 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
   /**
    * Recovers DSLink state from the event journal or snapshot.
    */
-  override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover  orElse recoverDSLinkSnapshot
+  override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover orElse recoverDSLinkSnapshot
 
   override def disconnected: Receive = super.disconnected orElse requesterDisconnected orElse toStash orElse snapshotReceiver
 
@@ -42,7 +42,10 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
  */
 class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee)
   extends BaseDSLinkActor(dsaParent, registry)
-  with SimpleResponderBehavior
+  with SimpleResponderBehavior {
+
+  override def receiveRecover = super.receiveRecover orElse simpleResponderRecover
+}
 
 /**
  * DSLink with a Router/Worker responder implementation, which uses two pools of workers
@@ -50,7 +53,10 @@ class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registr
  */
 class PooledDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee)
   extends BaseDSLinkActor(dsaParent, registry)
-  with PooledResponderBehavior
+  with PooledResponderBehavior {
+
+  override def receiveRecover = super.receiveRecover orElse pooledResponderRecover
+}
 
 /**
  * Factory for DSLink actors, supports the following responder implementation:

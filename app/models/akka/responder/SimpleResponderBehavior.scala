@@ -3,6 +3,7 @@ package models.akka.responder
 import akka.actor._
 import akka.persistence.PersistentActor
 import models.Origin
+import models.akka.{MainResponderBehaviorState, ResponderBehaviorState, SimpleResponderBehaviorState}
 import models.rpc.DSAResponse
 
 /**
@@ -13,6 +14,13 @@ trait SimpleResponderBehavior extends ResponderBehavior { me: PersistentActor wi
 
   private val listRegistry = new ListCallRegistry(log, ownId + "-LIST")
   private val subsRegistry = new SubscribeCallRegistry(log, ownId + "-SUBS")
+
+  val simpleResponderRecover: Receive = {
+    case offeredSnapshot: SimpleResponderBehaviorState =>
+      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
+      listRegistry.setBindings(offeredSnapshot.listBindings)
+      subsRegistry.setBindings(offeredSnapshot.subsBindings)
+  }
 
   /**
     * Adds the origin to the list of recipients for the given target RID.
@@ -45,4 +53,10 @@ trait SimpleResponderBehavior extends ResponderBehavior { me: PersistentActor wi
     * Delivers a SUBSCRIBE response to its recipients.
     */
   protected def deliverSubscribeResponse(rsp: DSAResponse) = subsRegistry.deliverResponse(rsp)
+
+  /**
+    * Tries to save this responder state as a snapshot.
+    */
+  protected def saveResponderBehaviorSnapshot(main: MainResponderBehaviorState) =
+    saveSnapshot(ResponderBehaviorState(main, SimpleResponderBehaviorState(listRegistry.getBindings, subsRegistry.getBindings)))
 }

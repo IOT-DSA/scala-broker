@@ -12,16 +12,24 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
   private var requesterBehaviorState: RequesterBehaviorState = _
   private var baseState: DSLinkBaseState = _
   private var folderState: DSLinkFolderState = _
+  private var responderState: ResponderBehaviorState = _
 
   val recoverDSLinkSnapshot: Receive = {
-    case SnapshotOffer(metadata, offeredSnapshot: DSLinkState) =>
-//      log.debug("{}: recovering with snapshot {}, metadata: {}", ownId, offeredSnapshot, metadata)
+    case SnapshotOffer(_, offeredSnapshot: DSLinkState) =>
       if (offeredSnapshot.requesterBehaviorState != null)
         receiveRecover(offeredSnapshot.requesterBehaviorState)
       if (offeredSnapshot.baseState != null)
         receiveRecover(offeredSnapshot.baseState)
       if (offeredSnapshot.folderState != null)
         receiveRecover(offeredSnapshot.folderState)
+
+      if (offeredSnapshot.responderBehaviorState != null) {
+        if (offeredSnapshot.responderBehaviorState.main != null)
+          receiveRecover(offeredSnapshot.responderBehaviorState.main)
+        if (offeredSnapshot.responderBehaviorState.additional != null)
+          receiveRecover(offeredSnapshot.responderBehaviorState.additional)
+      }
+
     case RecoveryCompleted =>
       log.debug("{}: recovery completed", ownId)
   }
@@ -33,39 +41,33 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
       log.error("{}: failed to save snapshot, metadata: {}, caused by: {}", ownId, metadata, reason)
   }
 
-  override def saveSnapshot(snapshot: Any): Unit = snapshot match {
-    case state: RequesterBehaviorState =>
-      requesterBehaviorState = state
-      tryToSaveSnapshot
-    case state: DSLinkBaseState =>
-      baseState = state
-      tryToSaveSnapshot
-    case state: DSLinkFolderState =>
-      folderState = state
-      tryToSaveSnapshot
-    case _ =>
-      log.error("{}: not supported snapshot type {}", ownId, snapshot)
+  override def saveSnapshot(snapshot: Any): Unit =
+    if (Settings.AkkaPersistenceSnapShotInterval <= 0) {
+      log.debug("{}: current lastSequenceNr = {} and Settings.AkkaPersistenceSnapShotInterval = {}", ownId, lastSequenceNr, Settings.AkkaPersistenceSnapShotInterval)
+      log.warning("{}: snapshot saving is disabled as Settings.AkkaPersistenceSnapShotInterval is '{}'", ownId, Settings.AkkaPersistenceSnapShotInterval)
+      return
+    } else snapshot match {
+        case state: RequesterBehaviorState =>
+          requesterBehaviorState = state
+          tryToSaveSnapshot
+        case state: DSLinkBaseState =>
+          baseState = state
+          tryToSaveSnapshot
+        case state: DSLinkFolderState =>
+          folderState = state
+          tryToSaveSnapshot
+        case state: ResponderBehaviorState =>
+          responderState = state
+          tryToSaveSnapshot
+        case _ =>
+          log.error("{}: not supported snapshot type {}", ownId, snapshot)
   }
 
   private def tryToSaveSnapshot = {
-    if (isSnapshottingOn) {
-      val snapshot = DSLinkState(baseState, requesterBehaviorState, folderState)
-      log.debug("{}: SAVING DSLink snapshot {} ", ownId, snapshot)
+    if (lastSequenceNr != 0 && lastSequenceNr % Settings.AkkaPersistenceSnapShotInterval == 0) {
+      val snapshot = DSLinkState(baseState, requesterBehaviorState, folderState, responderState)
+      log.debug("{}: Saving DSLink snapshot {} ", ownId, snapshot)
       super.saveSnapshot(snapshot)
     }
-  }
-
-  private def isSnapshottingOn: Boolean = {
-
-    if (Settings.AkkaPersistenceSnapShotInterval <= 0) {
-      log.warning("{}: snapshot saving is disabled as akka-persistence-snapshot-interval is '{}'", ownId, Settings.AkkaPersistenceSnapShotInterval)
-      return false
-    }
-
-    log.debug("{}: current lastSequenceNr = {}", ownId, lastSequenceNr)
-    if (lastSequenceNr != 0 && lastSequenceNr % Settings.AkkaPersistenceSnapShotInterval == 0)
-      return true
-
-    false
   }
 }

@@ -5,7 +5,7 @@ import akka.persistence.PersistentActor
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{DSLinkStateSnapshotter, RequestsProcessed, ResponsesProcessed}
+import models.akka.{DSLinkStateSnapshotter, MainResponderBehaviorState, RequestsProcessed, ResponsesProcessed}
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -24,13 +24,13 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]
 
   // stores call records for forward and reverse RID lookup
-  private val ridRegistry = new RidRegistry
+  private var ridRegistry = new RidRegistry
 
   // stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
-  private val sidRegistry = new SidRegistry
+  private var sidRegistry = new SidRegistry
 
   // stores responder's nodes' attributes locally
-  private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
+  private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
   // processes request using the appropriate handler
   private val requestHandler = handlePassthroughRequest orElse handleListRequest orElse
@@ -43,7 +43,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
     case env @ RequestEnvelope(requests) =>
       log.info("{}: received {} from {}", ownId, env, sender)
       persist(RequestsProcessed(requests)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         val result = processRequests(event.requests)
+        saveResponderBehaviorSnapshot(MainResponderBehaviorState(ridRegistry, sidRegistry, attributes))
         if (!result.requests.isEmpty)
           sendToEndpoint(RequestEnvelope(result.requests))
         if (!result.responses.isEmpty)
@@ -53,9 +55,11 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
     case m @ ResponseMessage(_, _, responses) =>
       log.debug("{}: received {}", ownId, m)
       persist(ResponsesProcessed(responses)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         processResponses(event.responses) foreach {
           case (to, rsps) => to ! ResponseEnvelope(rsps)
         }
+        saveResponderBehaviorSnapshot(MainResponderBehaviorState(ridRegistry, sidRegistry, attributes))
       }
   }
 
@@ -64,13 +68,18 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
     */
   val responderRecover: Receive = {
     case event: RequestsProcessed =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       // TODO has to be improved to separate the functionality
       processRequests(event.requests)
     case event: ResponsesProcessed =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.debug("{}: recovering with event {}", ownId, event)
       // TODO has to be improved to separate the functionality
       processResponses(event.responses)
+    case offeredSnapshot: MainResponderBehaviorState =>
+      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
+      ridRegistry = offeredSnapshot.ridRegistry
+      sidRegistry = offeredSnapshot.sidRegistry
+      attributes = offeredSnapshot.attributes
   }
 
   /**
@@ -311,5 +320,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
    */
   protected def sendToEndpoint(msg: Any): Unit
 
-//  protected def saveResponderBehaviorSnapshot(state: ResponderBehaviorState): Unit
+  /**
+    * Tries to save this responder state as a snapshot.
+    */
+  protected def saveResponderBehaviorSnapshot(main: MainResponderBehaviorState): Unit
 }

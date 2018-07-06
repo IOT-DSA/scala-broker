@@ -24,7 +24,7 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   /**
     * Handles persisted events.
     */
-  override def receiveRecover = dslinkFolderRecover orElse responderRecover orElse recoverDSLinkSnapshot
+  override def receiveRecover = dslinkFolderRecover orElse responderRecover orElse simpleResponderRecover orElse recoverDSLinkSnapshot
 
   /**
    * Handles control messages.

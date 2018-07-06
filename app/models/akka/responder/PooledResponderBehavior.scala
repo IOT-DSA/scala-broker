@@ -1,11 +1,11 @@
 package models.akka.responder
 
 import scala.concurrent.duration.DurationInt
-
 import akka.actor._
 import akka.persistence.PersistentActor
-import akka.routing.{ Broadcast, ConsistentHashingPool }
-import models.{ Origin, Settings }
+import akka.routing.{Broadcast, ConsistentHashingPool}
+import models.akka.{MainResponderBehaviorState, PooledResponderBehaviorState, ResponderBehaviorState}
+import models.{Origin, Settings}
 import models.rpc.DSAResponse
 
 /**
@@ -27,11 +27,18 @@ trait PooledResponderBehavior extends ResponderBehavior { me: PersistentActor wi
     case LookupTargetId(origin) => origin
   }
 
-  private val listPool = ConsistentHashingPool(Settings.Responder.ListPoolSize, hashMapping = originHash)
+  private var listPool = ConsistentHashingPool(Settings.Responder.ListPoolSize, hashMapping = originHash)
   private val listRouter = context.actorOf(listPool.props(ResponderListWorker.props(linkName)))
 
-  private val subsPool = ConsistentHashingPool(Settings.Responder.SubscribePoolSize, hashMapping = originHash)
+  private var subsPool = ConsistentHashingPool(Settings.Responder.SubscribePoolSize, hashMapping = originHash)
   private val subsRouter = context.actorOf(subsPool.props(ResponderSubscribeWorker.props(linkName)))
+
+  val pooledResponderRecover: Receive = {
+    case offeredSnapshot: PooledResponderBehaviorState =>
+      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
+      listPool = offeredSnapshot.listPool
+      subsPool = offeredSnapshot.subsPool
+  }
 
   /**
    * Sends `AddOrigin` message to the list router.
@@ -79,4 +86,10 @@ trait PooledResponderBehavior extends ResponderBehavior { me: PersistentActor wi
    * Broadcasts the response to the subscriber router's workers.
    */
   protected def deliverSubscribeResponse(rsp: DSAResponse) = subsRouter ! Broadcast(rsp)
+
+  /**
+    * Tries to save this responder state as a snapshot.
+    */
+  protected def saveResponderBehaviorSnapshot(main: MainResponderBehaviorState) =
+    saveSnapshot(ResponderBehaviorState(main, PooledResponderBehaviorState(listPool, subsPool)))
 }
