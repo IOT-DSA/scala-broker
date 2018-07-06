@@ -45,7 +45,6 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
     if (Settings.AkkaPersistenceSnapShotInterval <= 0) {
       log.debug("{}: current lastSequenceNr = {} and Settings.AkkaPersistenceSnapShotInterval = {}", ownId, lastSequenceNr, Settings.AkkaPersistenceSnapShotInterval)
       log.warning("{}: snapshot saving is disabled as Settings.AkkaPersistenceSnapShotInterval is '{}'", ownId, Settings.AkkaPersistenceSnapShotInterval)
-      return
     } else snapshot match {
         case state: RequesterBehaviorState =>
           requesterBehaviorState = state

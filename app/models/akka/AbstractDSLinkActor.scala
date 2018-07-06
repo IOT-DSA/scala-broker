@@ -129,6 +129,7 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
 
     persist(DSLinkBaseState(Some(context.watch(ref)), ci, Some(DateTime.now.toDate), lastDisconnected.map { _.toDate } )) { event =>
       log.debug("{}: persisting {}", ownId, event)
+      updateState(event)
       saveSnapshot(event)
 
       sendToRegistry(DSLinkStateChanged(linkName, event.connInfo.mode, true))
@@ -152,6 +153,7 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
 
     persist(DSLinkBaseState(None, connInfo, lastConnected.map { _.toDate }, Some(DateTime.now.toDate))) { event =>
       log.debug("{}: persisting {}", ownId, event)
+      updateState(event)
       saveSnapshot(event)
 
       sendToRegistry(DSLinkStateChanged(linkName, event.connInfo.mode, false))
