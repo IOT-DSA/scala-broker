@@ -1,0 +1,65 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-grafana
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-grafana
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-grafana
+    spec:
+      subdomain: "cloud-grafana-internal"
+      containers:
+      - name: graphana
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/graphana"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        - containerPort: 81
+        - containerPort: 2003
+        - containerPort: 8125
+          protocol: UDP
+        - containerPort: 8126
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-grafana-internal
+  labels:
+    app: cloud-broker-grafana
+spec:
+  ports:
+  - name: udp-8125
+    port: 8125
+    targetPort: 8125
+    protocol: UDP
+  - name: tcp-8126
+    port: 8126
+    targetPort: 8126
+    protocol: TCP
+  selector:
+    app: cloud-broker-grafana
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-grafana
+  labels:
+    app: cloud-broker-grafana
+spec:
+  clusterIP: 10.100.200.2
+  ports:
+  - name: grafana
+    port: 80
+    targetPort: 80
+    nodePort: 30003
+  selector:
+    app: cloud-broker-grafana
+  status: loadBalancer
+  type: NodePort
+  externalTrafficPolicy: Cluster
