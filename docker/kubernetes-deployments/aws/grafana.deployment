@@ -57,7 +57,7 @@ spec:
   - name: grafana
     port: 80
     targetPort: 80
-    nodePort: 30004
+    nodePort: 30005
   selector:
     app: cloud-broker-grafana
   status: loadBalancer
