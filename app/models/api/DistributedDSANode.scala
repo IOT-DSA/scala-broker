@@ -6,19 +6,20 @@ import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.cluster.Cluster
 import akka.cluster.ddata.ReplicatedData
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
-import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
+import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
 import akka.cluster.ddata.Replicator._
 import akka.event.Logging
 import akka.pattern.{PromiseRef, ask}
 import akka.util.Timeout
+import models.akka.Messages.{GetTokens, UpdateToken}
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.{AddNode, GetNodesByDescription}
 import models.rpc.DSAValue
 import models.util.LoggingAdapterInside
 
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = Map()) {
   def profile: Option[String] = attrAndConf.get("$is").flatMap(strType _)
@@ -340,7 +341,6 @@ class DistributedDSANode(_parent: Option[DSANode],
     (if (tuple._1.startsWith(suffix)) tuple._1 else suffix + tuple._1) -> tuple._2
   }
 
-
   override def onReceive(message: Any, sender: ActorRef): Unit = {
     message match {
       case g@GetSuccess(dataKey, Some(msg)) => msg match {
@@ -373,14 +373,43 @@ class DistributedDSANode(_parent: Option[DSANode],
       case c@Changed(dataKey) ⇒
         log.debug("Current elements: {}", c.get(dataKey))
         updateLocalState(c.get(dataKey))
+
+      // TODO: Extract following 2 methods (In the InMemoryDSANode too) into separated trait
+      case GetTokens =>
+        log.info(s"$ownId: GetTokens received")
+
+        val fResponse = children.map { m =>
+          m.values.filter(node => node.action.isEmpty).map(_.name)
+            .toList
+        }
+
+        val response = Await.result(fResponse, Duration.Inf)
+        sender ! response
+      case UpdateToken(name, value) =>
+        log.info(s"$ownId: received UpdateToken ($name, $value)")
+        if(name.startsWith("$")) {
+
+          val oIds = _configs.get(name)
+          val values: DSAVal = oIds match {
+            case None => array(value)
+            case Some(arr)  =>
+              val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
+              if (srcVal.contains(StringValue(value)))
+                array(value)
+              else
+                srcVal ++ Seq(StringValue(value))
+          }
+
+          _configs ++= Seq(name -> values)
+        } else
+          log.warning("UpdateToken's parameter does not contains @ " + name)
       case a:Any =>
         log.warning("unhandled  message: {}", a)
     }
   }
 
   override def preStart(): Unit = {
-    val initTimeout:FiniteDuration = FiniteDuration(5, TimeUnit.SECONDS)// 5 minutes //we can't use standard one - it's too short. We can't use infinite - it's too
-    // long ;)
+    val initTimeout:FiniteDuration = FiniteDuration(5, TimeUnit.SECONDS)// 5 minutes //we can't use standard one - it's too short. We can't use infinite - it's to long ;)
     replicator ! Get(dataKey, readLocal, Some(InitMe))
   }
 

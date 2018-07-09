@@ -1,12 +1,15 @@
 package models.akka
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import models.api.{ActionContext, DSAAction, DSANode, DSAValueType}
+import models.api._
 import models.rpc.DSAValue
 
 import scala.concurrent.Future
-import models.rpc.DSAValue.{DSAMap, DSAVal, MapValue, StringValue, ArrayValue, array}
+import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, MapValue, StringValue, array}
 import java.net.URLEncoder
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 /**
   * Standard node actions.
@@ -93,19 +96,24 @@ object StandardActions {
   def bindActions(node: DSANode
                   , actions: ActionDescription*) = actions foreach {
     ad =>
-      val se = ad.action.params
+      val params = ad.action.params filter
+        { a =>
+          a.getOrElse[DSAVal]("output", false).value == false
+        } map
+        { item => MapValue(item) }
 
-      val params = ad.action.params map { item =>
-        MapValue(item)
-      }
-
-      val dsaVal:DSAVal = ArrayValue(params)
+      val columns = ad.action.params filter
+        { a =>
+          a.getOrElse[DSAVal]("output", false).value == true
+        } map
+        { item => MapValue(item) }
 
       val configs:Map[String, DSAVal] = Map(
-        "$params" -> dsaVal,
+        "$params" -> ArrayValue(params),
         "$invokable" -> ad.invokable.getOrElse("config"),
-        "$is" -> ad.is.getOrElse("static"), // "static",
-        "$name" -> ad.displayName
+        "$is" -> ad.is.getOrElse("static"),
+        "$name" -> ad.displayName,
+        "$columns" -> ArrayValue(columns)
       )
 
       node.addChild(ad.name, configs.toSeq:_*).foreach { child =>
@@ -241,12 +249,18 @@ object StandardActions {
         bindTokenNodeActions(child)
       }
     }
+
+    val token = Await.result(fToken, Duration.Inf)
+
+    (token.substring(0, 16), token)
   }
     , Map[String, DSAVal]("name"->"Group", "type"->DSAString, "editor"->"enum[none,list,read,write,config]")
     , Map[String, DSAVal]("name"->"TimeRange", "type"->DSAString, "editor"->"daterange", "writable"->"config")
     , Map[String, DSAVal]("name"->"Count", "type"->DSANumber)
     , Map[String, DSAVal]("name"->"MaxSession", "type"->DSANumber)
     , Map[String, DSAVal]("name"->"Managed", "type"->DSABoolean)
+    , Map[String, DSAVal]("name"->"TokenName", "type"->DSAString, "output"->true)
+    , Map[String, DSAVal]("name"->"Token", "type"->DSAString, "output"->true)
   )
 
   /**
@@ -269,13 +283,14 @@ object StandardActions {
   /**
     * Modify current token node
     */
-  val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) => {
-    val node = ctx.node.parent.get
-    val group = ctx.args("Group").value.toString
+  val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) =>
+    {
+      val node = ctx.node.parent.get
+      val group = ctx.args("Group").value.toString
 
-    node.addConfigs("group" -> group)
-  }
-    , Map[String, DSAVal]("name"->StringValue("Group"), "type"-> DSAString)
+      node.addConfigs("group" -> group)
+    }
+    , Map[String, DSAVal]("name"->StringValue("Group"), "type"-> DSAString, "editor"->"enum[none,list,read,write,config]")
   )
 
   /**

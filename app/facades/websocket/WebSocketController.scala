@@ -21,7 +21,7 @@ import controllers.BasicController
 import javax.inject.{Inject, Singleton}
 import models.Settings
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, RootNodeActor}
-import models.akka.Messages.{GetOrCreateDSLink, GetTokens, RemoveDSLink}
+import models.akka.Messages.{GetOrCreateDSLink, GetTokens, RemoveDSLink, UpdateToken}
 import models.akka.QoSState.SubscriptionSourceMessage
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
@@ -34,6 +34,7 @@ import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
 import play.api.http.Status.UNAUTHORIZED
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -193,6 +194,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     import Settings.WebSocket._
 
     sessionInfo map { si =>
+      updateToken(si)
       createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
     } getOrElse
       Future.successful(Left[Result, DSAFlow](Forbidden))
@@ -232,6 +234,16 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     }
   }
 
+  private def updateToken(si: DSLinkSessionInfo) : Unit = {
+    si.ci.tokenHash.foreach { token =>
+      val tokenId = token.substring(0, 16)
+
+      val tokenActor = RootNodeActor.childProxy("/sys/tokens/" + tokenId)
+
+      tokenActor ! UpdateToken("$dsLinkIds", si.ci.dsId)
+    }
+  }
+
   private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: Option[String]): Boolean = {
     si.map(_.ci).fold(false) { ci =>
       val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
@@ -240,9 +252,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   private def checkToken(si: Option[DSLinkSessionInfo]): Boolean = {
-    // TODO: uncomment following 2 lines
-//    if (Settings.AllowAllLinks)
-//      return true
+    if (Settings.AllowAllLinks)
+      return true
 
     si.map(_.ci).fold( { log.warn("Token is absent!"); false } ) { ci =>
       val token = ci.tokenHash
@@ -264,8 +275,6 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
       res
     }
-
-//    true
   }
 
   private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {

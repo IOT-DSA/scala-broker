@@ -143,4 +143,13 @@ object Messages {
     * Sent to the Tokens node and returns list of child tokens
     */
   case class GetTokens()
+
+  /**
+    * Sent to a node. The node treads as token node, updates the node configs
+    * or attributes or node's value by the passed value. Configs and attributes
+    * are treaded as Array
+    * @param name
+    * @param value
+    */
+  case class UpdateToken(name: String, value: String)
 }

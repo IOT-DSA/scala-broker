@@ -52,7 +52,7 @@ trait DSANode {
   def action: Option[DSAAction]
   def action_=(a: DSAAction): Unit
 
-  def invoke(params: DSAMap): Unit
+  def invoke(params: DSAMap): Any
 
   def subscribe(sid: Int, ref: ActorRef): Unit
   def unsubscribe(sid: Int): Unit
@@ -152,8 +152,19 @@ trait DSANodeRequestHandler { self:DSANode =>
     /* invoke */
 
     case InvokeRequest(rid, _, params, _) =>
-      invoke(params)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+      val invokeRes = invoke(params)
+
+      invokeRes match {
+        case Some((tokenName, token)) =>
+          val strTokenName = tokenName.asInstanceOf[String]
+          val strToken = token.asInstanceOf[String]
+          DSAResponse(rid, Some(StreamState.Closed), Some(List(strTokenName, strToken)),
+            Some(List(ColumnInfo("TokenName", "String"), ColumnInfo("Token", "String")))) :: Nil
+        case None =>
+          DSAResponse(rid, Some(StreamState.Open)) :: Nil
+        case _ =>
+          DSAResponse(rid, Some(StreamState.Open)) :: Nil
+      }
 
     /* subscribe */
 

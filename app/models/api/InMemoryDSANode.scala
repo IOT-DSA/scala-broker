@@ -2,10 +2,10 @@ package models.api
 
 import akka.actor.{ActorRef, TypedActor, TypedProps}
 import akka.event.Logging
-import models.akka.Messages.GetTokens
+import models.akka.Messages.{GetTokens, UpdateToken}
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
-import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
+import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
 import models.util.LoggingAdapterInside
 
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -125,7 +125,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
     _action = Some(a)
   }
 
-  def invoke(params: DSAMap) = _action foreach (_.handler(ActionContext(this, params)))
+  def invoke(params: DSAMap) = _action map (_.handler(ActionContext(this, params)))
 
   protected var _sids = Map.empty[Int, ActorRef]
   def subscribe(sid: Int, ref: ActorRef) = _sids += sid -> ref
@@ -144,9 +144,27 @@ class InMemoryDSANode(val parent: Option[DSANode])
       log.info(s"$ownId: received $e")
       val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
+    case UpdateToken(name, value) =>
+      log.info(s"$ownId: received UpdateToken ($name, $value)")
+      if(name.startsWith("$")) {
+
+        val oIds = _configs.get(name)
+        val values: DSAVal = oIds match {
+          case None => array(value)
+          case Some(arr)  =>
+            val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
+            if (srcVal.contains(StringValue(value)))
+              array(value)
+            else
+              srcVal ++ Seq(StringValue(value))
+        }
+
+        _configs ++= Seq(name -> values)
+      } else
+        log.warning("UpdateToken's parameter does not contains @ " + name)
+
     case GetTokens =>
       log.info(s"$ownId: GetTokens received")
-//      val response = List("123456789123456789123456789", "a2", "a3")
 
       val fResponse = children.map { m =>
         m.values.filter(node => node.action.isEmpty).map(_.name)
