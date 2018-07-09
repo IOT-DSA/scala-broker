@@ -198,6 +198,6 @@ object SimpleResponderBehaviorSpec {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def persistenceId = linkPath
     override def connected = super.connected orElse responderBehavior orElse snapshotReceiver
-    override def receiveRecover = recoverBaseState orElse responderRecover orElse recoverDSLinkSnapshot
+    override def receiveRecover = recoverBaseState orElse responderRecover orElse simpleResponderRecover orElse recoverDSLinkSnapshot
   }
 }

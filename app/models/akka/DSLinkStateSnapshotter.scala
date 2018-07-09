@@ -37,8 +37,18 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
   val snapshotReceiver: Receive = {
     case SaveSnapshotSuccess(metadata) =>
       log.debug("{}: snapshot saved successfully, metadata: {}", ownId, metadata)
+      deleteMessages(metadata.sequenceNr)
+      deleteSnapshots(SnapshotSelectionCriteria(metadata.sequenceNr - (DSLinkStateSnapshotter.SNAPSHOTS_NUMBER_TO_KEEP * Settings.AkkaPersistenceSnapShotInterval), metadata.timestamp))
     case SaveSnapshotFailure(metadata, reason) =>
       log.error("{}: failed to save snapshot, metadata: {}, caused by: {}", ownId, metadata, reason)
+    case DeleteMessagesSuccess(toSequenceNr) =>
+      log.debug("{}: messages deleted successfully, toSequenceNr is '{}'", ownId, toSequenceNr)
+    case DeleteMessagesFailure(reason, toSequenceNr) =>
+      log.error("{}: failed to delete messages, toSequenceNr is '{}', caused by: {}", ownId, toSequenceNr, reason)
+    case DeleteSnapshotsSuccess(criteria) =>
+      log.debug("{}: snapshots deleted successfully with criteria: {}", ownId, criteria)
+    case DeleteSnapshotsFailure(criteria, reason) =>
+      log.error("{}: failed to delete snapshots with criteria: {}, caused by: {}", ownId, criteria, reason)
   }
 
   override def saveSnapshot(snapshot: Any): Unit =
@@ -69,4 +79,11 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
       super.saveSnapshot(snapshot)
     }
   }
+}
+
+object DSLinkStateSnapshotter {
+  /**
+    * How many snapshots we want to keep after old ones removing.
+    */
+  val SNAPSHOTS_NUMBER_TO_KEEP = 3
 }
