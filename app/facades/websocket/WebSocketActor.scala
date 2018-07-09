@@ -105,7 +105,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   /**
    * Sends an ACK back to the client.
    */
-  private def sendAck(remoteMsgId: Int) = sendToSocket(PingMessage(localMsgId.inc, Some(remoteMsgId)))
+  private def sendAck(remoteMsgId: Int) = sendToSocket(PongMessage(remoteMsgId))
 
   /**
    * Sends a DSAMessage to a WebSocket connection.

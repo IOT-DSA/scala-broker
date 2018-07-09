@@ -79,7 +79,7 @@ abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
    * Retrieves a record by the key from the binding map. If the key is not found, insert a new
    * blank record into the map.
    */
-  protected def getOrInsert(targetId: Int): GroupCallRecord = bindings.getOrElse(targetId, {
+  protected def getOrInsert(targetId: Int): GroupCallRecord = bindings.get(targetId).getOrElse({
     val wcr = new GroupCallRecord
     bindings += targetId -> wcr
     wcr

@@ -314,6 +314,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
         persist(RemoveTargetByRid(rid)) { event =>
           log.debug("{}: removing by RID persisted {}", ownId, event)
           targetsByRid.remove(event.rid)
+
         }
         target
     }

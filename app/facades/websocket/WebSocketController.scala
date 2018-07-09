@@ -6,34 +6,36 @@ import play.api.http.HttpEntity
 
 import scala.concurrent.Future
 import scala.util.Random
-import akka.Done
+import org.velvia.msgpack.PlayJsonCodecs.JsValueCodec
+import akka.{Done, NotUsed}
 import akka.actor._
 import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
 import akka.stream.{Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.util.ByteString
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
-
 import models.Settings
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
 import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
 import models.akka.QoSState.SubscriptionSourceMessage
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
-import models.rpc.DSAMessage
+import models.rpc.{DSAMessage, EmptyMessage, MsgpackTransformer, PingMessage}
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
-import play.api.libs.json.Json
+import play.api.libs.json.{JsValue, Json}
 import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
-import play.api.http.Status.UNAUTHORIZED
+import org.velvia.msgpack
 
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 /**
@@ -96,21 +98,19 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val tempKey = (serverConfig \ "tempKey").as[String]
       val wsUri = (serverConfig \ "wsUri").as[String]
       val salt = (serverConfig \ "salt").as[String].getBytes("UTF-8")
-
-      //TODO: Change the uplick connection format as well, like: //(serverConfig \ "format").as[String]
-      val format = MSGJSON
+      val format = (serverConfig \ "format").as[String]
 
       val auth = buildAuth(tempKey, salt)
       val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=$format"
 
-      uplinkWSConnect(wsUrl, name, dsId)
+      uplinkWSConnect(wsUrl, name, dsId, format)
     }
   }
 
   /**
    * Initiates a web socket connection with the upstream.
    */
-  private def uplinkWSConnect(url: String, name: String, dsId: String) = {
+  private def uplinkWSConnect(url: String, name: String, dsId: String, format:String) = {
     import Settings.WebSocket._
 
     val ci = ConnectionInfo(dsId, name, true, true)
@@ -119,10 +119,32 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     val dsaFlow = createWSFlow(sessionInfo, actors.upstream, BufferSize, OnOverflow)
 
     dsaFlow flatMap { flow =>
+
+      val tickSource = Source.tick(1 second, 30 seconds, ())
+        .zipWithIndex
+        .map{case (_, i) => PingMessage(i.toInt)}
+
       val inFlow = Flow[Message].collect {
-        case TextMessage.Strict(s) => Json.parse(s).as[DSAMessage]
+        case TextMessage.Strict(s) =>
+          val json = Json.parse(s).as[DSAMessage]
+          log.debug(s"upstream in: ${json}")
+          json
+        case BinaryMessage.Strict(m) =>
+          val jsVal = msgpack.unpack[JsValue](m.toArray)
+          log.debug(s"upstream in: ${jsVal}")
+          Json.fromJson[DSAMessage](jsVal).get
       }
-      val wsFlow = inFlow.viaMat(flow)(Keep.right).map(msg => TextMessage.Strict(Json.toJson(msg).toString))
+
+      val wsFlow = inFlow.viaMat(flow.merge(tickSource))(Keep.right).map(msg => {
+        log.debug(s"upstream ws: ${msg}")
+        if(format == MSGPACK) {
+          val json = Json.toJson(msg)
+          BinaryMessage.Strict(ByteString(msgpack.pack(json)))
+        } else {
+          TextMessage.Strict(Json.toJson(msg).toString)
+        }
+
+      })
 
       val (upgradeResponse, closed) = Http()
         .singleWebSocketRequest(WebSocketRequest(url), wsFlow)
@@ -198,9 +220,18 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     import Settings.WebSocket._
 
     sessionInfo map { si =>
-      createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
-    } getOrElse
+      createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map {
+        val result = Right[Result, DSAFlow](_)
+        log.debug(s"Establishing connection for \nsessionInfo: $si \nresult: $result")
+        result} recover {
+        case NonFatal(e) =>
+          log.error(s"Unable to establish ws connection for \nsessionInfo:$si", e)
+          Left[Result, DSAFlow](BadRequest)
+      }
+    } getOrElse {
+      log.warn(s"Session info is empty")
       Future.successful(Left[Result, DSAFlow](Forbidden))
+    }
   }
 
   private def acceptOrResult(f: Option[DSLinkSessionInfo] => Future[Either[Result, DSAFlow]]): WebSocket = {
