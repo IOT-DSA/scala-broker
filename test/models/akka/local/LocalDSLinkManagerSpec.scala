@@ -1,16 +1,18 @@
 package models.akka.local
 
+import akka.cluster.Cluster
+import akka.cluster.ddata.DistributedData
+
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.Inside
-
 import akka.pattern.ask
 import akka.routing.ActorSelectionRoutee
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
-import models.akka.{ AbstractActorSpec, RootNodeActor }
-import models.akka.Messages.{ GetDSLinkNames, GetLinkInfo, GetOrCreateDSLink, LinkInfo }
-import models.rpc.{ DSAResponse, ListRequest }
+import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import models.akka.{AbstractActorSpec, RootNodeActor}
+import models.akka.Messages.{GetDSLinkNames, GetLinkInfo, GetOrCreateDSLink, LinkInfo}
+import models.api.DistributedNodesRegistry
+import models.rpc.{DSAResponse, ListRequest}
 
 /**
  * LocalDSLinkManager test suite.
@@ -19,10 +21,10 @@ class LocalDSLinkManagerSpec extends AbstractActorSpec with Inside {
 
   implicit val timeout = Timeout(3 seconds)
 
-  val mgr = new LocalDSLinkManager(nullDaos)
+  val mgr = new LocalDSLinkManager()
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Downstream, mgr.dnlinkProps), Settings.Nodes.Downstream)
   val upstream = system.actorOf(LocalDSLinkFolderActor.props(Settings.Paths.Upstream, mgr.uplinkProps), Settings.Nodes.Upstream)
-  system.actorOf(RootNodeActor.props, Settings.Nodes.Root)
+  system.actorOf(RootNodeActor.props(), Settings.Nodes.Root)
 
   "getDownlinkRoutee" should {
     "return a actor selection routee" in {

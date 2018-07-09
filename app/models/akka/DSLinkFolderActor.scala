@@ -2,13 +2,16 @@ package models.akka
 
 import java.util.regex.Pattern
 
-import akka.actor.{ Actor, ActorLogging }
+import akka.persistence.PersistentActor
+import akka.actor.ActorLogging
 import akka.routing.Routee
-import models.{ RequestEnvelope, Settings }
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
 import models.akka.DSLinkMode.DSLinkMode
-import models.akka.Messages.{ DSLinkNodeStats, LinkState }
+import models.akka.Messages.{DSLinkNodeStats, LinkState}
 import models.akka.responder.SimpleResponderBehavior
 import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
+import models.{RequestEnvelope, Settings}
 
 /**
  * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.
@@ -16,7 +19,7 @@ import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, Response
  * When started, it verifies its own location against the `linkPath` parameter. For example,
  * if linkPath is set to "/downstream", the actor path needs to be "/user/downstream".
  */
-abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorLogging with SimpleResponderBehavior {
+abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor with ActorLogging with SimpleResponderBehavior {
   import models.rpc.DSAValue._
   import models.rpc.StreamState._
   
@@ -32,6 +35,23 @@ abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorL
 
   override def postStop = log.info(s"$ownId actor stopped")
 
+  val dslinkFolderRecover: Receive = {
+    case event: DSLinkCreated =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      getOrCreateDSLink(event.name)
+    case event: DSLinkRemoved =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      removeDSLinks(event.names: _*)
+    case event: DSLinkRegistered =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      links += (event.name -> LinkState(event.mode, event.connected))
+    case event: DSLinkUnregistered =>
+      log.debug("{}: trying to recover {}", ownId, event)
+      links -= event.name
+  }
+
+  implicit val mat = ActorMaterializer()
+
   /**
    * Terminates the actor system if the actor's path does not match `/user/<path>`.
    */
@@ -46,8 +66,10 @@ abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorL
    */
   protected def removeDisconnectedDSLinks = {
     val disconnected = links.filterNot(_._2.connected).keys.toSeq
-    removeDSLinks(disconnected: _*)
-    log.info("{}: removed {} disconnected DSLinks", ownId, disconnected.size)
+    persist(DSLinkRemoved(disconnected: _*)) { event =>
+      removeDSLinks(event.names: _*)
+      log.info("{}: removed {} disconnected DSLinks", ownId, event.names.size)
+    }
   }
 
   /**
@@ -78,17 +100,17 @@ abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorL
   }
 
   /**
-   * Processes a DSA payload and forwards the results to [[ResponderBehavior]].
+   * Processes a DSA payload and forwards the results to [[models.akka.responder.ResponderBehavior]].
    */
   protected def sendToEndpoint(msg: Any): Unit = msg match {
-    case RequestEnvelope(requests) => requests flatMap processRequest foreach responderBehavior
+    case RequestEnvelope(requests) => requests foreach handleRequest
     case _                         => log.warning("Unknown message received: {}", msg)
   }
 
   /**
    * Generates response for LIST request.
    */
-  protected def listNodes: Iterable[ArrayValue]
+  protected def listNodes: Source[ArrayValue, _]
 
   /**
    * Creates/accesses a new DSLink actor and emits an update, if there is an active LIST request.
@@ -103,19 +125,16 @@ abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorL
   /**
    * Processes an incoming request and produces a list of response envelopes, if any.
    */
-  protected def processRequest(request: DSARequest): TraversableOnce[ResponseMessage] = request match {
+  protected def handleRequest(request: DSARequest): Unit = request match {
     case ListRequest(rid, "/") =>
       listRid = Some(rid)
-      listNodes grouped Settings.ChildrenPerListResponse map { rows =>
+      val messages = listNodes grouped Settings.ChildrenPerListResponse map { rows =>
         val response = DSAResponse(rid = rid, stream = Some(Open), updates = Some(rows.toList))
         ResponseMessage(-1, None, List(response))
       }
-    case CloseRequest(_) =>
-      listRid = None
-      Nil
-    case _ =>
-      log.error(s"Invalid request - $request")
-      Nil
+      messages.runForeach(self.forward)
+    case CloseRequest(_) => listRid = None
+    case _ => log.error(s"Invalid request - $request")
   }
 
   /**
@@ -140,8 +159,10 @@ abstract class DSLinkFolderActor(val linkPath: String) extends Actor with ActorL
   protected def changeLinkState(name: String, mode: DSLinkMode, connected: Boolean, warnIfNotFound: Boolean) = {
     links.get(name) match {
       case Some(_) =>
-        links += (name -> LinkState(mode, connected))
-        log.info("{}: DSLink '{}' state changed to: mode={}, connected={}", ownId, name, mode, connected)
+        persist(DSLinkRegistered(name, mode, connected)) { event =>
+          links += (event.name -> LinkState(event.mode, event.connected))
+          log.info("{}: DSLink '{}' state changed to: mode={}, connected={}", ownId, event.name, event.mode, event.connected)
+        }
       case None if warnIfNotFound =>
         log.warning("{}: DSLink '{}' is not registered, ignoring state change", ownId, name)
       case _ =>

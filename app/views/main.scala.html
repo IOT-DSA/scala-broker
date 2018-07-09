@@ -1,6 +1,7 @@
 @import controllers.ViewConfig
+@import play.twirl.api.HtmlFormat
 
-@(cfg: ViewConfig)(content: Html)(tail: Html)
+@(cfg: ViewConfig, headTail: Html = HtmlFormat.empty)(content: Html)(tail: Html)
 
 @active(flag: Boolean) = @{if(flag) "class=active" else ""}
 
@@ -11,12 +12,12 @@
 		<div class="container">
 			<div class="navbar-header">
 				<button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".bs-navbar-collapse">
-					<span class="sr-only">Toggle navigation</span> 
-					<span class="icon-bar"></span> 
-					<span class="icon-bar"></span> 
+					<span class="sr-only">Toggle navigation</span>
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
 					<span class="icon-bar"></span>
 				</button>
-				<a href="/" class="navbar-brand"> 
+				<a href="/" class="navbar-brand">
 					<img alt="DSA" src="/assets/img/favicon/dsa_logo.png" height="32" />
 				</a>
 			</div>
@@ -31,45 +32,48 @@
 				</ul>
 			</nav>
 		</div>
-	</div>	
+	</div>
 }
 
 <!DOCTYPE html>
 <html lang="en">
-    <head>
+	<head>
 		<meta charset="utf-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+			<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 		<meta name="description" content="DSABroker">
 		<meta name="keywords" content="dsa,broker,scala,akka">
 		<meta name="author" content="Vlad Orzhekhovskiy">
-		
-        <title>@cfg.title</title>
-        
+
+		<title>@cfg.title</title>
+
 		<link rel="stylesheet" href="@routes.Assets.versioned("css/bootstrap.min.css")">
-		<link rel="stylesheet" href="@routes.Assets.versioned("css/jquery-ui.css")"> 
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/jquery-ui.css")">
 		<link rel="stylesheet" href="@routes.Assets.versioned("css/jquery.gritter.css")">
-		<link rel="stylesheet" href="@routes.Assets.versioned("css/font-awesome.min.css")">		
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/font-awesome.min.css")">
 		<link rel="stylesheet" href="@routes.Assets.versioned("css/style.css")">
-		<link rel="stylesheet" href="@routes.Assets.versioned("css/widgets.css")">   
-		
+		<link rel="stylesheet" href="@routes.Assets.versioned("css/widgets.css")">
+		<link href="http://fonts.googleapis.com/css?family=Roboto" rel="stylesheet" type="text/css">
+
 		<link rel="shortcut icon" href="#">
-    </head>
-    <body>
-    	@navigation()
-		
+
+		@headTail
+	</head>
+	<body>
+		@navigation()
+
 		<div class="content">
 			<div class="mainbar">
 				<div class="page-head">
 					<h2 class="pull-left">
-						@cfg.heading 
+						@cfg.heading
 						<span class="page-meta">@cfg.description</span>
 					</h2>
 					<div class="bread-crumb pull-right">
 						<a href="/">
-						<i class="fa fa-home"></i> Home</a> 
-						<span class="divider">/</span> 
+							<i class="fa fa-home"></i> Home</a>
+						<span class="divider">/</span>
 						<a href="#" class="bread-current">@cfg.heading</a>
 					</div>
 					<div class="clearfix"></div>
@@ -79,17 +83,16 @@
 			<div class="clearfix"></div>
 		</div>
 
-		<span class="totop"><a href="#"><i class="fa fa-chevron-up"></i></a></span>		
-        
-        <!-- putting scripts at the bottom to make loading faster -->
+		<span class="totop"><a href="#"><i class="fa fa-chevron-up"></i></a></span>
+
+			<!-- putting scripts at the bottom to make loading faster -->
 		<script src="@routes.Assets.versioned("js/jquery.js")"></script>
 		<script src="@routes.Assets.versioned("js/bootstrap.min.js")"></script>
-		<script src="@routes.Assets.versioned("js/jquery-ui.min.js")"></script> 
+		<script src="@routes.Assets.versioned("js/jquery-ui.min.js")"></script>
 		<script src="@routes.Assets.versioned("js/jquery.gritter.min.js")"></script>
 		<script src="@routes.Assets.versioned("js/respond.min.js")"></script>
 		<script src="@routes.Assets.versioned("js/html5shiv.js")"></script>
 		<script src="@routes.Assets.versioned("js/custom.js")"></script>
-		
-		@tail 
-    </body>
+		@tail
+	</body>
 </html>

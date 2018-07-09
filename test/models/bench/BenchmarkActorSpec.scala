@@ -18,11 +18,11 @@ class BenchmarkActorSpec extends AbstractActorSpec {
   implicit val timeout = Timeout(3 seconds)
   val dsId = "link" + "?" * 44
 
-  val dslinkMgr = new LocalDSLinkManager(nullDaos)
+  val dslinkMgr = new LocalDSLinkManager()
   val downstream = system.actorOf(LocalDSLinkFolderActor.props(
     Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
 
-  val bench = system.actorOf(BenchmarkActor.props(nullDaos))
+  val bench = system.actorOf(BenchmarkActor.props())
 
   "CreateResponders" should {
     "create a list of responders" in {
