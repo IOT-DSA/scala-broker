@@ -127,13 +127,12 @@ object StandardActions {
   val AddNode: DSAAction = DSAAction((ctx: ActionContext) =>
     {
       ctx.node.parent foreach { parent =>
-        parent.addChild(ctx.args("name").value.toString, Some("broker/dataNode")) foreach { node =>
+        parent.addChild(ctx.args("Name").value.toString, Some("broker/dataNode")) foreach { node =>
           bindDataNodeActions(node)
         }
       }
     }
     , Map[String, DSAVal]("name"->"Name", "type"-> DSAString)
-    , Map[String, DSAVal]("name"->"Type", "type"-> DSAString)
   )
 
   /**
@@ -141,8 +140,8 @@ object StandardActions {
    */
   val AddValue: DSAAction = DSAAction(ctx => {
       val parent = ctx.node.parent.get
-      val name = ctx.args("name").value.toString
-      val dataType = ctx.args("type").value.toString
+      val name = ctx.args("Name").value.toString
+      val dataType = ctx.args("Type").value.toString
 
       parent.addChild(name, Some("broker/dataNode")) foreach { node =>
         node.valueType = DSAValueType.withName(dataType)
@@ -158,7 +157,7 @@ object StandardActions {
    */
   val SetValue: DSAAction = DSAAction((ctx: ActionContext) => {
       val node = ctx.node.parent.get
-      val value = ctx.args("value")
+      val value = ctx.args("Value")
 
       node.value = value
     }
@@ -170,13 +169,13 @@ object StandardActions {
     */
   val SetAttribute: DSAAction = DSAAction(ctx => {
       val node = ctx.node.parent.get
-      val name = ctx.args("name").value.toString
-      val value = ctx.args("value")
+      val name = ctx.args("Name").value.toString
+      val value = ctx.args("Value")
 
       node.addAttributes(name -> value)
     }
     , Map[String, DSAVal]("name"->"Name", "type"-> DSAString)
-    , Map[String, DSAVal]("name"->"Type", "type"-> DSAString)
+    , Map[String, DSAVal]("name"->"Value", "type"-> DSAString)
   )
 
   /**
@@ -184,8 +183,8 @@ object StandardActions {
     */
   val SetConfig: DSAAction = DSAAction(ctx => {
       val node = ctx.node.parent.get
-      val name = ctx.args("name").value.toString
-      val value = ctx.args("value")
+      val name = ctx.args("Name").value.toString
+      val value = ctx.args("Value")
 
       node.addConfigs(name -> value)
     }
@@ -220,9 +219,9 @@ object StandardActions {
 
     val node = ctx.node.parent.get
     val groupName = ctx.args.getOrElse("Role", ctx.args("Group").value).toString
-    val timeRange = ctx.args.getOrElse("Time_Range", "").toString
+    val timeRange = ctx.args.getOrElse("TimeRange", "").toString
     val count = ctx.args.getOrElse("Count", "").toString
-    val maxSession = ctx.args.getOrElse("Max_Session", "").toString
+    val maxSession = ctx.args.getOrElse("MaxSession", "").toString
     val managed = ctx.args.getOrElse("Managed", "").toString
 
     val fToken: Future[String] = models.util.Tokens.makeToken(node);
@@ -290,7 +289,7 @@ object StandardActions {
 
       node.addConfigs("group" -> group)
     }
-    , Map[String, DSAVal]("name"->StringValue("Group"), "type"-> DSAString, "editor"->"enum[none,list,read,write,config]")
+    , Map[String, DSAVal]("name"->"Group", "type"-> DSAString, "editor"->"enum[none,list,read,write,config]")
   )
 
   /**

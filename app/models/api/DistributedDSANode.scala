@@ -385,24 +385,27 @@ class DistributedDSANode(_parent: Option[DSANode],
 
         val response = Await.result(fResponse, Duration.Inf)
         sender ! response
-      case UpdateToken(name, value) =>
-        log.info(s"$ownId: received UpdateToken ($name, $value)")
-        if(name.startsWith("$")) {
 
-          val oIds = _configs.get(name)
-          val values: DSAVal = oIds match {
-            case None => array(value)
-            case Some(arr)  =>
-              val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
-              if (srcVal.contains(StringValue(value)))
-                array(value)
-              else
-                srcVal ++ Seq(StringValue(value))
-          }
-
-          _configs ++= Seq(name -> values)
-        } else
-          log.warning("UpdateToken's parameter does not contains @ " + name)
+        // TODO: Check following case, is it valueable here?
+//      case UpdateToken(name, value) =>
+//        log.info(s"$ownId: received UpdateToken ($name, $value)")
+//        if(name.startsWith("$")) {
+//
+//          val oIds = _configs.get(name)
+//          val values: DSAVal = oIds match {
+//            case None => array(value)
+//            case Some(arr)  =>
+//              val srcVal = arr.asInstanceOf[ArrayValue].value.toList
+//
+//              if (srcVal.contains(StringValue(value)))
+//                array(value)
+//              else
+//                srcVal ++ Seq(StringValue(value))
+//          }
+//
+//          _configs ++= Seq(name -> values)
+//        } else
+//          log.warning("UpdateToken's parameter does not contains @ " + name)
       case a:Any =>
         log.warning("unhandled  message: {}", a)
     }
