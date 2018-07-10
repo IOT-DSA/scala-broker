@@ -117,11 +117,9 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
         case None =>
           val tgtId = ridRegistry.saveListLookup(path)
           addListOrigin(tgtId, origin)
-          log.debug(s"{}: ListRequest({}, {}) == None", ownId, rid, path)
           HandlerResult(ListRequest(tgtId, translatePath(path)))
         case Some(rec) =>
           addListOrigin(rec.targetId, origin)
-          log.debug(s"{}: ListRequest({}, {}) == {}", ownId, rid, path, rec)
           HandlerResult.Empty
       }
   }
@@ -216,18 +214,10 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
     case CloseRequest(rid) =>
       val origin = Origin(sender, rid)
       ridRegistry.lookupByOrigin(origin) match {
-        case
-          Some(LookupRecord(_, tgtId, _, _)) =>
-          log.debug("{}:passthrough call: CloseRequest({})", ownId, tgtId)
-          HandlerResult(CloseRequest(tgtId)) // passthrough call
+        case Some(LookupRecord(_, tgtId, _, _)) => HandlerResult(CloseRequest(tgtId)) // passthrough call
         case _ => // LIST call
-          val removed = removeListOrigin(origin)
-          log.debug("{}:removed origin == {}", ownId, removed)
-          removed map { targetId =>
-            ridRegistry.lookupByTargetId(targetId) foreach { lookup =>
-              ridRegistry.removeLookup(lookup)
-              log.debug("{}:removed lookup == {}", ownId, lookup)
-            }
+          removeListOrigin(origin) map { targetId =>
+            ridRegistry.lookupByTargetId(targetId) foreach ridRegistry.removeLookup
             HandlerResult(CloseRequest(targetId))
           } getOrElse HandlerResult.Empty
       }
