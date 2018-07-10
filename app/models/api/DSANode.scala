@@ -158,7 +158,7 @@ trait DSANodeRequestHandler { self:DSANode =>
         case Some((tokenName, token)) =>
           val strTokenName = tokenName.asInstanceOf[String]
           val strToken = token.asInstanceOf[String]
-          DSAResponse(rid, Some(StreamState.Closed), Some(List(strTokenName, strToken)),
+          DSAResponse(rid, Some(StreamState.Closed), Some(List(array(strTokenName, strToken))),
             Some(List(ColumnInfo("TokenName", "String"), ColumnInfo("Token", "String")))) :: Nil
         case None =>
           DSAResponse(rid, Some(StreamState.Open)) :: Nil

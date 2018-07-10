@@ -219,6 +219,7 @@ class DistributedDSANode(_parent: Option[DSANode],
   }
 
   override def invoke(params: DSAMap): Unit = {
+    implicit val system: ActorSystem = TypedActor.context.system
     _action foreach { a =>
       a.handler(ActionContext(this, params))
     }

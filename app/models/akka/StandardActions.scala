@@ -8,6 +8,9 @@ import scala.concurrent.Future
 import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, MapValue, StringValue, array}
 import java.net.URLEncoder
 
+import akka.actor.{ActorSystem, TypedActor}
+import models.akka.Messages.DisconnectEndpoint
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -16,6 +19,8 @@ import scala.concurrent.duration._
   */
 object StandardActions {
   import DSAValueType._
+
+  implicit val system: ActorSystem = TypedActor.context.system
 
   case class ActionDescription(name:String, displayName:String, action: DSAAction
                                , invokable: Option[String] = Option("write")
@@ -297,6 +302,21 @@ object StandardActions {
     */
   val RemoveTokenClients: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
+
+    val fids = node.config("dsLinkIds")
+
+    fids foreach {
+      case Some(x) =>
+        val arrDsId = x.asInstanceOf[ArrayValue].value
+        arrDsId foreach { dsId =>
+          println(dsId)
+          val dstActorRef = RootNodeActor.childProxy("/downstream/" + dsId.toString)
+          dstActorRef ! DisconnectEndpoint(true)
+        }
+
+      case None =>
+
+    }
   }
   )
 

@@ -1,6 +1,6 @@
 package models.api
 
-import akka.actor.{ActorRef, TypedActor, TypedProps}
+import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.event.Logging
 import models.akka.Messages.{GetTokens, UpdateToken}
 import models.{RequestEnvelope, ResponseEnvelope}
@@ -51,7 +51,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
   def profile_=(p: String) = addConfigs("$is" -> p)
 
   protected var _configs = Map[String, DSAVal]("$is" -> "node")
-  def configs = Future.successful(_configs.toMap)
+  def configs = Future.successful(_configs)
   def config(name: String) = configs map (_.get(name))
   def addConfigs(configs: (String, DSAVal)*) = {
     val cfg = configs map {
@@ -125,7 +125,10 @@ class InMemoryDSANode(val parent: Option[DSANode])
     _action = Some(a)
   }
 
-  def invoke(params: DSAMap) = _action map (_.handler(ActionContext(this, params)))
+  def invoke(params: DSAMap) = {
+    implicit val system: ActorSystem = TypedActor.context.system
+    _action map (_.handler(ActionContext(this, params)))
+  }
 
   protected var _sids = Map.empty[Int, ActorRef]
   def subscribe(sid: Int, ref: ActorRef) = _sids += sid -> ref
