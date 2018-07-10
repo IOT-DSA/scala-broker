@@ -1,5 +1,7 @@
 package facades.websocket
 
+import java.util.UUID
+
 import org.joda.time.DateTime
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
 import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
@@ -25,7 +27,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
 
   protected val ci = config.connInfo
   protected val linkName = ci.linkName
-  protected val ownId = s"WSActor[$linkName]"
+  protected val ownId = s"WSActor[$linkName]-${UUID.randomUUID.toString}"
 
   private val localMsgId = new IntCounter(1)
 
@@ -40,7 +42,6 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
     routee ! ConnectEndpoint(self, ci)
     incrementTags(tagsForConnection("connected")(ci):_*)
   }
-
 
   /**
    * Cleans up after the actor stops and logs session data.
