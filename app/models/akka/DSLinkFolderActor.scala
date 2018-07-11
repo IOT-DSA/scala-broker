@@ -25,7 +25,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   
   checkPath(linkPath)
 
-  protected val ownId: String = "[" + linkPath + "]"
+  protected def ownId: String = "[" + linkPath + "]"
 
   protected var links = Map.empty[String, LinkState]
 
