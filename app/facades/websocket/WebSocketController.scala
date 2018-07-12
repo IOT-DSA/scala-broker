@@ -101,7 +101,13 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       val format = (serverConfig \ "format").as[String]
 
       val auth = buildAuth(tempKey, salt)
-      val wsUrl = s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=$format"
+      // Java Url class returns -1 if there is no port in uri string oO
+      val wsUrl = if(connUrl.getPort != -1){
+        s"ws://${connUrl.getHost}:${connUrl.getPort}$wsUri?dsId=$dsId&auth=$auth&format=$format"
+      } else {
+        s"ws://${connUrl.getHost}$wsUri?dsId=$dsId&auth=$auth&format=$format"
+      }
+
 
       uplinkWSConnect(wsUrl, name, dsId, format)
     }
