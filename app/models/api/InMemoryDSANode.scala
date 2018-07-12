@@ -148,7 +148,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
       val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
     case UpdateToken(name, value) =>
-      log.info(s"$ownId: received UpdateToken ($name, $value)")
+      log.info(s"$ownId: received UpdateToken config ($name, $value)")
       if(name.startsWith("$")) {
 
         val oIds = _configs.get(name)

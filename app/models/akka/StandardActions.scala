@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 object StandardActions {
   import DSAValueType._
 
-  implicit val system: ActorSystem = TypedActor.context.system
+//  implicit val system: ActorSystem = TypedActor.context.system
 
   case class ActionDescription(name:String, displayName:String, action: DSAAction
                                , invokable: Option[String] = Option("write")
@@ -59,7 +59,7 @@ object StandardActions {
 
   def bindTokenGroupNodeActions(node: DSANode) =
     bindActions(node
-      , ActionDescription("addToken", "Add token node", AddToken, Option("config"))
+      , ActionDescription("add", "Add token node", AddToken, Option("config"))
     )
 
 
@@ -310,7 +310,7 @@ object StandardActions {
         val arrDsId = x.asInstanceOf[ArrayValue].value
         arrDsId foreach { dsId =>
           println(dsId)
-          val dstActorRef = RootNodeActor.childProxy("/downstream/" + dsId.toString)
+          val dstActorRef = RootNodeActor.childProxy("/downstream/" + dsId.toString)(TypedActor.context.system)
           dstActorRef ! DisconnectEndpoint(true)
         }
 

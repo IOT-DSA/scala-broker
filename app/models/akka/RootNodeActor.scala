@@ -112,7 +112,7 @@ class RootNodeActor extends Actor with ActorLogging {
    */
   private def createSysNode = {
     val sysNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
-    sysNode.profile = "node"
+    sysNode.profile = "broker/sysRoot"
 
     // Add root node (aka tokens/GroupToken node) for all tokens
     // In Dart impl GroupToken node is used for grouping tokens by a user

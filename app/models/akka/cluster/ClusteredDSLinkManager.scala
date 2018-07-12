@@ -34,6 +34,12 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
       node.displayName = "data"
   }
 
+//  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/Tokens", Some("broker/tokens")))).mapTo[DSANode] foreach{
+//    node =>
+//      node.displayName = "/Tokens"
+//  }
+
+
   log.info("Clustered DSLink Manager created")
 
   /**
@@ -56,6 +62,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
     case Paths.Data                                => routeToDistributed(path, message)
     case path if path.startsWith(Paths.Data)       => routeToDistributed(path, message)
+//    case path if path.startsWith(Paths.Sys)        => routeToDistributed(path, message)//
+//    case path if path.startsWith(Paths.Sys)         => system.actorSelection("/user" + Paths.Sys) ! message
     case path                                      => RootNodeActor.childProxy(path)(system) ! message
   }
 
