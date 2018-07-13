@@ -21,7 +21,7 @@ import controllers.BasicController
 import javax.inject.{Inject, Singleton}
 import models.Settings
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, RootNodeActor}
-import models.akka.Messages.{GetOrCreateDSLink, GetTokens, RemoveDSLink, UpdateToken}
+import models.akka.Messages.{GetOrCreateDSLink, GetTokens, RemoveDSLink, AppendDsId2Token}
 import models.akka.QoSState.SubscriptionSourceMessage
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
@@ -194,7 +194,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     import Settings.WebSocket._
 
     sessionInfo map { si =>
-      updateToken(si)
+      appendDsId2Token(si)
       createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map Right[Result, DSAFlow]
     } getOrElse
       Future.successful(Left[Result, DSAFlow](Forbidden))
@@ -234,13 +234,13 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     }
   }
 
-  private def updateToken(si: DSLinkSessionInfo) : Unit = {
+  private def appendDsId2Token(si: DSLinkSessionInfo) : Unit = {
     si.ci.tokenHash.foreach { token =>
       val tokenId = token.substring(0, 16)
 
-      val tokenActor = RootNodeActor.childProxy("/sys/tokens/" + tokenId)
+      val tokenActor = RootNodeActor.childProxy(Settings.Paths.Tokens + "/" + tokenId)
 
-      tokenActor ! UpdateToken("$dsLinkIds", si.ci.dsId)
+      tokenActor ! AppendDsId2Token("$dsLinkIds", si.ci.dsId)
     }
   }
 

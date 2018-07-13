@@ -7,7 +7,7 @@ import akka.cluster.ddata.Replicator.Update
 import akka.cluster.ddata.Replicator._
 import akka.util.Timeout
 import com.google.inject.Inject
-import models.Settings.QueryTimeout
+import models.Settings.{Paths, QueryTimeout}
 import models.akka.StandardActions
 import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue.StringValue
@@ -137,7 +137,7 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
   }
 
   private def createNewNode(nodeDescription: DSANodeDescription, pPath: (Option[String], String)) = pPath match {
-    case (None, name) =>
+    case (None, name) => // Root node
       val newOne: DSANode = TypedActor(context)
         .typedActorOf(DistributedDSANode.props( None, new StringValue(""), nodeDescription, self, replicator))
 
@@ -145,18 +145,39 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
         StandardActions.bindDataRootActions(newOne)
       }
       newOne
-    case (Some(parent), name) => {
+    case (Some(parent), name) => { // Children node
       val parentNode: DSANode = registry.get(parent)
         .getOrElse(getOrCreateNode(parent))
+
       val child = registry.get(nodeDescription.path).getOrElse {
         val newOne: DSANode = TypedActor(context)
           .typedActorOf(DistributedDSANode.props(Some(parentNode), new StringValue(""), nodeDescription, self, replicator))
 
-        if (isNotCommon(name)) {
-          StandardActions.bindDataNodeActions(newOne)
+        parent match {
+          // Processing /sys/tokens node - add all required actions
+          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Tokens) =>
+            StandardActions.bindTokenGroupNodeActions(newOne)
+
+          // Processing /sys/tokens/<tokenid> - do nothing
+          case Paths.Tokens =>
+
+          // Processing /sys/tokens node - add all required actions
+          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Roles) =>
+            StandardActions.bindRolesNodeActions(newOne)
+
+          // Processing /sys/roles/<role> - do nothing
+          case Paths.Roles =>
+
+          // Processing non common nodes
+          case parent if isNotCommon(name) =>
+            StandardActions.bindDataNodeActions(newOne)
+
+          // Processing any other nodes - do nothing
+          case parent =>
         }
         newOne
       }
+
       parentNode.addChild(name, child)
       child
     }

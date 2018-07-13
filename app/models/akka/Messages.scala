@@ -151,5 +151,5 @@ object Messages {
     * @param name
     * @param value
     */
-  case class UpdateToken(name: String, value: String)
+  case class AppendDsId2Token(name: String, value: String)
 }

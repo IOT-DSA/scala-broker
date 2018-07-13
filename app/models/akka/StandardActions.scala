@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 object StandardActions {
   import DSAValueType._
 
-//  implicit val system: ActorSystem = TypedActor.context.system
+
 
   case class ActionDescription(name:String, displayName:String, action: DSAAction
                                , invokable: Option[String] = Option("write")
@@ -220,44 +220,45 @@ object StandardActions {
     * TODO: Check the case when 'Group' is not exist in the param
     * TODO: Add 'TimeRange', 'Count', 'Managed' params
     */
-  val AddToken: DSAAction = DSAAction((ctx: ActionContext) => {
+  val AddToken: DSAAction = DSAAction(
+    (ctx: ActionContext) => {
 
-    val node = ctx.node.parent.get
-    val groupName = ctx.args.getOrElse("Role", ctx.args("Group").value).toString
-    val timeRange = ctx.args.getOrElse("TimeRange", "").toString
-    val count = ctx.args.getOrElse("Count", "").toString
-    val maxSession = ctx.args.getOrElse("MaxSession", "").toString
-    val managed = ctx.args.getOrElse("Managed", "").toString
+      val node = ctx.node.parent.get
+      val groupName = ctx.args.getOrElse("Role", ctx.args("Group").value).toString
+      val timeRange = ctx.args.getOrElse("TimeRange", "").toString
+      val count = ctx.args.getOrElse("Count", "").toString
+      val maxSession = ctx.args.getOrElse("MaxSession", "").toString
+      val managed = ctx.args.getOrElse("Managed", "").toString
 
-    val fToken: Future[String] = models.util.Tokens.makeToken(node);
+      val fToken: Future[String] = models.util.Tokens.makeToken(node);
 
-    for (
-      token <- fToken
-    )
-    {
-      val tokenId = token.substring(0, 16);
-      node.addChild(tokenId) foreach { child =>
-        child.profile = "broker/TokenNode"
-        child.addConfigs(
-          ("group" -> groupName)
-          , ("token" -> token)
-          , ("is" -> "broker/Token")
-        )
-        child.addConfigs(
-          ("$$count"->count)
-          , ("$$managed"->managed)
-          , ("$$maxSession"->maxSession)
-          , ("$$timeRange"->timeRange)
+      for (
+        token <- fToken
+      )
+      {
+        val tokenId = token.substring(0, 16);
+        node.addChild(tokenId) foreach { child =>
+          child.profile = "broker/tokenNode"
+          child.addConfigs(
+            ("group" -> groupName)
+            , ("token" -> token)
+            , ("is" -> "broker/Token")
+          )
+          child.addConfigs(
+            ("$$count"->count)
+            , ("$$managed"->managed)
+            , ("$$maxSession"->maxSession)
+            , ("$$timeRange"->timeRange)
 
-        )
-        bindTokenNodeActions(child)
+          )
+          bindTokenNodeActions(child)
+        }
       }
+
+      val token = Await.result(fToken, Duration.Inf)
+
+      (token.substring(0, 16), token)
     }
-
-    val token = Await.result(fToken, Duration.Inf)
-
-    (token.substring(0, 16), token)
-  }
     , Map[String, DSAVal]("name"->"Group", "type"->DSAString, "editor"->"enum[none,list,read,write,config]")
     , Map[String, DSAVal]("name"->"TimeRange", "type"->DSAString, "editor"->"daterange", "writable"->"config")
     , Map[String, DSAVal]("name"->"Count", "type"->DSANumber)

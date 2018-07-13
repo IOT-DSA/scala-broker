@@ -34,11 +34,20 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
       node.displayName = "data"
   }
 
-//  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/Tokens", Some("broker/tokens")))).mapTo[DSANode] foreach{
-//    node =>
-//      node.displayName = "/Tokens"
-//  }
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys", Some("broker/sysRoot")))).mapTo[DSANode] foreach{
+    node =>
+      node.displayName = "sys"
+  }
 
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens", Some("broker/tokensRoot")))).mapTo[DSANode] foreach{
+    node =>
+      node.displayName = "tokens"
+  }
+
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/roles", Some("broker/rolesRoot")))).mapTo[DSANode] foreach{
+    node =>
+      node.displayName = "roles"
+  }
 
   log.info("Clustered DSLink Manager created")
 
@@ -62,7 +71,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
     case Paths.Data                                => routeToDistributed(path, message)
     case path if path.startsWith(Paths.Data)       => routeToDistributed(path, message)
-//    case path if path.startsWith(Paths.Sys)        => routeToDistributed(path, message)//
+    case path if path.startsWith(Paths.Tokens)     => routeToDistributed(path, message)
+    case path if path.startsWith(Paths.Roles)      => routeToDistributed(path, message)
 //    case path if path.startsWith(Paths.Sys)         => system.actorSelection("/user" + Paths.Sys) ! message
     case path                                      => RootNodeActor.childProxy(path)(system) ! message
   }

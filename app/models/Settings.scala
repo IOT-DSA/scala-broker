@@ -71,6 +71,8 @@ object Settings {
     val Defs = "/defs"
     val Sys = "/sys"
     val Users = "/users"
+    val Tokens = Sys + "/tokens"
+    val Roles = Sys + "/roles"
     val Downstream = Root + Nodes.Downstream
     val Upstream = Root + Nodes.Upstream
   }

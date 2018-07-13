@@ -11,7 +11,7 @@ import akka.cluster.ddata.Replicator._
 import akka.event.Logging
 import akka.pattern.{PromiseRef, ask}
 import akka.util.Timeout
-import models.akka.Messages.{GetTokens, UpdateToken}
+import models.akka.Messages.{GetTokens, AppendDsId2Token}
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.{AddNode, GetNodesByDescription}
@@ -218,9 +218,9 @@ class DistributedDSANode(_parent: Option[DSANode],
     _action = Some(a)
   }
 
-  override def invoke(params: DSAMap): Unit = {
+  override def invoke(params: DSAMap): Any = {
     implicit val system: ActorSystem = TypedActor.context.system
-    _action foreach { a =>
+    _action map { a =>
       a.handler(ActionContext(this, params))
     }
   }
@@ -376,6 +376,27 @@ class DistributedDSANode(_parent: Option[DSANode],
         updateLocalState(c.get(dataKey))
 
       // TODO: Extract following 2 methods (In the InMemoryDSANode too) into separated trait
+      case AppendDsId2Token(name, value) =>
+        // TODO: Check following case, is it valueable here?
+        log.info(s"$ownId: received AppendDsId2Token ($name, $value)")
+        if(name.startsWith("$")) {
+
+          val oIds = _configs.get(name)
+          val values: DSAVal = oIds match {
+            case None => array(value)
+            case Some(arr)  =>
+              val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
+              if (srcVal.contains(StringValue(value)))
+                array(value)
+              else
+                srcVal ++ Seq(StringValue(value))
+          }
+
+          addConfigs(name -> values)
+
+        } else
+          log.warning("UpdateToken's parameter does not contains @ " + name)
+
       case GetTokens =>
         log.info(s"$ownId: GetTokens received")
 
@@ -387,26 +408,6 @@ class DistributedDSANode(_parent: Option[DSANode],
         val response = Await.result(fResponse, Duration.Inf)
         sender ! response
 
-        // TODO: Check following case, is it valueable here?
-//      case UpdateToken(name, value) =>
-//        log.info(s"$ownId: received UpdateToken ($name, $value)")
-//        if(name.startsWith("$")) {
-//
-//          val oIds = _configs.get(name)
-//          val values: DSAVal = oIds match {
-//            case None => array(value)
-//            case Some(arr)  =>
-//              val srcVal = arr.asInstanceOf[ArrayValue].value.toList
-//
-//              if (srcVal.contains(StringValue(value)))
-//                array(value)
-//              else
-//                srcVal ++ Seq(StringValue(value))
-//          }
-//
-//          _configs ++= Seq(name -> values)
-//        } else
-//          log.warning("UpdateToken's parameter does not contains @ " + name)
       case a:Any =>
         log.warning("unhandled  message: {}", a)
     }

@@ -2,7 +2,7 @@ package models.api
 
 import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.event.Logging
-import models.akka.Messages.{GetTokens, UpdateToken}
+import models.akka.Messages.{GetTokens, AppendDsId2Token}
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
@@ -147,8 +147,8 @@ class InMemoryDSANode(val parent: Option[DSANode])
       log.info(s"$ownId: received $e")
       val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
-    case UpdateToken(name, value) =>
-      log.info(s"$ownId: received UpdateToken config ($name, $value)")
+    case AppendDsId2Token(name, value) =>
+      log.info(s"$ownId: received AppendDsId2Token ($name, $value)")
       if(name.startsWith("$")) {
 
         val oIds = _configs.get(name)
