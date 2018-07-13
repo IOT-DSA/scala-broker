@@ -93,7 +93,7 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
       tellPeers(PeerMessage(evt))
 
     case GetDSLinkStats =>
-      val nodeStats = askPeers[DSLinkNodeStats](PeerMessage(GetDSLinkStats))
+      val nodeStats = askPeersWithRecover[DSLinkNodeStats](PeerMessage(GetDSLinkStats))
       nodeStats map DSLinkStats pipeTo sender
 
     case FindDSLinks(regex, limit, offset) =>
