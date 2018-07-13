@@ -9,6 +9,7 @@ import models.Settings
 
 import scala.concurrent.Future
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 /**
   * An envelope for message routing, that provides the entityId for the shard coordinator.
@@ -52,11 +53,29 @@ trait ClusteredActor extends Actor with ActorLogging {
   /**
     * Sends a message to all downstream nodes in the cluster and collects the responses into a map.
     */
-  protected def askPeers[T: ClassTag](request: Any, includeSelf: Boolean = true) = {
+  protected def askPeers[T: ClassTag](request: Any, includeSelf: Boolean = true)= {
     val results = peers(includeSelf) map {
-      case (address, selection) => selection.ask(request).mapTo[T].map(x => address -> x)
+      case (address, selection) => selection.ask(request)
+        .mapTo[T]
+        .map(x => address -> x)
     }
     Future.sequence(results) map (_.toMap)
+  }
+
+  /**
+    * Sends a message to all downstream nodes in the cluster and collects the responses into a map.
+    */
+  protected def askPeersWithRecover[T: ClassTag](request: Any, includeSelf: Boolean = true)= {
+    val results = peers(includeSelf) map {
+      case (address, selection) => selection.ask(request)
+        .mapTo[T]
+        .map(x => Some(address -> x))
+        .recover{case NonFatal(e) =>
+          log.error("Couldn't get data for reqquest:{}", request, e)
+          None
+        }
+    }
+    Future.sequence(results) map (_.filter(_.isDefined).map(_.get).toMap)
   }
 
   /**
