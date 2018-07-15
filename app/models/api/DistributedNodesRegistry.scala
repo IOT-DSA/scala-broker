@@ -8,12 +8,15 @@ import akka.cluster.ddata.Replicator._
 import akka.util.Timeout
 import com.google.inject.Inject
 import models.Settings.{Paths, QueryTimeout}
+import models.akka.Messages.GetTokens
 import models.akka.StandardActions
 import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue.StringValue
 import models.rpc.{InvokeRequest, RemoveRequest, SetRequest}
 
 import scala.annotation.tailrec
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit cluster: Cluster, system: ActorSystem) extends Actor with ActorLogging {
 
@@ -54,6 +57,13 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
 
       log.debug("Created nodes: {}", toAdd)
       log.debug("Removed nodes: {}", toRemove)
+    case GetTokens =>
+      log.debug(s"ddNodeRegistry: GetTokens received")
+
+      val response = registry
+        .filter{ case (name, node ) => name.startsWith(Paths.Tokens) && node.action.isEmpty }
+        .values.map(_.name).toList
+      sender ! response
   }
 
   def removeNode(p: String): Set[String] = {

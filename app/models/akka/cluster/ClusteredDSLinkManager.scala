@@ -44,6 +44,12 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
       node.displayName = "tokens"
   }
 
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens/123456789123456789123456789", Some("broker/token")))).mapTo[DSANode] foreach{
+    node =>
+      node.displayName = "1234567891234567"
+  }
+
+
   (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/roles", Some("broker/rolesRoot")))).mapTo[DSANode] foreach{
     node =>
       node.displayName = "roles"
