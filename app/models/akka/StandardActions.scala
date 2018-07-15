@@ -9,7 +9,9 @@ import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, MapValue, StringValue, a
 import java.net.URLEncoder
 
 import akka.actor.{ActorSystem, TypedActor}
-import models.akka.Messages.DisconnectEndpoint
+import models.Settings
+import models.Settings.Paths
+import models.akka.Messages.{DisconnectEndpoint, GetConfigVal, RemoveDSLink}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -304,20 +306,29 @@ object StandardActions {
   val RemoveTokenClients: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
 
-    val fids = node.config("dsLinkIds")
+    val fids = node.config("$dsLinkIds")
+
+    implicit val system: ActorSystem =
+      if (ctx.node.isInstanceOf[DistributedDSANode])
+        ctx.node.asInstanceOf[DistributedDSANode]._system
+      else
+        ctx.node.asInstanceOf[InMemoryDSANode].system
 
     fids foreach {
       case Some(x) =>
         val arrDsId = x.asInstanceOf[ArrayValue].value
         arrDsId foreach { dsId =>
-          println(dsId)
-          val dstActorRef = RootNodeActor.childProxy("/downstream/" + dsId.toString)(TypedActor.context.system)
-          dstActorRef ! DisconnectEndpoint(true)
+          val dstName = if (dsId.toString.size > 45)
+            dsId.toString.substring(0, dsId.toString.size - 45)
+            else dsId.toString
+
+          val dstActorRef = system.actorSelection("/user" + Paths.Downstream)
+          dstActorRef ! RemoveDSLink(dstName)
         }
 
       case None =>
-
     }
+    node.removeConfig("$dsLinkIds")
   }
   )
 

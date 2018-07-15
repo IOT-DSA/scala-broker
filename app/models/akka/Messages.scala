@@ -144,6 +144,8 @@ object Messages {
     */
   case class GetTokens()
 
+  case class GetConfigVal(name: String)
+
   /**
     * Sent to a node. The node treads as token node, updates the node configs
     * or attributes or node's value by the passed value. Configs and attributes

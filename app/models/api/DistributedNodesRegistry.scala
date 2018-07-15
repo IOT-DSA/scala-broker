@@ -159,14 +159,14 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
             StandardActions.bindTokenGroupNodeActions(newOne)
 
           // Processing /sys/tokens/<tokenid> - do nothing
-          case Paths.Tokens =>
+          case parent if (parent + "/" + name).startsWith(Paths.Tokens + "/") =>
 
           // Processing /sys/tokens node - add all required actions
           case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Roles) =>
             StandardActions.bindRolesNodeActions(newOne)
 
           // Processing /sys/roles/<role> - do nothing
-          case Paths.Roles =>
+          case parent if (parent + "/" + name).startsWith(Paths.Roles + "/") =>
 
           // Processing non common nodes
           case parent if isNotCommon(name) =>

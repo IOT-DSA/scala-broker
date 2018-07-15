@@ -48,7 +48,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                                      actors:       BrokerActors,
                                      wsc:          WSClient,
                                      keys:         LocalKeys,
-                                     cc:           ControllerComponents)
+                                     cc:           ControllerComponents,
+                                     dslinkMgr:    DSLinkManager
+                                    )
   extends BasicController(cc)
   with Meter {
 
@@ -235,12 +237,11 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   private def appendDsId2Token(si: DSLinkSessionInfo) : Unit = {
+    log.debug("Try to append dsLink to his token ...")
     si.ci.tokenHash.foreach { token =>
       val tokenId = token.substring(0, 16)
-
-      val tokenActor = RootNodeActor.childProxy(Settings.Paths.Tokens + "/" + tokenId)
-
-      tokenActor ! AppendDsId2Token("$dsLinkIds", si.ci.dsId)
+      val dsaPath = Settings.Paths.Tokens + "/" + tokenId
+      dslinkMgr.dsaSend(dsaPath, AppendDsId2Token("$dsLinkIds", si.ci.dsId))
     }
   }
 

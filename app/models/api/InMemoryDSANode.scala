@@ -2,7 +2,7 @@ package models.api
 
 import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.event.Logging
-import models.akka.Messages.{GetTokens, AppendDsId2Token}
+import models.akka.Messages.{AppendDsId2Token, GetConfigVal, GetTokens}
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
@@ -31,7 +31,9 @@ class InMemoryDSANode(val parent: Option[DSANode])
   val path = parent.map(_.path).getOrElse("") + "/" + name
 
   protected def ownId = s"[$path]"
+
   override implicit val executionContext:ExecutionContext = TypedActor.context.dispatcher
+  val system = TypedActor.context.system
 
   private var _value: DSAVal = _
   def value = Future.successful(_value)
@@ -175,6 +177,11 @@ class InMemoryDSANode(val parent: Option[DSANode])
       }
 
       val response = Await.result(fResponse, Duration.Inf)
+      sender ! response
+    case GetConfigVal(name) =>
+      log.info(s"$ownId: GetDSLinksIds received")
+      val fResp = config(name)
+      val response = Await.result(fResp, Duration.Inf)
       sender ! response
     case msg @ _ =>
       log.error("Unknown message: " + msg)

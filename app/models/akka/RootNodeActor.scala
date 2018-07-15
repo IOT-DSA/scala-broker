@@ -114,41 +114,14 @@ class RootNodeActor extends Actor with ActorLogging {
     val sysNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
     sysNode.profile = "broker/sysRoot"
 
-    // Add root node (aka tokens/GroupToken node) for all tokens
-    // In Dart impl GroupToken node is used for grouping tokens by a user
-    // I.e. GroupToken is just "username". Since users are skipped (as Rick said)
-    // , we are not creating user's groupToken
-    sysNode.addChild("tokens").foreach { node =>
-      node.profile = "node"
-      node.displayName = "Tokens"
-      StandardActions.bindTokenGroupNodeActions(node)
-
-      // Add default token
-      val tokenId = "1234567891234567"
-      node.addChild(tokenId) foreach { child =>
-        child.profile = "broker/TokenNode"
-        child.addConfigs(
-          ("group" -> "config")
-          , ("token" -> "tokenId")
-          , ("is" -> "broker/Token")
-        )
-        child.addConfigs(
-          ("$$count"->null)
-          , ("$$managed"->false)
-          , ("$$maxSession"->null)
-          , ("$$timeRange"->null)
-
-        )
-        bindTokenNodeActions(child)
-      }
-    }
+    // The method call was commented as it does need in cluster mode.
+    // TODO: Uncomment it in future
+//    RootNodeActor.createTokensNode(sysNode)
 
     // Add root node for roles
-    sysNode.addChild("roles").foreach { node =>
-      node.profile = "node"
-      node.displayName = "Roles"
-      StandardActions.bindRolesNodeActions(node)
-    }
+    // The method call was commented as it does need in cluster mode.
+    // TODO: Uncomment it in future
+//    RootNodeActor.createRolesNode(sysNode)
 
     sysNode
   }
@@ -159,6 +132,7 @@ class RootNodeActor extends Actor with ActorLogging {
  */
 object RootNodeActor {
   import models.Settings.Nodes._
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   /**
    * Creates a new instance of [[RootNodeActor]] props.
@@ -190,4 +164,53 @@ object RootNodeActor {
   def childProxy(dsaPath: String)(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonProxy.props("/user/" + Root,
       settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + dsaPath.forAkka)))
+
+  /**
+    * Create Roles nodes in the parent node (usualy in /sys)
+    * The roles are related to tokens and permission
+    * TODO: Remove it to Token's class
+    * @param parentNode
+    */
+  private def createRolesNode(parentNode: DSANode) = {
+    parentNode.addChild("roles").foreach { node =>
+      node.profile = "node"
+      node.displayName = "Roles"
+      StandardActions.bindRolesNodeActions(node)
+    }
+  }
+
+  /**
+    * Add root node (aka tokens/GroupToken node) for all tokens
+    * In Dart impl GroupToken node is used for grouping tokens by a user
+    * I.e. GroupToken is just "username". Since users are skipped (as Rick said)
+    * , we are not creating user's groupToken
+    *
+    **/
+  private def createTokensNode(parentNode: DSANode) = {
+    parentNode.addChild("tokens").foreach { node =>
+      node.profile = "node"
+      node.displayName = "Tokens"
+      StandardActions.bindTokenGroupNodeActions(node)
+
+      // Add default token
+      val tokenId = "1234567891234567"
+      node.addChild(tokenId) foreach { child =>
+        child.profile = "broker/TokenNode"
+        child.addConfigs(
+          ("group" -> "config")
+          , ("token" -> "tokenId")
+          , ("is" -> "broker/Token")
+        )
+        child.addConfigs(
+          ("$$count" -> null)
+          , ("$$managed" -> false)
+          , ("$$maxSession" -> null)
+          , ("$$timeRange" -> null)
+
+        )
+        bindTokenNodeActions(child)
+      }
+    }
+  }
+
 }

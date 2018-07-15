@@ -67,6 +67,8 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   val dataKey = DistributedDSANodeKey(path)
 
+  val _system: ActorSystem = system
+
   //actors behaviors would be better, but we work with typed actor
   private var stateInitialized = false;
 
@@ -377,40 +379,49 @@ class DistributedDSANode(_parent: Option[DSANode],
 
       // TODO: Extract following 2 methods (In the InMemoryDSANode too) into separated trait
       case AppendDsId2Token(name, value) =>
-        // TODO: Check following case, is it valueable here?
-        log.info(s"$ownId: received AppendDsId2Token ($name, $value)")
-        if(name.startsWith("$")) {
-
-          val oIds = _configs.get(name)
-          val values: DSAVal = oIds match {
-            case None => array(value)
-            case Some(arr)  =>
-              val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
-              if (srcVal.contains(StringValue(value)))
-                array(value)
-              else
-                srcVal ++ Seq(StringValue(value))
-          }
-
-          addConfigs(name -> values)
-
-        } else
-          log.warning("UpdateToken's parameter does not contains @ " + name)
+        appendDsId2config(name, value)
 
       case GetTokens =>
-        log.info(s"$ownId: GetTokens received")
-
-        val fResponse = children.map { m =>
-          m.values.filter(node => node.action.isEmpty).map(_.name)
-            .toList
-        }
-
-        val response = Await.result(fResponse, Duration.Inf)
-        sender ! response
+        getTokens(sender)
 
       case a:Any =>
         log.warning("unhandled  message: {}", a)
     }
+  }
+
+  private def getTokens(sender: ActorRef) = {
+    log.info(s"$ownId: GetTokens received")
+
+    val fResponse = children.map { m =>
+      m.values.filter(node => node.action.isEmpty).map(_.name)
+        .toList
+    }
+
+    val response = Await.result(fResponse, Duration.Inf)
+    sender ! response
+  }
+
+  private def appendDsId2config(name: String, value: String) = {
+    log.info(s"$ownId: received AppendDsId2Token ($name, $value)")
+    if (name.startsWith("$")) {
+
+      val fIds = config(name)
+
+      val v = fIds.onComplete { item =>
+        val values: DSAVal = item.get match {
+          case None => array(value)
+          case Some(arr) =>
+            val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
+            if (srcVal.contains(StringValue(value)))
+              array(value)
+            else
+              srcVal ++ Seq(StringValue(value))
+        }
+        addConfigs(name -> values)
+      }
+
+    } else
+      log.warning("UpdateToken's parameter does not contains '" + name + "' variable name")
   }
 
   override def preStart(): Unit = {
