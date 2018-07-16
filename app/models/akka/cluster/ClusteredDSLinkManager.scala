@@ -44,9 +44,9 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
       node.displayName = "tokens"
   }
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens/123456789123456789123456789", Some("broker/token")))).mapTo[DSANode] foreach{
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens/1234567891234567", Some("broker/token")))).mapTo[DSANode] foreach{
     node =>
-      node.displayName = "1234567891234567"
+      node.displayName = "123456789123456789123456789"
   }
 
 
@@ -71,8 +71,10 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
    * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.
    */
   def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = path match {
-    case Paths.Downstream                          => system.actorSelection("/user" + Paths.Downstream) ! message
-    case path if path.startsWith(Paths.Downstream) => getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
+    case Paths.Downstream                          =>
+      system.actorSelection("/user" + Paths.Downstream) ! message
+    case path if path.startsWith(Paths.Downstream) =>
+      getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
     case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ! message
     case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
     case Paths.Data                                => routeToDistributed(path, message)
@@ -80,7 +82,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     case path if path.startsWith(Paths.Tokens)     => routeToDistributed(path, message)
     case path if path.startsWith(Paths.Roles)      => routeToDistributed(path, message)
 //    case path if path.startsWith(Paths.Sys)         => system.actorSelection("/user" + Paths.Sys) ! message
-    case path                                      => RootNodeActor.childProxy(path)(system) ! message
+    case path                                      =>
+      RootNodeActor.childProxy(path)(system) ! message
   }
 
   /**
