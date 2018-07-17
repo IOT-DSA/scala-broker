@@ -2,19 +2,23 @@ package models.akka
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import models.api._
-import models.rpc.DSAValue
 
 import scala.concurrent.Future
-import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, MapValue, StringValue, array}
+import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue}
 import java.net.URLEncoder
 
-import akka.actor.{ActorSystem, TypedActor}
-import models.Settings
 import models.Settings.Paths
-import models.akka.Messages.{DisconnectEndpoint, GetConfigVal, RemoveDSLink}
+import models.akka.Messages.{DisconnectEndpoint, GetOrCreateDSLink, RemoveDSLink}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+
+import akka.actor.ActorSystem
+import akka.pattern.ask
+import akka.routing.Routee
+
+import akka.util.Timeout
+
 
 /**
   * Standard node actions.
@@ -300,6 +304,8 @@ object StandardActions {
     , Map[String, DSAVal]("name"->"Group", "type"-> DSAString, "editor"->"enum[none,list,read,write,config]")
   )
 
+  implicit val duration: Timeout = 20 seconds
+
   /**
     * Remove all clients related to the token. Token is the same
     */
@@ -318,12 +324,18 @@ object StandardActions {
       case Some(x) =>
         val arrDsId = x.asInstanceOf[ArrayValue].value
         arrDsId foreach { dsId =>
-          val dstName = if (dsId.toString.size > 45)
-            dsId.toString.substring(0, dsId.toString.size - 45)
+          val dstName = if (dsId.toString.size > 44)
+            dsId.toString.substring(0, dsId.toString.size - 44)
             else dsId.toString
 
           val dstActorRef = system.actorSelection("/user" + Paths.Downstream)
-          dstActorRef ! RemoveDSLink(dstName)
+
+          val fRoutee = (dstActorRef ? GetOrCreateDSLink(dstName)).mapTo[Routee]
+
+          fRoutee foreach { routee =>
+            routee ! DisconnectEndpoint(true)
+            dstActorRef ! RemoveDSLink(dstName)
+          }
         }
 
       case None =>

@@ -134,8 +134,6 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
           }
       }
     }
-
-
   }
 
   /**
