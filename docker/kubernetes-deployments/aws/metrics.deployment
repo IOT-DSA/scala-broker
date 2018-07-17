@@ -71,13 +71,13 @@ spec:
   - name: grafana
     port: 80
     targetPort: 80
-    nodePort: 30003
   - name: zipkin
     port: 9411
     targetPort: 9411
-    nodePort: 30004
   selector:
     app: cloud-broker-metrics
   status: loadBalancer
-  type: NodePort
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 0.0.0.0/0
   externalTrafficPolicy: Cluster
