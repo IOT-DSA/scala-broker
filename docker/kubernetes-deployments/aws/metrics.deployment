@@ -24,6 +24,13 @@ spec:
         - containerPort: 8125
           protocol: UDP
         - containerPort: 8126
+        resources:
+          requests:
+            memory: "2096Mi"
+            cpu: "1000m"
+          limits:
+            memory: "2096Mi"
+            cpu: "1000m"
       - name: zipkin
         image: openzipkin/zipkin
         imagePullPolicy: Always
