@@ -15,8 +15,8 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
   import models.Settings._
   import models.rpc.DSAValue._
 
-  private val downExtra: Seq[(String, DSAVal)] = List("downstream" -> true)
-  private val upExtra: Seq[(String, DSAVal)] = List("upstream" -> true)
+  private val downExtra: Seq[(String, DSAVal)] = List("$downstream" -> true)
+  private val upExtra: Seq[(String, DSAVal)] = List("$upstream" -> true)
 
   val (root, downstream, upstream, benchmark) = if (actorSystem.hasExtension(Cluster))
     createClusteredActors

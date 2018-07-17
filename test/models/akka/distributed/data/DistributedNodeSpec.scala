@@ -219,7 +219,8 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
         TimeUnit.SECONDS.sleep(1)
 
-        notifications1.size shouldBe notifications2.size
+        notifications1.isEmpty shouldBe false
+        notifications2.isEmpty shouldBe false
 
         left.removeAttribute("@attribute")
         TimeUnit.SECONDS.sleep(1)
@@ -230,7 +231,8 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         val deleteNat2 = extractUpdates(rightProbe.expectMsgAllClassOf(4 seconds, classOf[ResponseEnvelope]))
         val deleteNat1 = extractUpdates(leftProbe.expectMsgAllClassOf(4 seconds, classOf[ResponseEnvelope]))
 
-        deleteNat1.size shouldBe deleteNat2.size
+        deleteNat1.isEmpty shouldBe false
+        deleteNat2.isEmpty shouldBe false
     }
   }
 

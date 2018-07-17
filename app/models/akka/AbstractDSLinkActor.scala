@@ -52,6 +52,7 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
    * Called on link shut down, notifies the registry and logs the dslink status.
    */
   override def postStop() = {
+    endpoint foreach (_ ! PoisonPill)
     sendToRegistry(UnregisterDSLink(self.path.name.forDsa))
     log.info("{}: stopped", ownId)
   }
