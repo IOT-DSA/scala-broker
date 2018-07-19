@@ -1,0 +1,162 @@
+---
+# This is the backend service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ingress-lb
+  labels:
+    app: nginx-ingress-lb
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    name: http
+    targetPort: 80
+  - port: 443
+    name: https
+    targetPort: 443
+  selector:
+    # Selects nginx-ingress-controller pods
+    k8s-app: nginx-ingress-controller
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-ingress-controller
+  labels:
+    k8s-app: nginx-ingress-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: nginx-ingress-controller
+  template:
+    metadata:
+      labels:
+        k8s-app: nginx-ingress-controller
+    spec:
+      # hostNetwork makes it possible to use ipv6 and to preserve the source IP correctly regardless of docker configuration
+      # however, it is not a hard dependency of the nginx-ingress-controller itself and it may cause issues if port 10254 already is taken on the host
+      # that said, since hostPort is broken on CNI (https://github.com/kubernetes/kubernetes/issues/31307) we have to use hostNetwork where CNI is used
+      # like with kubeadm
+      # hostNetwork: true
+      terminationGracePeriodSeconds: 60
+      containers:
+      - image: quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.17.1
+        name: nginx-ingress-controller
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          timeoutSeconds: 1
+        ports:
+        - containerPort: 80
+          hostPort: 80
+        - containerPort: 443
+          hostPort: 443
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        args:
+        - /nginx-ingress-controller
+        - --default-backend-service=$(POD_NAMESPACE)/http-svc
+        - --publish-service=$(POD_NAMESPACE)/nginx-ingress-lb
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: http-svc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-svc
+  template:
+    metadata:
+      labels:
+        app: http-svc
+    spec:
+      containers:
+      - name: http-svc
+        image: gcr.io/google_containers/echoserver:1.8
+        ports:
+        - containerPort: 8080
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-svc
+  labels:
+    app: http-svc
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: http-svc
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-consent
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /consent
+        backend:
+          # This assumes http-svc exists and routes to healthy endpoints.
+          serviceName: consent
+          servicePort: consent-port
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: broker
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    # define sticky session annotations as describe here:
+    # https://github.com/kubernetes/ingress-nginx/tree/master/docs/examples/affinity/cookie
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+spec:
+  rules:
+    - http:
+        paths:
+        - path: /*
+          backend:
+            serviceName: cloud-broker-external
+            servicePort: dsabroker-webinterface
