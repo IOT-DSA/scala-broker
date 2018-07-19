@@ -43,22 +43,25 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    */
   val responderBehavior: Receive = {
     case env @ RequestEnvelope(requests) =>
-      log.info("{}: received {} from {}", ownId, env, sender)
-      persist(RequestsProcessed(requests)) { event =>
+      log.debug("{}: received {} from {}", ownId, env, sender)
+     // persist(RequestsProcessed(requests)) { event =>
+      val event = RequestsProcessed(requests)
         val result = processRequests(event.requests)
         if (!result.requests.isEmpty)
           sendToEndpoint(RequestEnvelope(result.requests))
         if (!result.responses.isEmpty)
           sender ! ResponseEnvelope(result.responses)
-      }
+     // }
 
     case m @ ResponseMessage(_, _, responses) =>
       log.debug("{}: received {}", ownId, m)
-      persist(ResponsesProcessed(responses)) { event =>
+      ResponsesProcessed(responses)
+    //  persist(ResponsesProcessed(responses)) { event =>
+      val event = ResponsesProcessed(responses)
         processResponses(event.responses) foreach {
           case (to, rsps) => to ! ResponseEnvelope(rsps)
         }
-      }
+     // }
   }
 
   /**

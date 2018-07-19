@@ -1,7 +1,8 @@
 package models.akka.responder
 
 import akka.event.LoggingAdapter
-import models.{ Origin, ResponseEnvelope }
+import kamon.Kamon
+import models.{Origin, ResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
@@ -151,7 +152,9 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
     } else {
       val results = list flatMap handleSubscribeResponseRow(rsp.stream, rsp.columns, rsp.error)
       results groupBy (_._1) mapValues (_.map(_._2)) foreach {
-        case (to, rsps) => to ! ResponseEnvelope(rsps)
+        case (to, rsps) =>
+          Kamon.currentSpan().tag("kind", "SubscribeResponse")
+          to ! ResponseEnvelope(rsps)
       }
     }
   }

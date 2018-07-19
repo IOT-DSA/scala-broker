@@ -51,9 +51,9 @@ class DSLinkManagerProvider @Inject() (actorSystem: ActorSystem)
 
 @Singleton
 class StatsDConnection @Inject()(lifecycle: ApplicationLifecycle) {
-
-  if(Settings.MetricsReporters.statsdConfigured)  Kamon.addReporter(new StatsDReporter())
-  if(Settings.MetricsReporters.zipkinConfigured)  Kamon.addReporter(new ZipkinReporter())
+//
+//  if(Settings.MetricsReporters.statsdConfigured)  Kamon.addReporter(new StatsDReporter())
+//  if(Settings.MetricsReporters.zipkinConfigured)  Kamon.addReporter(new ZipkinReporter())
 
   SystemMetrics.startCollecting()
 

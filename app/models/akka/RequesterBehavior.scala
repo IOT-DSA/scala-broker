@@ -204,11 +204,11 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     def cleanupSids(rows: Seq[DSAVal]) = {
       val sids = Set[Int]()
       rows collect extractSid foreach sids.add
-
-      persist(RemoveTargetBySid(sids.toSeq: _*)) { event =>
+      val event = RemoveTargetBySid(sids.toSeq: _*)
+//      persist(RemoveTargetBySid(sids.toSeq: _*)) { event =>
         log.debug("{}: removing by SIDs persisted {}", ownId, event)
         removeTargetBy(event.sids: _*)
-      }
+//      }
     }
 
     responses filter (_.stream == Some(StreamState.Closed)) foreach {

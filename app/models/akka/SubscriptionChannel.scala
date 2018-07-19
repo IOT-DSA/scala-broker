@@ -86,7 +86,9 @@ class SubscriptionChannel(val store: ActorRef)
           toResponseMsg(_).foreach { m =>
             log.debug("push(out, {})", m)
             push(out, m)
-            pull(in)
+            if (!hasBeenPulled(in)) {
+              pull(in)
+            }
           }
         }
       }
