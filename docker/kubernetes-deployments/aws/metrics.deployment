@@ -26,11 +26,11 @@ spec:
         - containerPort: 8126
         resources:
           requests:
-            memory: "2096Mi"
-            cpu: "1000m"
+            memory: "1000Mi"
+            cpu: "500m"
           limits:
-            memory: "2096Mi"
-            cpu: "1000m"
+            memory: "1000Mi"
+            cpu: "500m"
       - name: zipkin
         image: openzipkin/zipkin
         imagePullPolicy: Always
