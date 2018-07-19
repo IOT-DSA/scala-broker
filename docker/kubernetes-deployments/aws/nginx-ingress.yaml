@@ -4,6 +4,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx-ingress-lb
+  annotations:
+     service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: '*'
+     service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: '3600'
   labels:
     app: nginx-ingress-lb
 spec:
@@ -159,4 +162,14 @@ spec:
         - path: /*
           backend:
             serviceName: cloud-broker-external
-            servicePort: dsabroker-webinterface
+            servicePort: 9000
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nginx-configuration
+  namespace: ingress-nginx
+  labels:
+    app: ingress-nginx
+data:
+  use-proxy-protocol: "true"
