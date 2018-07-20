@@ -6,7 +6,6 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import models.akka.Messages._
 import models.metrics.Meter
-
 import scala.util.control.NonFatal
 import scala.collection.mutable.Set
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
@@ -31,8 +30,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   ), "stateKeeper")
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
-  private var targetsByRid = collection.mutable.Map.empty[Int, String]
-  private var targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
+  private val targetsByRid = collection.mutable.Map.empty[Int, String]
+  private val targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
 
   private var lastRid: Int = 0
 
@@ -48,10 +47,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     case m @ RequestMessage(msg, ack, requests) =>
       log.debug("{}: received {}", ownId, m)
       processRequests(requests)
-      requests.lastOption foreach (req => persist(LastRidSet(req.rid)) { event =>
-        log.debug("{}: persisting {}", ownId, event)
-        lastRid = event.rid
-        saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid)) })
+      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received in connected mode {}", ownId, e)
       cleanupStoredTargets(responses)
