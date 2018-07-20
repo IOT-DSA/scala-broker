@@ -1,5 +1,6 @@
 package models.akka.responder
 
+import akka.routing.ActorSelectionRoutee
 import akka.testkit.TestProbe
 import models.Origin
 import models.akka.AbstractActorSpec
@@ -11,7 +12,7 @@ class RidRegistrySpec extends AbstractActorSpec {
   import RidRegistry._
   import models.rpc.DSAMethod._
 
-  val Seq(a1, a2, a3) = (1 to 3) map (_ => TestProbe().ref)
+  val Seq(a1, a2, a3) = (1 to 3) map (_ => ActorSelectionRoutee(system.actorSelection(TestProbe().ref.path)))
 
   val registry = new RidRegistry
 
