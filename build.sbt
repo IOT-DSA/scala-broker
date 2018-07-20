@@ -144,12 +144,12 @@ lazy val commonDependencies = Seq(
   "io.netty"                     % "netty-handler"               % "4.0.41.Final" force(),
   "org.msgpack"                 %% "msgpack-scala"               % "0.8.13",
   "org.json4s"                  %% "json4s-native"               % "3.5.0",
-  "io.kamon"                    %% "kamon-akka-remote-2.5"       % "1.0.0",
-  "io.kamon"                    %% "kamon-akka-2.5"              % "1.0.0",
+//  "io.kamon"                    %% "kamon-akka-remote-2.5"       % "1.0.0",
+//  "io.kamon"                    %% "kamon-akka-2.5"              % "1.0.0",
   "io.kamon"                    %% "kamon-statsd"                % "1.0.0",
   "io.kamon"                    %% "kamon-system-metrics"        % "1.0.0",
   "io.kamon"                    %% "kamon-core"                  % "1.0.0",
-  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
+//  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
   "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12"
 )
 
