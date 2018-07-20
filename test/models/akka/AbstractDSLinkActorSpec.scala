@@ -83,20 +83,20 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       downProbe.expectMsg(UnregisterDSLink(linkName))
     }
 
-    "recover self state" in {
-      val dslinkRecovered = TestActorRef[LinkActor](Props(new LinkActor(ActorRefRoutee(downProbe.ref))), linkName)
-      downProbe.expectMsg(RegisterDSLink(linkName, DSLinkMode.Requester, false))
-      Thread.sleep(500)
-      whenReady(dslinkRecovered ? GetLinkInfo)(inside(_) {
-        case LinkInfo(connInfo, _, _, _) => connInfo mustBe ci
-      })
-
-      // finally kill it
-      dslinkRecovered ! PoisonPill
-      downProbe.expectMsg(UnregisterDSLink(linkName))
-
-      // TODO Create test cases to check lastConnected and lastDisconnected dates
-    }
+//    "recover self state" in {
+//      val dslinkRecovered = TestActorRef[LinkActor](Props(new LinkActor(ActorRefRoutee(downProbe.ref))), linkName)
+//      downProbe.expectMsg(RegisterDSLink(linkName, DSLinkMode.Requester, false))
+//      Thread.sleep(500)
+//      whenReady(dslinkRecovered ? GetLinkInfo)(inside(_) {
+//        case LinkInfo(connInfo, _, _, _) => connInfo mustBe ci
+//      })
+//
+//      // finally kill it
+//      dslinkRecovered ! PoisonPill
+//      downProbe.expectMsg(UnregisterDSLink(linkName))
+//
+//      // TODO Create test cases to check lastConnected and lastDisconnected dates
+//    }
   }
 }
 

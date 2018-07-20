@@ -33,32 +33,32 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   private val mgmtHandler: Receive = {
 
     case GetOrCreateDSLink(name) =>
-      persist(DSLinkCreated(name)) { event =>
-        log.debug("{}: requested DSLink '{}'", ownId, event.name)
-        sender ! getOrCreateDSLink(event.name)
-      }
+//      persist(DSLinkCreated(name)) { event =>
+      log.debug("{}: requested DSLink '{}'", ownId, name)
+      sender ! getOrCreateDSLink(name)
+//      }
 
     case RegisterDSLink(name, mode, connected) =>
-      persist(DSLinkRegistered(name, mode, connected)) { event =>
-        links += (event.name -> LinkState(event.mode, event.connected))
-        log.info("{}: registered DSLink '{}'", ownId, event.name)
-        notifyOnRegister(event.name)
-      }
+//      persist(DSLinkRegistered(name, mode, connected)) { event =>
+      links += (name -> LinkState(mode, connected))
+      log.info("{}: registered DSLink '{}'", ownId, name)
+      notifyOnRegister(name)
+//      }
 
     case GetDSLinkNames => sender ! links.keys
 
     case RemoveDSLink(name) =>
-      persist(DSLinkRemoved(name)) { event =>
-        removeDSLinks(event.names: _*)
-        log.debug("{}: ordered to remove DSLink '{}'", ownId, event.names)
-      }
+//      persist(DSLinkRemoved(name)) { event =>
+      removeDSLinks(name)
+      log.debug("{}: ordered to remove DSLink '{}'", ownId, name)
+//      }
 
     case UnregisterDSLink(name) =>
-      persist(DSLinkUnregistered(name)) { event =>
-        links -= event.name
-        log.info("{}: removed DSLink '{}'", ownId, event.name)
-        notifyOnRemove(event.name)
-      }
+//      persist(DSLinkUnregistered(name)) { event =>
+      links -= name
+      log.info("{}: removed DSLink '{}'", ownId, name)
+      notifyOnRemove(name)
+//      }
 
     case DSLinkStateChanged(name, mode, connected) => changeLinkState(name, mode, connected, true)
 
