@@ -130,15 +130,18 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     log.debug("{}: connectToEndpoint called, [ref: {}] [connection: {}]", ownId, ref, ci)
     assert(ci.isRequester || ci.isResponder, "DSLink must be Requester, Responder or Dual")
 
-    persist(DSLinkBaseState(Some(context.watch(ref)), ci, Some(DateTime.now.toDate), lastDisconnected.map { _.toDate } )) { event =>
-      updateState(event)
-      sendToRegistry(DSLinkStateChanged(linkName, ci.mode, true))
+//    persist(DSLinkBaseState(Some(context.watch(ref)), ci, Some(DateTime.now.toDate), lastDisconnected.map { _.toDate } )) { event =>
+    endpoint = Some(context.watch(ref))
+    connInfo = ci
+    lastConnected = Some(DateTime.now)
 
-      log.debug("{}: unstashing all stored messages", ownId)
-      unstashAll()
-      context.become(connected)
-      afterConnection()
-    }
+    sendToRegistry(DSLinkStateChanged(linkName, ci.mode, true))
+
+    log.debug("{}: unstashing all stored messages", ownId)
+    unstashAll()
+    context.become(connected)
+    afterConnection()
+//    }
   }
 
   /**
@@ -151,12 +154,13 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
       if (kill) ref ! PoisonPill
     }
 
-    persist(DSLinkBaseState(None, connInfo, lastConnected.map { _.toDate }, Some(DateTime.now.toDate))) { event =>
-      updateState(event)
-      sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
-      context.become(disconnected)
-      afterDisconnection()
-    }
+//    persist(DSLinkBaseState(None, connInfo, lastConnected.map { _.toDate }, Some(DateTime.now.toDate))) { event =>
+    endpoint = None
+    lastDisconnected = Some(DateTime.now)
+    sendToRegistry(DSLinkStateChanged(linkName, connInfo.mode, false))
+    context.become(disconnected)
+    afterDisconnection()
+//    }
   }
 
   /**

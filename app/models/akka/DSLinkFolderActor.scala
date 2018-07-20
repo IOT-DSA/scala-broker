@@ -66,10 +66,10 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
    */
   protected def removeDisconnectedDSLinks = {
     val disconnected = links.filterNot(_._2.connected).keys.toSeq
-    persist(DSLinkRemoved(disconnected: _*)) { event =>
-      removeDSLinks(event.names: _*)
-      log.info("{}: removed {} disconnected DSLinks", ownId, event.names.size)
-    }
+//    persist(DSLinkRemoved(disconnected: _*)) { event =>
+    removeDSLinks(disconnected: _*)
+    log.info("{}: removed {} disconnected DSLinks", ownId, disconnected.size)
+//    }
   }
 
   /**
@@ -159,10 +159,10 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   protected def changeLinkState(name: String, mode: DSLinkMode, connected: Boolean, warnIfNotFound: Boolean) = {
     links.get(name) match {
       case Some(_) =>
-        persist(DSLinkRegistered(name, mode, connected)) { event =>
-          links += (event.name -> LinkState(event.mode, event.connected))
-          log.info("{}: DSLink '{}' state changed to: mode={}, connected={}", ownId, event.name, event.mode, event.connected)
-        }
+//        persist(DSLinkRegistered(name, mode, connected)) { event =>
+        links += (name -> LinkState(mode, connected))
+        log.info("{}: DSLink '{}' state changed to: mode={}, connected={}", ownId, name, mode, connected)
+//        }
       case None if warnIfNotFound =>
         log.warning("{}: DSLink '{}' is not registered, ignoring state change", ownId, name)
       case _ =>
