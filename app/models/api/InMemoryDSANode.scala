@@ -172,8 +172,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
       log.info(s"$ownId: GetTokens received")
 
       val fResponse = children.map { m =>
-        m.values.filter(node => node.action.isEmpty).map(_.name)
-          .toList
+        m.values.filter(node => node.action.isEmpty).toList
       }
 
       val response = Await.result(fResponse, Duration.Inf)

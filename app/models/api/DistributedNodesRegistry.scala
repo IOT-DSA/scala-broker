@@ -61,8 +61,9 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
       log.debug(s"ddNodeRegistry: GetTokens received")
 
       val response = registry
-        .filter{ case (name, node ) => name.startsWith(Paths.Tokens) && node.action.isEmpty }
-        .values.map(_.name).toList
+        .filter{ case (name, node ) => name.startsWith(Paths.Tokens + "/") && node.action.isEmpty }
+        .values.toList
+
       sender ! response
   }
 
@@ -92,7 +93,6 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
       log.error("path {} couldn't be found in distributedDataNode:{}", path)
       log.info("current keys: {}", registry.keySet.mkString("\n -> "))
     }
-
 
     maybeNode.foreach { node =>
       val formated = formatMessagePath(message)
@@ -169,14 +169,16 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
             StandardActions.bindTokenGroupNodeActions(newOne)
 
           // Processing /sys/tokens/<tokenid> - do nothing
-          case parent if (parent + "/" + name).startsWith(Paths.Tokens + "/") =>
+          case parent if (parent + "/" + name).startsWith(Paths.Tokens + "/") && isNotCommon(name) =>
+            StandardActions.bindTokenNodeActions(newOne)
 
-          // Processing /sys/tokens node - add all required actions
+          // Processing /sys/roles node - add all required actions
           case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Roles) =>
             StandardActions.bindRolesNodeActions(newOne)
 
           // Processing /sys/roles/<role> - do nothing
-          case parent if (parent + "/" + name).startsWith(Paths.Roles + "/") =>
+          case parent if (parent + "/" + name).startsWith(Paths.Roles + "/")  && isNotCommon(name) =>
+            StandardActions.bindRoleNodeActions(newOne)
 
           // Processing non common nodes
           case parent if isNotCommon(name) =>

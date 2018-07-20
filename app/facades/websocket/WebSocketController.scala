@@ -7,7 +7,7 @@ import play.api.http.HttpEntity
 import scala.concurrent.Future
 import scala.util.Random
 import org.velvia.msgpack.PlayJsonCodecs.JsValueCodec
-import akka.{Done}
+import akka.Done
 import akka.actor._
 import akka.pattern.ask
 import akka.http.scaladsl.Http
@@ -20,9 +20,10 @@ import akka.util.ByteString
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
 import models.Settings
-import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee, RootNodeActor}
-import models.akka.Messages.{GetOrCreateDSLink, GetTokens, RemoveDSLink, AppendDsId2Token}
+import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, Messages, RichRoutee, RootNodeActor}
+import models.akka.Messages.{AppendDsId2Token, GetOrCreateDSLink, GetTokens, RemoveDSLink}
 import models.akka.QoSState.SubscriptionSourceMessage
+import models.api.DSANode
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
 import models.rpc.{DSAMessage, PingMessage}
@@ -33,10 +34,10 @@ import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.mvc.WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
+import org.joda.time.DateTime
 import org.velvia.msgpack
 
 import scala.util.control.NonFatal
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -301,17 +302,37 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     si.map(_.ci).fold( { log.warn("Token is absent!"); false } ) { ci =>
       val token = ci.tokenHash
-      val tokensActor = RootNodeActor.childProxy("/sys/tokens")
+      val dsaPath = "/sys/tokens"
 
       if (token.isEmpty)
-        log.warn("Token is absent!")
+        log.warn("Client token is absent!")
 
-      val fActiveTokens = tokensActor ? GetTokens
+      val fat = dslinkMgr.dsaAsk(dsaPath, GetTokens)
+      val fActiveTokens = fat.asInstanceOf[Future[List[DSANode]]]
+
       val fExist = fActiveTokens.map {
-        item =>
-          log.debug("Available tokens are: " + item.toString)
-          val tokenId = token.flatMap(a => Option(a.substring(0, 16)))
-          item.asInstanceOf[List[String]].contains(tokenId.getOrElse(None))
+        listNodes =>
+
+        log.debug("Available tokens are: " + listNodes.toString)
+        val tokenId = token.flatMap(a => Option(a.substring(0, 16))).get
+
+        listNodes foreach( item => log.debug("node name is: " + item.name))
+
+        val r = listNodes.indexWhere(_.name.equals(tokenId))
+
+        r match {
+          case -1 => false
+          case i: Int =>
+            val tokenNode = listNodes(i)
+
+            val check =  for {
+                checkCount <- checkTokenCount(tokenId, tokenNode)
+                checkDate <- checkTokenDates(tokenId, tokenNode)
+              } yield checkCount && checkDate
+
+            Await.result(check, Duration.Inf)
+          case _ => false
+        }
       }
 
       // TODO: try to avoid Await here
@@ -319,6 +340,60 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
       res
     }
+  }
+
+  def checkTokenDates(tokenId: String, tokenNode: DSANode) = {
+    val dateRange = tokenNode.config("$timeRange")
+
+    val check = dateRange map {
+      range =>
+
+      range match {
+        case None =>
+          log.warn("TimeRange is absent in the token, pass the token")
+          true
+        case Some(x) =>
+          val r = try {
+            val dates = x.toString.split('/')
+            val date1 = DateTime.parse(dates(0))
+            val date2 = DateTime.parse(dates(1))
+
+            val currentDate = DateTime.now()
+
+            val c = currentDate.compareTo(date1) >= 0 && currentDate.compareTo(date2) <= 0
+            if (c) log.warn(s"The token is out of the dateRange $date1 - $date2")
+            c
+          } catch {
+            case e: Exception =>
+              log.error(e.getMessage)
+              false
+          }
+          r
+      }
+    }
+
+    check
+  }
+
+  private def checkTokenCount(tokenId: String, tokenNode: DSANode) = {
+    val fCountItem = tokenNode.config("$countItem")
+    val fCount = tokenNode.config("$count")
+
+    val fCheck = for {
+      countItem <- fCountItem
+      count <- fCount
+    } yield {
+      val iCountItem = countItem.getOrElse(0).toString.toInt
+      tokenNode.addConfigs("$countItem" -> iCountItem.toString)
+
+      val countCheck = iCountItem <= count.getOrElse(0).toString.toInt
+
+      if (!countCheck)
+        log.error(s"DSLink with tokenId $tokenId distinguish limit of connection to the broker. DS link is not allowd to connect")
+
+      countCheck
+    }
+    fCheck
   }
 
   private def getTransformer(sessionInfo : Option[DSLinkSessionInfo]) = {

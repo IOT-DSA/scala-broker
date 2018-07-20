@@ -1,10 +1,13 @@
 package models.akka.local
 
-import akka.actor.{ ActorRef, ActorSystem }
-import akka.routing.{ ActorSelectionRoutee, Routee }
+import akka.actor.{ActorRef, ActorSystem}
+import akka.routing.{ActorSelectionRoutee, Routee}
 import akka.util.Timeout
 import models.akka.DSLinkManager
 import models.util.DsaToAkkaCoder._
+import akka.pattern.ask
+import scala.concurrent.Future
+
 
 /**
  * Uses Akka Actor Selection to communicate with DSLinks.
@@ -34,6 +37,20 @@ class LocalDSLinkManager()(implicit val system: ActorSystem) extends DSLinkManag
   def dsaSend(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = dsaPath match {
     case dsaPath if dsaPath.startsWith(Paths.Downstream) => system.actorSelection("/user" + dsaPath.forAkka) ! message
     case dsaPath if dsaPath.startsWith(Paths.Upstream)   => system.actorSelection("/user" + dsaPath.forAkka) ! message
-    case dsaPath                                      => system.actorSelection("/user/" + Nodes.Root + dsaPath.forAkka) ! message
+    case dsaPath                                         => system.actorSelection("/user/" + Nodes.Root + dsaPath.forAkka) ! message
+  }
+
+  /**
+    * Ask message from its DSA destination using actor selection
+    *
+    * @param dsaPath
+    * @param message
+    * @param sender
+    * @return
+    */
+  def dsaAsk(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender) : Future[Any] = dsaPath match {
+    case dsaPath if dsaPath.startsWith(Paths.Downstream) => system.actorSelection("/user" + dsaPath.forAkka) ? message
+    case dsaPath if dsaPath.startsWith(Paths.Upstream)   => system.actorSelection("/user" + dsaPath.forAkka) ? message
+    case dsaPath                                         => system.actorSelection("/user/" + Nodes.Root + dsaPath.forAkka) ? message
   }
 }

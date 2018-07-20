@@ -116,7 +116,7 @@ class RootNodeActor extends Actor with ActorLogging {
 
     // The method call was commented as it does need in cluster mode.
     // TODO: Uncomment it in future
-//    RootNodeActor.createTokensNode(sysNode)
+    RootNodeActor.createTokensNode(sysNode)
 
     // Add root node for roles
     // The method call was commented as it does need in cluster mode.

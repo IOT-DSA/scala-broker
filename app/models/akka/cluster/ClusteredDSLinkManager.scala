@@ -1,16 +1,18 @@
 package models.akka.cluster
 
-import akka.actor.{ ActorRef, ActorSystem }
+import akka.actor.{ActorRef, ActorSystem}
 import akka.cluster.Cluster
-import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
+import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.routing.Routee
 import akka.util.Timeout
-import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
+import models.akka.{DSLinkManager, RichRoutee, RootNodeActor}
 import akka.actor.Props
 import akka.cluster.ddata.DistributedData
 import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
 import akka.pattern.ask
+
+import scala.concurrent.Future
 
 /**
  * Uses Akka Cluster Sharding to communicate with DSLinks.
@@ -29,7 +31,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), "distributedNodesRegistry")
 
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/data", Some("broker/dataRoot")))).mapTo[DSANode] foreach{
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/data", Some("broker/dataRoot")))).mapTo[DSANode] foreach {
     node =>
       node.displayName = "data"
   }
@@ -39,18 +41,24 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
       node.displayName = "sys"
   }
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens", Some("broker/tokensRoot")))).mapTo[DSANode] foreach{
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens", Some("broker/tokensRoot"))))
+    .mapTo[DSANode] foreach {
+
     node =>
       node.displayName = "tokens"
   }
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens/1234567891234567", Some("broker/token")))).mapTo[DSANode] foreach{
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens/1234567891234567", Some("broker/token"))))
+    .mapTo[DSANode] foreach {
+
     node =>
       node.displayName = "123456789123456789123456789"
   }
 
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/roles", Some("broker/rolesRoot")))).mapTo[DSANode] foreach{
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/roles", Some("broker/rolesRoot"))))
+    .mapTo[DSANode] foreach {
+
     node =>
       node.displayName = "roles"
   }
@@ -78,6 +86,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ! message
     case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
     case Paths.Data                                => routeToDistributed(path, message)
+    case Paths.Sys                                 => routeToDistributed(path, message)
     case path if path.startsWith(Paths.Data)       => routeToDistributed(path, message)
     case path if path.startsWith(Paths.Tokens)     => routeToDistributed(path, message)
     case path if path.startsWith(Paths.Roles)      => routeToDistributed(path, message)
@@ -85,6 +94,29 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     case path                                      =>
       RootNodeActor.childProxy(path)(system) ! message
   }
+
+  /**
+    * Ask message from its DSA destination using actor selection
+    *
+    * @param path
+    * @param message
+    * @param sender
+    * @return
+    */
+  def dsaAsk(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender) : Future[Any] = path match {
+    case Paths.Downstream                          =>
+      system.actorSelection("/user" + Paths.Downstream) ? message
+    case path if path.startsWith(Paths.Downstream) =>
+      getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ? message
+    case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ? message
+    case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ? message
+    case Paths.Data                                => ???
+    case path if path.startsWith(Paths.Data)       => ???
+    case path if path.startsWith(Paths.Tokens)     => distrubutedNodeRegistry ? message
+    case path if path.startsWith(Paths.Roles)      => distrubutedNodeRegistry ? message
+    case path                                      => RootNodeActor.childProxy(path)(system) ? message
+  }
+
 
   /**
    * Extracts DSLink name and payload from the message.
@@ -124,4 +156,6 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
   private def routeToDistributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Unit =
     distrubutedNodeRegistry ! RouteMessage(path, message, sender)
 
+  private def ask4Distributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Future[Any] =
+    distrubutedNodeRegistry ? RouteMessage(path, message, sender)
 }

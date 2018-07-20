@@ -40,6 +40,17 @@ object StandardActions {
   val SET_CONFIG = "setConfig"
   val DELETE_NODE = "deleteNode"
 
+  val ADD_TOKEN = "add"
+  val REMOVE_TOKEN = "remove"
+  val TOKEN_REMOVE_CLIENTS = "removeAllClients"
+  val REGENERATE_TOKEN = "regenerate"
+  val UPDATE_TOKEN = "update"
+
+  val ADD_ROLE = "addRole"
+  val ADD_RULE = "addRule"
+  val REMOVE_ROLE = "removeRole"
+  val REMOVE_RULE = "removeRule"
+
 
   /**
     * Adds actions as per broker/dataRoot profile.
@@ -212,13 +223,23 @@ object StandardActions {
     node.parent foreach (_.removeChild(node.name))
   })
 
+
   val commonActions:Map[String, ActionDescription] = Map(
     ADD_NODE -> ActionDescription(ADD_NODE, "Add Node", AddNode, Option("config")),
     ADD_VALUE -> ActionDescription(ADD_VALUE, "Add Value", AddValue),
     SET_VALUE -> ActionDescription(SET_VALUE, "Set Value", SetValue),
     SET_ATTRIBUTE -> ActionDescription(SET_ATTRIBUTE, "Set Attribute", SetAttribute),
     SET_CONFIG -> ActionDescription(SET_CONFIG, "Set Config", SetConfig),
-    DELETE_NODE -> ActionDescription(DELETE_NODE, "Delete Node", DeleteNode)
+    DELETE_NODE -> ActionDescription(DELETE_NODE, "Delete Node", DeleteNode),
+    ADD_TOKEN -> ActionDescription(ADD_TOKEN, "Add token node", AddToken, Option("config")),
+    REMOVE_TOKEN -> ActionDescription(REMOVE_TOKEN, "Remove token", DeleteNode, Option("config")),
+    TOKEN_REMOVE_CLIENTS -> ActionDescription(TOKEN_REMOVE_CLIENTS, "Remove clients", RemoveTokenClients, Option("config")),
+    REGENERATE_TOKEN -> ActionDescription(REGENERATE_TOKEN, "Regenerate", RegenerateToken, Option("config")),
+    UPDATE_TOKEN -> ActionDescription(UPDATE_TOKEN, "Update token", UpdateToken, Option("config")),
+    ADD_ROLE -> ActionDescription(ADD_ROLE, "Add permission group", AddRoleNode, Option("config")),
+    ADD_RULE -> ActionDescription(ADD_RULE, "Add rule", AddRuleNode, Option("config")),
+    REMOVE_ROLE -> ActionDescription(REMOVE_ROLE, "Remove group", DeleteNode, Option("config")),
+    REMOVE_RULE -> ActionDescription(REMOVE_RULE, "Remove rule", DeleteNode, Option("config"))
   )
 
   /**
@@ -251,10 +272,10 @@ object StandardActions {
             , ("is" -> "broker/Token")
           )
           child.addConfigs(
-            ("$$count"->count)
-            , ("$$managed"->managed)
-            , ("$$maxSession"->maxSession)
-            , ("$$timeRange"->timeRange)
+            ("$count"->count)
+            , ("$managed"->managed)
+            , ("$maxSession"->maxSession)
+            , ("$timeRange"->timeRange)
 
           )
           bindTokenNodeActions(child)

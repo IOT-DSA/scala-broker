@@ -204,7 +204,7 @@ trait DSANodeRequestHandler { self:DSANode =>
         case (name, cfgs) => array(name, cfgs)
       }
       val updates = cfgUpdates ++ attrUpdates ++ childUpdates
-      DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil
+      DSAResponse(rid, Some(StreamState.Closed), Some(updates.toList)) :: Nil
 
     /* close */
 
