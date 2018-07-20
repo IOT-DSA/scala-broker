@@ -1,7 +1,7 @@
 package models.akka.responder
 
 import akka.event.LoggingAdapter
-import models.{ Origin, ResponseEnvelope }
+import models.{Origin, ResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
@@ -110,7 +110,7 @@ abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
  * LIST call registry.
  */
 class ListCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegistry(log, ownId) {
-  import models.rpc.StreamState._
+  import models.akka.RichRoutee
 
   /**
    * Sends the last call response (if any) to the new origin.
@@ -139,6 +139,7 @@ class ListCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegi
  */
 class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegistry(log, ownId) {
   import models.rpc.StreamState._
+  import models.akka.RichRoutee
 
   /**
    * Sends the last call response (if any) to the new origin.
@@ -160,8 +161,12 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
       log.warning(s"$ownId: cannot find updates in Subscribe response $rsp")
     } else {
       val results = list flatMap handleSubscribeResponseRow(rsp.stream, rsp.columns, rsp.error)
+      log.debug("{}: deliverResponse results: {}", ownId, results)
       results groupBy (_._1) mapValues (_.map(_._2)) foreach {
-        case (to, rsps) => to ! ResponseEnvelope(rsps)
+        case (to, rsps) =>
+          log.debug("{}: deliverResponse SENDS to: '{}', rsps: {}", ownId, to, rsps)
+          to ! ResponseEnvelope(rsps)
+
       }
     }
   }
@@ -174,8 +179,10 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
     val rec = getOrInsert(targetSid)
     rec.setLastResponse(DSAResponse(0, stream, Some(List(row)), columns, error))
 
-    if (stream == Some(StreamState.Closed)) // shouldn't normally happen w/o UNSUBSCRIBE
+    if (stream == Some(StreamState.Closed)) { // shouldn't normally happen w/o UNSUBSCRIBE
+      log.debug("{}: stream is closed by targetSid: '{}'", ownId, targetSid)
       remove(targetSid)
+    }
 
     rec.origins map { origin =>
       val sourceRow = replaceSid(row, origin.sourceId)

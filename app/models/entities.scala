@@ -1,7 +1,7 @@
 package models
 
 import models.rpc.{DSARequest, DSAResponse}
-import _root_.akka.actor.ActorRef
+import _root_.akka.routing.Routee
 import models.akka.QoS
 
 /**
@@ -43,8 +43,8 @@ case class SubscriptionResponseEnvelope(response: DSAResponse, sid: Int, qos: Qo
 /**
  * Used in call records to store the subscribers for future responses.
  */
-case class Origin(source: ActorRef, sourceId: Int) {
-  override def toString = s"Origin(${source.path.name}:$sourceId)"
+case class Origin(source: Routee, sourceId: Int) {
+  override def toString = s"Origin(${source}:$sourceId)"
 }
 
 /**

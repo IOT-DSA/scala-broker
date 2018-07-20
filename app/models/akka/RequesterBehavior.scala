@@ -53,7 +53,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
         lastRid = event.rid
         saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid)) })
     case e @ ResponseEnvelope(responses) =>
-      log.debug("{}: received {}", ownId, e)
+      log.debug("{}: received in connected mode {}", ownId, e)
       cleanupStoredTargets(responses)
 
       val(subscriptions, other) = responses.partition(isSubscription)
@@ -78,7 +78,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       getSubscriptionSource(actorRef)
     case e @ ResponseEnvelope(responses) =>
 
-      log.debug("{}: received {}", ownId, e)
+      log.debug("{}: received in disconnected mode {}", ownId, e)
       cleanupStoredTargets(responses)
 
       val(subscriptions, other) = responses.partition(isSubscription)
@@ -154,14 +154,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   private def handleSubscriptions(subscriptions:Seq[DSAResponse], connected: Boolean = true) = subscriptions foreach {
     r => withQosAndSid(r) foreach {
       message =>
-      log.debug("sending subscription message: {}", message)
       val toSend = SubscriptionNotificationMessage(-1, None, List(message.response), message.sid, message.qos)
-
-      if(connected){
+      if (connected) {
+        log.debug("{}: sending subscription message [connected mode]: {}", ownId, toSend)
         // in connected state pushing to stream with backpressure logic
         toSocket offer toSend
-      } else if(message.qos >= QoS.Durable){
+      } else if (message.qos >= QoS.Durable) {
         //in disconnected - just send to state actor
+        log.debug("{}: put notification [disconnected mode]: {}", ownId, toSend)
         qosState ! PutNotification(toSend)
       }
     }

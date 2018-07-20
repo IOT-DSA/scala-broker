@@ -31,7 +31,7 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
       }
 
     case RecoveryCompleted =>
-      log.debug("{}: recovery completed", ownId)
+      log.debug("{}: recovery completed with persistenceId: '{}'", ownId, persistenceId)
   }
 
   val snapshotReceiver: Receive = {
@@ -52,30 +52,30 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
   }
 
   override def saveSnapshot(snapshot: Any): Unit =
-    if (Settings.AkkaPersistenceSnapShotInterval <= 0) {
-      log.debug("{}: current lastSequenceNr = {} and Settings.AkkaPersistenceSnapShotInterval = {}", ownId, lastSequenceNr, Settings.AkkaPersistenceSnapShotInterval)
+    if (Settings.AkkaPersistenceSnapShotInterval <= 0)
       log.warning("{}: snapshot saving is disabled as Settings.AkkaPersistenceSnapShotInterval is '{}'", ownId, Settings.AkkaPersistenceSnapShotInterval)
-    } else snapshot match {
-        case state: RequesterBehaviorState =>
-          requesterBehaviorState = state
-          tryToSaveSnapshot
-        case state: DSLinkBaseState =>
-          baseState = state
-          tryToSaveSnapshot
-        case state: DSLinkFolderState =>
-          folderState = state
-          tryToSaveSnapshot
-        case state: ResponderBehaviorState =>
-          responderState = state
-          tryToSaveSnapshot
-        case _ =>
-          log.error("{}: not supported snapshot type {}", ownId, snapshot)
-  }
+    else snapshot match {
+      case state: RequesterBehaviorState =>
+        requesterBehaviorState = state
+        tryToSaveSnapshot
+      case state: DSLinkBaseState =>
+        baseState = state
+        tryToSaveSnapshot
+      case state: DSLinkFolderState =>
+        folderState = state
+        tryToSaveSnapshot
+      case state: ResponderBehaviorState =>
+        responderState = state
+        tryToSaveSnapshot
+      case _ =>
+        log.error("{}: not supported snapshot type {}", ownId, snapshot)
+    }
 
   private def tryToSaveSnapshot = {
+    log.debug("{}: persistenceId: '{}', lastSequenceNr: '{}', Settings.AkkaPersistenceSnapShotInterval: '{}'", ownId, persistenceId, lastSequenceNr, Settings.AkkaPersistenceSnapShotInterval)
     if (lastSequenceNr != 0 && lastSequenceNr % Settings.AkkaPersistenceSnapShotInterval == 0) {
       val snapshot = DSLinkState(baseState, requesterBehaviorState, folderState, responderState)
-      log.debug("{}: Saving DSLink snapshot {} ", ownId, snapshot)
+      log.debug("{}: Saving DSLink snapshot {} with persistenceId '{}'", ownId, snapshot, persistenceId)
       super.saveSnapshot(snapshot)
     }
   }

@@ -9,19 +9,22 @@ import models.akka.{DSLinkStateSnapshotter, MainResponderBehaviorState, Requests
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
+import _root_.akka.routing.ActorSelectionRoutee
+import _root_.akka.routing.Routee
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
 trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor with ActorLogging =>
   import RidRegistry._
+  import models.akka.RichRoutee
 
   protected def linkPath: String
 
   protected def ownId: String
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
-  type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]
+  type ResponseHandler = PartialFunction[DSAResponse, List[(Routee, DSAResponse)]]
 
   // stores call records for forward and reverse RID lookup
   private var ridRegistry = new RidRegistry
@@ -35,6 +38,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   // processes request using the appropriate handler
   private val requestHandler = handlePassthroughRequest orElse handleListRequest orElse
     handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
+
+  private def routee = ActorSelectionRoutee(context.actorSelection(sender.path))
 
   /**
    * Processes incoming requests and responses.
@@ -103,10 +108,11 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   /**
    * Processes the responses and returns the translated ones groupped by their destinations.
    */
-  def processResponses(responses: Seq[DSAResponse]): Map[ActorRef, Seq[DSAResponse]] = {
+  def processResponses(responses: Seq[DSAResponse]): Map[Routee, Seq[DSAResponse]] = {
     val handler = handleSubscribeResponse orElse handleNonSubscribeResponse
 
     val results = responses flatMap handler
+    log.debug("{}: processResponses results: {}", ownId, results)
 
     log.debug("{}: RID after Rsp: {}", ownId, ridRegistry.info)
     log.debug("{}: SID after Rsp: {}", ownId, sidRegistry.info)
@@ -119,7 +125,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
    */
   private def handleListRequest: RequestHandler = {
     case ListRequest(rid, path) =>
-      val origin = Origin(sender, rid)
+      val origin = Origin(routee, rid)
       ridRegistry.lookupByPath(path) match {
         case None =>
           val tgtId = ridRegistry.saveListLookup(path)
@@ -136,7 +142,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
    */
   private def handlePassthroughRequest: RequestHandler = {
 
-    def tgtId(srcId: Int, method: DSAMethod) = ridRegistry.savePassthroughLookup(method, Origin(sender, srcId))
+    def tgtId(srcId: Int, method: DSAMethod) = ridRegistry.savePassthroughLookup(method, Origin(routee, srcId))
 
     def saveAttribute(nodePath: String, name: String, value: DSAVal) = {
       log.info(s"$ownId: saving attribute under $nodePath: $name = $value")
@@ -178,8 +184,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   private def handleSubscribeRequest: RequestHandler = {
     case req @ SubscribeRequest(srcRid, _) =>
       val srcPath = req.path // to ensure there's only one path (see requester actor)
-      val ridOrigin = Origin(sender, srcRid)
-      val sidOrigin = Origin(sender, srcPath.sid)
+      val ridOrigin = Origin(routee, srcRid)
+      val sidOrigin = Origin(routee, srcPath.sid)
 
       Kamon.currentSpan().tag("rid", srcRid)
       Kamon.currentSpan().tag("kind", "SubscribeRequest")
@@ -205,8 +211,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
    */
   private def handleUnsubscribeRequest: RequestHandler = {
     case req @ UnsubscribeRequest(rid, _) =>
-      val ridOrigin = Origin(sender, rid)
-      val sidOrigin = Origin(sender, req.sid)
+      val ridOrigin = Origin(routee, rid)
+      val sidOrigin = Origin(routee, req.sid)
       removeSubscribeOrigin(sidOrigin) map { targetSid =>
         sidRegistry.removeLookup(targetSid)
         val tgtRid = ridRegistry.saveUnsubscribeLookup(ridOrigin)
@@ -219,7 +225,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
    */
   private def handleCloseRequest: RequestHandler = {
     case CloseRequest(rid) =>
-      val origin = Origin(sender, rid)
+      val origin = Origin(routee, rid)
       ridRegistry.lookupByOrigin(origin) match {
         case Some(LookupRecord(_, tgtId, _, _)) => HandlerResult(CloseRequest(tgtId)) // passthrough call
         case _ => // LIST call
@@ -234,7 +240,10 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
    * Forwards response to the recipients and returns nothing.
    */
   private def handleSubscribeResponse: ResponseHandler = {
-    case rsp @ DSAResponse(0, _, _, _, _) => deliverSubscribeResponse(rsp); Nil
+    case rsp @ DSAResponse(0, _, _, _, _) =>
+      log.debug("{}: handleSubscribeResponse: {}", ownId, rsp)
+      deliverSubscribeResponse(rsp)
+      Nil
   }
 
   /**
@@ -262,7 +271,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
           log.warning(s"$ownId: Cannot find original request for target RID: ${rsp.rid}")
           Nil
       }
-
+      log.debug("{}: handleNonSubscribeResponse result: {}", ownId, result)
       result
   }
   /**
