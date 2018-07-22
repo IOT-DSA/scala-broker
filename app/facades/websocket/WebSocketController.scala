@@ -235,7 +235,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       createWSFlow(si, actors.downstream, BufferSize, OnOverflow) map {
         val result = Right[Result, DSAFlow](_)
         log.debug(s"Establishing connection for \nsessionInfo: $si \nresult: $result")
-        result} recover {
+        result
+      } recover {
         case NonFatal(e) =>
           log.error(s"Unable to establish ws connection for \nsessionInfo:$si", e)
           Left[Result, DSAFlow](BadRequest)
