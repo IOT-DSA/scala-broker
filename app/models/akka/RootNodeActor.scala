@@ -4,9 +4,9 @@ import akka.actor._
 import akka.cluster.singleton._
 import models.akka.StandardActions.bindTokenNodeActions
 import models.{RequestEnvelope, ResponseEnvelope}
-import models.api.{ActionContext, DSANode}
+import models.api.{ActionContext, DSANode, DSAValueType}
 import models.rpc.{DSAError, DSARequest, DSAResponse, ListRequest}
-import models.rpc.DSAValue.{StringValue, array, obj}
+import models.rpc.DSAValue.{DSAVal, StringValue, array, obj}
 import models.util.DsaToAkkaCoder._
 
 /**
@@ -165,6 +165,13 @@ object RootNodeActor {
     ClusterSingletonProxy.props("/user/" + Root,
       settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + dsaPath.forAkka)))
 
+
+  val DEFAULT_ROLE  = "default"
+  val DEFAULT_ROLE_CONFIG = Map[String, DSAVal]("$is"->"broker/permissionRole")
+  val DEFAULT_RULE = "fallback"
+  val DEFAULT_RULE_CONFIG = Map[String, DSAVal]("$is"->"broker/permissionRole"
+                                                , "$type"->DSAValueType.DSAString
+                                                , "$writable"->"config")
   /**
     * Create Roles nodes in the parent node (usualy in /sys)
     * The roles are related to tokens and permission
@@ -186,6 +193,11 @@ object RootNodeActor {
     * , we are not creating user's groupToken
     *
     **/
+  val DEFAULT_TOKEN = "1234567891234567"
+  val DEFAULT_TOKEN_CONFIG = Map[String, DSAVal]("$is"->"broker/token", "$role"->"config", "token" -> "tokenId")
+  val DEFAULT_TOKEN_PROFILE = Map[String, DSAVal]("$$count" -> null, "$$managed" -> false, "$$maxSession" -> null
+    , "$$timeRange" -> null)
+
   private def createTokensNode(parentNode: DSANode) = {
     parentNode.addChild("tokens").foreach { node =>
       node.profile = "node"
@@ -193,21 +205,11 @@ object RootNodeActor {
       StandardActions.bindTokenGroupNodeActions(node)
 
       // Add default token
-      val tokenId = "1234567891234567"
+      val tokenId = DEFAULT_TOKEN
       node.addChild(tokenId) foreach { child =>
         child.profile = "broker/TokenNode"
-        child.addConfigs(
-          ("group" -> "config")
-          , ("token" -> "tokenId")
-          , ("is" -> "broker/Token")
-        )
-        child.addConfigs(
-          ("$$count" -> null)
-          , ("$$managed" -> false)
-          , ("$$maxSession" -> null)
-          , ("$$timeRange" -> null)
-
-        )
+        child.addConfigs(DEFAULT_TOKEN_CONFIG.toList:_*)
+        child.addConfigs(DEFAULT_TOKEN_PROFILE.toList:_*)
         bindTokenNodeActions(child)
       }
     }

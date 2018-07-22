@@ -51,7 +51,6 @@ object StandardActions {
   val REMOVE_ROLE = "removeRole"
   val REMOVE_RULE = "removeRule"
 
-
   /**
     * Adds actions as per broker/dataRoot profile.
     */
@@ -76,16 +75,16 @@ object StandardActions {
 
   def bindTokenGroupNodeActions(node: DSANode) =
     bindActions(node
-      , ActionDescription("add", "Add token node", AddToken, Option("config"))
+      , commonActions(ADD_TOKEN)
     )
 
 
   def bindTokenNodeActions(node: DSANode) =
     bindActions(node
-      , ActionDescription("remove", "Remove token", DeleteNode, Option("config"))
-      , ActionDescription("removeAllClients", "Remove clients", RemoveTokenClients, Option("config"))
-      , ActionDescription("regenerate", "Regenerate", RegenerateToken, Option("config"))
-      , ActionDescription("update", "Update token", UpdateToken, Option("config"))
+      , commonActions(REMOVE_TOKEN)
+      , commonActions(TOKEN_REMOVE_CLIENTS)
+      , commonActions(REGENERATE_TOKEN)
+      , commonActions(UPDATE_TOKEN)
     )
 
   /**
@@ -93,21 +92,20 @@ object StandardActions {
     */
   def bindRolesNodeActions(node: DSANode) = {
     bindActions(node
-      , ActionDescription("addRole", "Add permission group", AddRoleNode, Option("config"))
+      , commonActions(ADD_ROLE)
     )
   }
 
   def bindRoleNodeActions(node: DSANode) = {
     bindActions(node
-      , ActionDescription("addRule", "Add rule", AddRuleNode, Option("config"))
-      , ActionDescription("removeRole", "Remove group", DeleteNode, Option("config"))
+      , commonActions(ADD_RULE)
+      , commonActions(REMOVE_ROLE)
     )
   }
 
   def bindRuleNodeActions(node: DSANode) = {
     bindActions(node
-      , ActionDescription("removeRule", "Remove rule", DeleteNode
-        , Option("config"))
+      , commonActions(REMOVE_RULE)
     )
   }
 
@@ -222,25 +220,6 @@ object StandardActions {
     val node = ctx.node.parent.get
     node.parent foreach (_.removeChild(node.name))
   })
-
-
-  val commonActions:Map[String, ActionDescription] = Map(
-    ADD_NODE -> ActionDescription(ADD_NODE, "Add Node", AddNode, Option("config")),
-    ADD_VALUE -> ActionDescription(ADD_VALUE, "Add Value", AddValue),
-    SET_VALUE -> ActionDescription(SET_VALUE, "Set Value", SetValue),
-    SET_ATTRIBUTE -> ActionDescription(SET_ATTRIBUTE, "Set Attribute", SetAttribute),
-    SET_CONFIG -> ActionDescription(SET_CONFIG, "Set Config", SetConfig),
-    DELETE_NODE -> ActionDescription(DELETE_NODE, "Delete Node", DeleteNode),
-    ADD_TOKEN -> ActionDescription(ADD_TOKEN, "Add token node", AddToken, Option("config")),
-    REMOVE_TOKEN -> ActionDescription(REMOVE_TOKEN, "Remove token", DeleteNode, Option("config")),
-    TOKEN_REMOVE_CLIENTS -> ActionDescription(TOKEN_REMOVE_CLIENTS, "Remove clients", RemoveTokenClients, Option("config")),
-    REGENERATE_TOKEN -> ActionDescription(REGENERATE_TOKEN, "Regenerate", RegenerateToken, Option("config")),
-    UPDATE_TOKEN -> ActionDescription(UPDATE_TOKEN, "Update token", UpdateToken, Option("config")),
-    ADD_ROLE -> ActionDescription(ADD_ROLE, "Add permission group", AddRoleNode, Option("config")),
-    ADD_RULE -> ActionDescription(ADD_RULE, "Add rule", AddRuleNode, Option("config")),
-    REMOVE_ROLE -> ActionDescription(REMOVE_ROLE, "Remove group", DeleteNode, Option("config")),
-    REMOVE_RULE -> ActionDescription(REMOVE_RULE, "Remove rule", DeleteNode, Option("config"))
-  )
 
   /**
     * Adds a Token node.
@@ -387,10 +366,7 @@ object StandardActions {
       val perm = ctx.args("Permission")
 
       parent.addChild(URLEncoder.encode(path, "UTF-8"), "$permission"->perm) foreach { ruleNode =>
-        bindActions(ruleNode
-          , ActionDescription("removeRule", "Remove rule", DeleteNode
-            , Option("config"))
-        )
+        bindActions(ruleNode, commonActions(REMOVE_RULE))
       }
     }
     , Map[String, DSAVal]("name"->"Path", "type"-> DSAString)
@@ -398,4 +374,21 @@ object StandardActions {
       , "editor"->"enum[none,list,read,write,config]")
   )
 
+  val commonActions:Map[String, ActionDescription] = Map(
+    ADD_NODE -> ActionDescription(ADD_NODE, "Add Node", AddNode, Option("config")),
+    ADD_VALUE -> ActionDescription(ADD_VALUE, "Add Value", AddValue),
+    SET_VALUE -> ActionDescription(SET_VALUE, "Set Value", SetValue),
+    SET_ATTRIBUTE -> ActionDescription(SET_ATTRIBUTE, "Set Attribute", SetAttribute),
+    SET_CONFIG -> ActionDescription(SET_CONFIG, "Set Config", SetConfig),
+    DELETE_NODE -> ActionDescription(DELETE_NODE, "Delete Node", DeleteNode),
+    ADD_TOKEN -> ActionDescription(ADD_TOKEN, "Add token node", AddToken, Option("config")),
+    REMOVE_TOKEN -> ActionDescription(REMOVE_TOKEN, "Remove token", DeleteNode, Option("config")),
+    TOKEN_REMOVE_CLIENTS -> ActionDescription(TOKEN_REMOVE_CLIENTS, "Remove clients", RemoveTokenClients, Option("config")),
+    REGENERATE_TOKEN -> ActionDescription(REGENERATE_TOKEN, "Regenerate", RegenerateToken, Option("config")),
+    UPDATE_TOKEN -> ActionDescription(UPDATE_TOKEN, "Update token", UpdateToken, Option("config")),
+    ADD_ROLE -> ActionDescription(ADD_ROLE, "Add permission group", AddRoleNode, Option("config")),
+    ADD_RULE -> ActionDescription(ADD_RULE, "Add rule", AddRuleNode, Option("config")),
+    REMOVE_ROLE -> ActionDescription(REMOVE_ROLE, "Remove group", DeleteNode, Option("config")),
+    REMOVE_RULE -> ActionDescription(REMOVE_RULE, "Remove rule", DeleteNode, Option("config"))
+  )
 }

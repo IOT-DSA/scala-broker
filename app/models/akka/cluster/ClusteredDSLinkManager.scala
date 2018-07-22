@@ -5,12 +5,13 @@ import akka.cluster.Cluster
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.routing.Routee
 import akka.util.Timeout
-import models.akka.{DSLinkManager, RichRoutee, RootNodeActor}
+import models.akka.{DSLinkManager, RichRoutee, RootNodeActor, StandardActions}
 import akka.actor.Props
 import akka.cluster.ddata.DistributedData
 import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
 import akka.pattern.ask
+import models.rpc.DSAValue.DSAVal
 
 import scala.concurrent.Future
 
@@ -31,36 +32,50 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), "distributedNodesRegistry")
 
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/data", Some("broker/dataRoot")))).mapTo[DSANode] foreach {
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Data, Some("broker/dataRoot")))).mapTo[DSANode] foreach {
     node =>
       node.displayName = "data"
   }
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys", Some("broker/sysRoot")))).mapTo[DSANode] foreach{
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Sys, Some("broker/sysRoot")))).mapTo[DSANode] foreach{
     node =>
       node.displayName = "sys"
   }
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens", Some("broker/tokensRoot"))))
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Tokens, Some("broker/tokensRoot"))))
     .mapTo[DSANode] foreach {
 
     node =>
       node.displayName = "tokens"
   }
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/tokens/1234567891234567", Some("broker/token"))))
-    .mapTo[DSANode] foreach {
-
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription(Paths.Tokens + "/" + RootNodeActor.DEFAULT_TOKEN
+    , RootNodeActor.DEFAULT_TOKEN_CONFIG))).mapTo[DSANode] foreach {
     node =>
       node.displayName = "123456789123456789123456789"
   }
 
-
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/sys/roles", Some("broker/rolesRoot"))))
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Roles, Some("broker/rolesRoot"))))
     .mapTo[DSANode] foreach {
 
     node =>
       node.displayName = "roles"
+  }
+
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Roles + "/" + RootNodeActor.DEFAULT_ROLE
+    , Some("broker/permissionRole"))))
+    .mapTo[DSANode] foreach {
+
+    node =>
+      node.displayName = "Default role"
+  }
+
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription(Paths.Roles + "/default/falback",
+                                      RootNodeActor.DEFAULT_RULE_CONFIG, value = "read")))
+    .mapTo[DSANode] foreach {
+      node =>
+
+      node.displayName = "Fallback rule"
   }
 
   log.info("Clustered DSLink Manager created")

@@ -149,7 +149,7 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
   private def createNewNode(nodeDescription: DSANodeDescription, pPath: (Option[String], String)) = pPath match {
     case (None, name) => // Root node
       val newOne: DSANode = TypedActor(context)
-        .typedActorOf(DistributedDSANode.props( None, new StringValue(""), nodeDescription, self, replicator))
+        .typedActorOf(DistributedDSANode.props( None, nodeDescription.value, nodeDescription, self, replicator))
 
       if (isNotCommon(name)) {
         StandardActions.bindDataRootActions(newOne)
@@ -161,26 +161,26 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
 
       val child = registry.get(nodeDescription.path).getOrElse {
         val newOne: DSANode = TypedActor(context)
-          .typedActorOf(DistributedDSANode.props(Some(parentNode), new StringValue(""), nodeDescription, self, replicator))
+          .typedActorOf(DistributedDSANode.props(Some(parentNode), nodeDescription.value, nodeDescription, self, replicator))
 
         parent match {
           // Processing /sys/tokens node - add all required actions
           case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Tokens) =>
             StandardActions.bindTokenGroupNodeActions(newOne)
 
-          // Processing /sys/tokens/<tokenid> - do nothing
+          // Processing /sys/tokens/<tokenid> - bind token actions
           case parent if (parent + "/" + name).startsWith(Paths.Tokens + "/") && isNotCommon(name) =>
             StandardActions.bindTokenNodeActions(newOne)
 
-          // Processing /sys/roles node - add all required actions
+          // Processing /sys/roles node - add all roles actions
           case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Roles) =>
             StandardActions.bindRolesNodeActions(newOne)
 
-          // Processing /sys/roles/<role> - do nothing
+          // Processing /sys/roles/<role> - bind role actions
           case parent if (parent + "/" + name).startsWith(Paths.Roles + "/")  && isNotCommon(name) =>
             StandardActions.bindRoleNodeActions(newOne)
 
-          // Processing non common nodes
+          // Processing non common nodes (actions)
           case parent if isNotCommon(name) =>
             StandardActions.bindDataNodeActions(newOne)
 

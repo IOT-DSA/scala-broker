@@ -314,11 +314,11 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
         listNodes =>
 
         log.debug("Available tokens are: " + listNodes.toString)
-        val tokenId = token.flatMap(a => Option(a.substring(0, 16))).get
+        val tokenId = token.flatMap(a => Option(a.substring(0, 16)))
 
         listNodes foreach( item => log.debug("node name is: " + item.name))
 
-        val r = listNodes.indexWhere(_.name.equals(tokenId))
+        val r = listNodes.indexWhere(tokenId.isDefined && _.name.equals(tokenId.get))
 
         r match {
           case -1 => false
@@ -326,8 +326,8 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
             val tokenNode = listNodes(i)
 
             val check =  for {
-                checkCount <- checkTokenCount(tokenId, tokenNode)
-                checkDate <- checkTokenDates(tokenId, tokenNode)
+                checkCount <- checkTokenCount(tokenId.get, tokenNode)
+                checkDate <- checkTokenDates(tokenId.get, tokenNode)
               } yield checkCount && checkDate
 
             Await.result(check, Duration.Inf)

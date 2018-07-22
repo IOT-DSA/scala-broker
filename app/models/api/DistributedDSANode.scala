@@ -21,7 +21,7 @@ import models.util.LoggingAdapterInside
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = Map()) {
+case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = Map(), value: DSAVal = StringValue("")) {
   def profile: Option[String] = attrAndConf.get("$is").flatMap(strType _)
 
   def valueType: Option[DSAValueType] = attrAndConf.get("$type").flatMap { v =>
@@ -104,7 +104,6 @@ class DistributedDSANode(_parent: Option[DSANode],
     old.copy(value = old.value.withValue(v))
   }
 
-
   override def valueType: Future[DSAValueType] = Future.successful(valueTypeSync.getOrElse(DSADynamic))
 
   private def valueTypeSync = data
@@ -117,7 +116,6 @@ class DistributedDSANode(_parent: Option[DSANode],
     old.copy(configs = old.configs + ("$type" -> vt.toString))
   }
 
-
   override def displayName: Future[String] = Future.successful(
     data.configs.get("$name")
       .map(_.value.asInstanceOf[String])
@@ -128,11 +126,9 @@ class DistributedDSANode(_parent: Option[DSANode],
     old.copy(configs = old.configs + ("$name" -> name))
   }
 
-
   override def profile: String = data.configs.get("$is")
     .map(_.value.asInstanceOf[String])
     .getOrElse("node")
-
 
   override def profile_=(p: String): Unit = editProperty { old =>
     old.copy(configs = old.configs + ("$is" -> p))
@@ -369,6 +365,7 @@ class DistributedDSANode(_parent: Option[DSANode],
       }
       case e@RequestEnvelope(requests) =>
         log.info("{}: received {}", ownId, e)
+//        checkPermission()
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
       case u: UpdateResponse[_] ⇒ // ignore
