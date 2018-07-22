@@ -55,11 +55,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "7000Mi"
-            cpu: "3000m"
+            memory: "2000Mi"
+            cpu: "1000m"
           limits:
-            memory: "7000Mi"
-            cpu: "3000m"
+            memory: "2000Mi"
+            cpu: "1000m"
 ---
 apiVersion: v1
 kind: Service
