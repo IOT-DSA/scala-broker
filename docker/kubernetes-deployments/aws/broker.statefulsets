@@ -3,14 +3,6 @@ kind: StatefulSet
 namespace: default
 metadata:
   name: cloud-broker-cluster
-  labels:
-    autoscaler: "true"
-    autoscaler_percent_cpu: "50"
-    autoscaler_count: "0"
-    autoreduce_normal: "true"
-    autoreduce_percent_cpu: "20"
-    min_replicas: "3"
-    max_replicas: "10"
 spec:
   selector:
     matchLabels:
