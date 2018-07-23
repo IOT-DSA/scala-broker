@@ -291,6 +291,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
   }
 
   private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: Option[String]): Boolean = {
+    if (Settings.AllowAllLinks)
+      return true
+
     si.map(_.ci).fold(false) { ci =>
       val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
       clientAuth.getOrElse("") == localAuth
