@@ -365,7 +365,7 @@ class DistributedDSANode(_parent: Option[DSANode],
       }
       case e@RequestEnvelope(requests) =>
         log.info("{}: received {}", ownId, e)
-        checkPermission()
+//        checkPermission()
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
       case u: UpdateResponse[_] ⇒ // ignore
