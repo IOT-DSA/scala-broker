@@ -6,6 +6,7 @@ import models.{ RequestEnvelope, ResponseEnvelope }
 import models.api.DSANode
 import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ StringValue, array, obj }
+import models.util.DsaToAkkaCoder._
 
 /**
  * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
@@ -60,7 +61,7 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /data node.
    */
   private def createDataNode = {
-    val dataNode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
+    val dataNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode
@@ -70,7 +71,7 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /defs node hierarchy.
    */
   private def createDefsNode = {
-    val defsNode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
+    val defsNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
     defsNode.profile = "node"
     defsNode.addChild("profile").foreach { node =>
       node.profile = "static"
@@ -100,7 +101,7 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /users node.
    */
   private def createUsersNode = {
-    val usersNode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
+    val usersNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
     usersNode.profile = "node"
     usersNode
   }
@@ -109,7 +110,7 @@ class RootNodeActor extends Actor with ActorLogging {
    * Creates a /sys node.
    */
   private def createSysNode = {
-    val sysNode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
+    val sysNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
     sysNode.profile = "node"
     sysNode
   }
@@ -124,14 +125,14 @@ object RootNodeActor {
   /**
    * Creates a new instance of [[RootNodeActor]] props.
    */
-  def props = Props(new RootNodeActor)
+  def props() = Props(new RootNodeActor())
 
   /**
    * Starts a Singleton Manager and returns the cluster-wide unique instance of [[RootNodeActor]].
    */
   def singletonStart(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonManager.props(
-      singletonProps = props,
+      singletonProps = props(),
       terminationMessage = PoisonPill,
       settings = ClusterSingletonManagerSettings(system).withRole("backend")),
     name = Root)
@@ -148,7 +149,7 @@ object RootNodeActor {
   /**
    * Returns a proxy for a child node of the singleton [[RootNodeActor]].
    */
-  def childProxy(path: String)(implicit system: ActorSystem): ActorRef = system.actorOf(
+  def childProxy(dsaPath: String)(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonProxy.props("/user/" + Root,
-      settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + path)))
+      settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + dsaPath.forAkka)))
 }

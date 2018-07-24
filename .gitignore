@@ -23,4 +23,9 @@ project/plugins/project/
 .settings/
 /bin/
 docker/docker-compose/target
+docker/docker-compose/data
 docker/docker-compose/docker-compose.yaml.original
+.key
+nodes.json
+nodes.json.bak
+

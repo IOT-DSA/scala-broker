@@ -1,0 +1,3 @@
+nginx_vhosts:
+  - listen: "80 default_server"
+    proxy_pass: "http://localhost:8080"

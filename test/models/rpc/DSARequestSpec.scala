@@ -73,27 +73,27 @@ class DSARequestSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
     }
     "split multiple-path request into multiple single-path requests" in {
       val paths = ScalaList(SubscriptionPath("path1", 1), SubscriptionPath("path2", 2, Some(2)),
-        SubscriptionPath("path3", 3, Some(3)))
+        SubscriptionPath("path 3", 3, Some(3)))
       val req = SubscribeRequest(Rid, paths)
       req.split must contain only (SubscribeRequest(Rid, paths(0)), SubscribeRequest(Rid, paths(1)),
         SubscribeRequest(Rid, paths(2)))
     }
     "serialize to JSON" in {
       val paths = ScalaList(SubscriptionPath("path1", 1),
-        SubscriptionPath("path2", 2, Some(2)), SubscriptionPath("path3", 3, Some(3)))
+        SubscriptionPath("path2", 2, Some(2)), SubscriptionPath("path 3", 3, Some(3)))
       testJson(SubscribeRequest(Rid, paths), baseJson(Subscribe) ++ Json.obj("paths" -> Json.arr(
         Json.obj("path" -> "path1", "sid" -> 1),
         Json.obj("path" -> "path2", "sid" -> 2, "qos" -> 2),
-        Json.obj("path" -> "path3", "sid" -> 3, "qos" -> 3))))
+        Json.obj("path" -> "path 3", "sid" -> 3, "qos" -> 3))))
     }
     "output only first three paths for compact logging" in {
       val paths = ScalaList(SubscriptionPath("path1", 1), SubscriptionPath("path2", 2, Some(2)),
-        SubscriptionPath("path3", 3, Some(1)), SubscriptionPath("path4", 4, Some(1)),
+        SubscriptionPath("path 3", 3, Some(1)), SubscriptionPath("path4", 4, Some(1)),
         SubscriptionPath("path5", 5, None))
       SubscribeRequest(Rid, paths).toString mustBe
-        "SubscribeRequest(123,List(SubscriptionPath(path1,1,None),SubscriptionPath(path2,2,Some(2)),SubscriptionPath(path3,3,Some(1))...2 more))"
+        "SubscribeRequest(123,List(SubscriptionPath(path1,1,None),SubscriptionPath(path2,2,Some(2)),SubscriptionPath(path 3,3,Some(1))...2 more))"
       SubscribeRequest(Rid, paths.take(3)).toString mustBe
-        "SubscribeRequest(123,List(SubscriptionPath(path1,1,None),SubscriptionPath(path2,2,Some(2)),SubscriptionPath(path3,3,Some(1))))"
+        "SubscribeRequest(123,List(SubscriptionPath(path1,1,None),SubscriptionPath(path2,2,Some(2)),SubscriptionPath(path 3,3,Some(1))))"
       SubscribeRequest(Rid, paths.take(1)).toString mustBe
         "SubscribeRequest(123,List(SubscriptionPath(path1,1,None)))"
       SubscribeRequest(Rid, Nil).toString mustBe "SubscribeRequest(123,List())"

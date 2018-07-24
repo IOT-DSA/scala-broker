@@ -1,0 +1,76 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-metrics
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-metrics
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-metrics
+    spec:
+      subdomain: "cloud-metrics-internal"
+      containers:
+      - name: graphana
+        image: graphana:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+        - containerPort: 81
+        - containerPort: 2003
+        - containerPort: 8125
+          protocol: UDP
+        - containerPort: 8126
+      - name: zipkin
+        image: openzipkin/zipkin
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9411
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-metrics-internal
+  labels:
+    app: cloud-broker-metrics
+spec:
+  ports:
+  - name: udp-8125
+    port: 8125
+    targetPort: 8125
+    protocol: UDP
+  - name: tcp-8126
+    port: 8126
+    targetPort: 8126
+    protocol: TCP
+  - name: zipkin
+    port: 9411
+  selector:
+    app: cloud-broker-metrics
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-metrics
+  labels:
+    app: cloud-broker-metrics
+spec:
+  clusterIP: 10.97.200.242
+  ports:
+  - name: grafana
+    port: 80
+    targetPort: 80
+    nodePort: 30003
+  - name: zipkin
+    port: 9411
+    targetPort: 9411
+    nodePort: 30004
+  selector:
+    app: cloud-broker-metrics
+  status: loadBalancer
+  type: NodePort
+  externalTrafficPolicy: Cluster

@@ -105,6 +105,25 @@ object LocalKeys {
   }
 
   /**
+    * Generates "saled" shared secret
+    *
+    * @param salt
+    * @param sharedSecret
+    * @return
+    */
+  def saltSharedSecret(salt: Array[Byte], sharedSecret: Array[Byte]) = {
+    // TODO make more scala-like
+    val bytes = Array.ofDim[Byte](salt.length + sharedSecret.length)
+    System.arraycopy(salt, 0, bytes, 0, salt.length)
+    System.arraycopy(sharedSecret, 0, bytes, salt.length, sharedSecret.length)
+
+    val sha = new SHA256.Digest
+    val digested = sha.digest(bytes)
+    UrlBase64.encodeBytes(digested)
+  }
+
+
+  /**
    * Deserializes the serialized data into usable keys.
    */
   def deserialize(serialized: String) = {
@@ -155,3 +174,4 @@ object LocalKeys {
     deserialize(serialized)
   }
 }
+

@@ -6,30 +6,45 @@ import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRe
 import akka.routing.Routee
 import akka.util.Timeout
 import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
-import models.metrics.EventDaos
 import akka.actor.Props
+import akka.cluster.ddata.DistributedData
+import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
+import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
+import akka.pattern.ask
 
 /**
  * Uses Akka Cluster Sharding to communicate with DSLinks.
  */
-class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(implicit val system: ActorSystem) extends DSLinkManager {
+class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSystem) extends DSLinkManager {
   import models.Settings._
+
+  implicit val ctx = system.dispatcher
 
   implicit val timeout = Timeout(QueryTimeout)
 
   private val cluster = Cluster(system)
+
+  private val replicator = DistributedData(system).replicator
+  private val distrubutedNodeRegistry:ActorRef = system
+    .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), "distributedNodesRegistry")
+
+
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init("/data", Some("broker/dataRoot")))).mapTo[DSANode] foreach{
+    node =>
+      node.displayName = "data"
+  }
 
   log.info("Clustered DSLink Manager created")
 
   /**
    * Returns a [[ShardedRoutee]] instance for the specified downlink.
    */
-  def getDownlinkRoutee(name: String): Routee = ShardedRoutee(dnlinkRegion, name)
+  def getDownlinkRoutee(dsaName: String): Routee = ShardedRoutee(dnlinkRegion, dsaName)
 
   /**
    * Returns a [[ShardedRoutee]] instance for the specified uplink.
    */
-  def getUplinkRoutee(name: String): Routee = ShardedRoutee(uplinkRegion, name)
+  def getUplinkRoutee(dsaName: String): Routee = ShardedRoutee(uplinkRegion, dsaName)
 
   /**
    * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.
@@ -39,6 +54,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(impli
     case path if path.startsWith(Paths.Downstream) => getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
     case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ! message
     case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
+    case Paths.Data                                => routeToDistributed(path, message)
+    case path if path.startsWith(Paths.Data)       => routeToDistributed(path, message)
     case path                                      => RootNodeActor.childProxy(path)(system) ! message
   }
 
@@ -76,4 +93,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean, val eventDaos: EventDaos)(impli
     else
       sharding.start(typeName, linkProps, ClusterShardingSettings(system), extractEntityId, extractShardId)
   }
+
+  private def routeToDistributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Unit =
+    distrubutedNodeRegistry ! RouteMessage(path, message, sender)
+
 }

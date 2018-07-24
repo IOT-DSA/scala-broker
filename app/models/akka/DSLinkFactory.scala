@@ -1,12 +1,11 @@
 package models.akka
 
 import akka.actor.Props
-import models.akka.responder.{ PooledResponderBehavior, ResponderBehavior, SimpleResponderBehavior }
-import models.metrics.EventDaos
+import models.akka.responder.{PooledResponderBehavior, ResponderBehavior, SimpleResponderBehavior}
 import akka.routing.Routee
 
 /**
- * Combines [[AbstractDSLinkActor] with Requester behavior and abstract Responder behavior
+ * Combines [[AbstractDSLinkActor]] with Requester behavior and abstract Responder behavior
  * (to be provided by the subclasses).
  */
 abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends AbstractDSLinkActor(registry)
@@ -22,6 +21,15 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
     super.postStop
   }
 
+  override def persistenceId = linkPath
+
+  /**
+   * Recovers DSLink state from the event journal.
+   */
+  override def receiveRecover = recoverBaseState orElse requesterRecover orElse responderRecover
+
+  override def disconnected: Receive = super.disconnected orElse requesterDisconnected orElse toStash
+
   /**
    * Handles messages in CONNECTED state.
    */
@@ -32,7 +40,7 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
  * DSLink with a simple responder implementation, which uses local registries for LIST and
  * SUBSCRIBE calls.
  */
-class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee, val eventDaos: EventDaos)
+class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee)
   extends BaseDSLinkActor(dsaParent, registry)
   with SimpleResponderBehavior
 
@@ -40,7 +48,7 @@ class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registr
  * DSLink with a Router/Worker responder implementation, which uses two pools of workers
  * for managing LIST and SUBSCRIBE bindings.
  */
-class PooledDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee, val eventDaos: EventDaos)
+class PooledDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee)
   extends BaseDSLinkActor(dsaParent, registry)
   with PooledResponderBehavior
 
@@ -55,13 +63,13 @@ class PooledDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registr
  */
 object DSLinkFactory {
 
-  def createSimpleProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee, eventDaos: EventDaos) =
-    Props(new SimpleDSLinkActor(dslinkMgr, dsaParent, registry, eventDaos))
+  def createSimpleProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee) =
+    Props(new SimpleDSLinkActor(dslinkMgr, dsaParent, registry))
 
-  def createPooledProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee, eventDaos: EventDaos) =
-    Props(new PooledDSLinkActor(dslinkMgr, dsaParent, registry, eventDaos))
+  def createPooledProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee) =
+    Props(new PooledDSLinkActor(dslinkMgr, dsaParent, registry))
 
-  def createPubSubProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee, eventDaos: EventDaos) = ???
+  def createPubSubProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee) = ???
 
-  def createDPubSubProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee, eventDaos: EventDaos) = ???
+  def createDPubSubProps(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee) = ???
 }

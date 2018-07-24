@@ -1,0 +1,23 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: system-separate
+spec:
+  selector:
+    matchLabels:
+      app: system-separate
+  template:
+    metadata:
+      labels:
+        app: system-separate
+    spec:
+      containers:
+      - name: system-dslink
+        image: system-dslink:latest
+        imagePullPolicy: Never
+        env:
+        - name: BROKER_HOST
+          value: "10.97.200.241"
+        - name: BROKER_PORT
+          value: "9000"

@@ -1,0 +1,17 @@
+---
+# handlers file for docker.ubuntu
+- name: Start Docker
+  service: name=docker state=started
+  become: yes
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+  become: yes
+
+- name: Restart docker
+  service: name=docker state=restarted
+  become: yes
+
+- name: Restart dockerio
+  service: name=docker.io state=restarted
+  become: yes

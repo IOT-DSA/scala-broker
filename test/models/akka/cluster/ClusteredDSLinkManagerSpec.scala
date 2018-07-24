@@ -1,18 +1,18 @@
 package models.akka.cluster
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.Inside
-
 import com.typesafe.config.ConfigFactory
-
-import akka.actor.ActorSystem
-import akka.testkit.{ TestActors, TestKit, TestProbe }
+import akka.actor.{ActorSystem}
+import akka.cluster.Cluster
+import akka.cluster.ddata.DistributedData
+import akka.testkit.{TestActors, TestKit, TestProbe}
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
-import models.akka.{ AbstractActorSpec, DSLinkMode, RootNodeActor }
+import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import models.akka.{AbstractActorSpec, DSLinkMode, RootNodeActor}
 import models.akka.Messages.RegisterDSLink
-import models.rpc.{ DSAResponse, ListRequest }
+import models.api.DistributedNodesRegistry
+import models.rpc.{DSAResponse, ListRequest}
 
 /**
  * ClusteredDSLinkManager test suite.
@@ -120,13 +120,17 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
    */
   private def createClusterArtifacts(port: Int, proxyMode: Boolean) = {
     val system = createActorSystem(port)
-    val mgr = new ClusteredDSLinkManager(proxyMode, nullDaos)(system)
+    val mgr = new ClusteredDSLinkManager(proxyMode)(system)
     system.actorOf(TestActors.forwardActorProps(downstreamProbe.ref), Settings.Nodes.Downstream)
     system.actorOf(TestActors.forwardActorProps(upstreamProbe.ref), Settings.Nodes.Upstream)
     if (proxyMode)
       RootNodeActor.singletonProxy(system)
-    else
+    else{
+      val cluster = Cluster(system)
+      val replicator = DistributedData(system).replicator
+      val ddregistry = system.actorOf(DistributedNodesRegistry.props(replicator, cluster, system))
       RootNodeActor.singletonStart(system)
+    }
     val probe = TestProbe()(system)
 
     (system, mgr, probe)

@@ -3,16 +3,17 @@ package models.akka.responder
 import scala.concurrent.duration.DurationInt
 
 import akka.actor._
+import akka.persistence.PersistentActor
 import akka.routing.{ Broadcast, ConsistentHashingPool }
 import models.{ Origin, Settings }
-import models.akka.AbstractDSLinkActor
 import models.rpc.DSAResponse
 
 /**
  * Handles communication with a remote DSLink in Responder mode using a router and a pool of workers
  * for implementing multi-recipient responce delivery (LIST, SUBSCRIBE).
  */
-trait PooledResponderBehavior extends ResponderBehavior { me: Actor with ActorLogging =>
+trait PooledResponderBehavior extends ResponderBehavior { me: PersistentActor with ActorLogging =>
+
   import context.system
   import ResponderWorker._
   import akka.routing.ConsistentHashingRouter._

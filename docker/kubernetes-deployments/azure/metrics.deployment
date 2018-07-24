@@ -1,0 +1,46 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-metrics
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-metrics
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-metrics
+    spec:
+      containers:
+      - name: graphana
+        image: acuityregistry.azurecr.io/graphana
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        - containerPort: 81
+        - containerPort: 2003
+        - containerPort: 8125
+        - containerPort: 8126
+      - name: zipkin
+        image: acuityregistry.azurecr.io/zipkin
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9411
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-metrics
+  labels:
+    app: cloud-broker-metrics
+spec:
+  clusterIP: 10.0.0.2
+  ports:
+  - name: graphana
+    port: 80
+  - name: zipkin
+    port: 9411
+  selector:
+    app: cloud-broker-metrics
+  type: LoadBalancer

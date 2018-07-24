@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: StatefulSet
+namespace: default
+metadata:
+  name: cloud-broker-cluster
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-cluster
+  replicas: 3
+  serviceName: cloud-broker-internal
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-cluster
+    spec:
+      subdomain: "cloud-broker-internal"
+      podManagementPolicy: Parallel
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+          searches:
+            - cloud-broker-internal.default.svc.cluster.local
+      containers:
+      - name: broker-cluster
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala:latest"
+        imagePullPolicy: Always
+        serviceName: "cloud-broker-internal"
+        ports:
+        - containerPort: 9000
+        - containerPort: 9005
+        - containerPort: 2551
+        - containerPort: 9443
+        env:
+        - name: JAVA_OPTS
+          value: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
+        - name: STATSD_HOST
+          value: cloud-metrics-internal
+        - name: STATSD_PORT
+          value: "8125"
+        - name: ZIPKIN_HOST
+          value: cloud-metrics-internal
+        - name: ZIPKIN_PORT
+          value: "9411"
+        - name: AKKA_REMOTING_BIND_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: AKKA_REMOTING_BIND_PORT
+          value: "2551"
+        - name: AKKA_SEED_NODES
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
+        - name: AKKA_ACTOR_SYSTEM_NAME
+          value: DSASystem
+        - name: CONF_FILE
+          value: "/opt/docker/conf/backend.conf"
+        resources:
+          requests:
+            memory: "2000Mi"
+            cpu: "1000m"
+          limits:
+            memory: "2000Mi"
+            cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-internal
+  labels:
+    app: cloud-broker-cluster
+spec:
+  ports:
+  - port: 2551
+    targetPort: 2551
+    protocol: TCP
+  selector:
+    app: cloud-broker-cluster
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-external
+  labels:
+    app: cloud-broker-cluster
+spec:
+  clusterIP: 10.100.0.3
+  ports:
+  - name: dsabroker-webinterface
+    port: 9000
+    targetPort: 9000
+    nodePort: 30001
+  - name: dsa-9005
+    port: 9005
+    targetPort: 9005
+    nodePort: 30002
+  selector:
+    app: cloud-broker-cluster
+  status: loadBalancer
+  type: NodePort
+  externalTrafficPolicy: Cluster
+

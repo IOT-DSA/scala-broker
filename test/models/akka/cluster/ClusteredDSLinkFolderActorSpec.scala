@@ -34,15 +34,15 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   val extra: (String, DSAVal) = "downstream" -> true
 
   val system1 = createActorSystem(2551)
-  val mgr1 = new ClusteredDSLinkManager(false, nullDaos)(system1)
+  val mgr1 = new ClusteredDSLinkManager(false)(system1)
   val downstream1 = system1.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr1.getDownlinkRoutee, extra), Nodes.Downstream)
 
   val system2 = createActorSystem(0)
-  val mgr2 = new ClusteredDSLinkManager(false, nullDaos)(system2)
+  val mgr2 = new ClusteredDSLinkManager(false)(system2)
   val downstream2 = system2.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr2.getDownlinkRoutee, extra), Nodes.Downstream)
 
   val system3 = createActorSystem(0)
-  val mgr3 = new ClusteredDSLinkManager(false, nullDaos)(system3)
+  val mgr3 = new ClusteredDSLinkManager(false)(system3)
   val downstream3 = system3.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr3.getDownlinkRoutee, extra), Nodes.Downstream)
 
   override def afterAll = {
@@ -54,11 +54,11 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "GetOrCreateDSLink" should {
     "create a new dslink" in {
-      whenReady(downstream1 ? GetOrCreateDSLink("aaa")) { result =>
+      whenReady(downstream1 ? GetOrCreateDSLink("aa a")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
         link.region mustBe mgr1.dnlinkRegion
-        link.entityId mustBe "aaa"
+        link.entityId mustBe "aa a"
       }
       whenReady(downstream2 ? GetOrCreateDSLink("bbb")) { result =>
         result mustBe a[ShardedRoutee]
@@ -91,11 +91,11 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       }
     }
     "return an existing DSLink actor" in {
-      whenReady(downstream2 ? GetOrCreateDSLink("aaa")) { result =>
+      whenReady(downstream2 ? GetOrCreateDSLink("aa a")) { result =>
         result mustBe a[ShardedRoutee]
         val link = result.asInstanceOf[ShardedRoutee]
         link.region mustBe mgr2.dnlinkRegion
-        link.entityId mustBe "aaa"
+        link.entityId mustBe "aa a"
       }
       whenReady(downstream3 ? GetOrCreateDSLink("eee")) { result =>
         result mustBe a[ShardedRoutee]
@@ -112,13 +112,13 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   "GetDSLinkNames" should {
     "return dslink names from any node" in {
       whenReady((downstream1 ? GetDSLinkNames).mapTo[Iterable[String]]) {
-        _.toSet mustBe Set("aaa", "bbb", "ccc", "ddd", "eee")
+        _.toSet mustBe Set("aa a", "bbb", "ccc", "ddd", "eee")
       }
       whenReady((downstream2 ? GetDSLinkNames).mapTo[Iterable[String]]) {
-        _.toSet mustBe Set("aaa", "bbb", "ccc", "ddd", "eee")
+        _.toSet mustBe Set("aa a", "bbb", "ccc", "ddd", "eee")
       }
       whenReady((downstream3 ? GetDSLinkNames).mapTo[Iterable[String]]) {
-        _.toSet mustBe Set("aaa", "bbb", "ccc", "ddd", "eee")
+        _.toSet mustBe Set("aa a", "bbb", "ccc", "ddd", "eee")
       }
     }
     "match sharded entities" in {
@@ -127,7 +127,7 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       val f3 = (mgr3.dnlinkRegion ? GetShardRegionState).mapTo[CurrentShardRegionState]
       whenReady(for (s1 <- f1; s2 <- f2; s3 <- f3) yield (s1, s2, s3)) { states =>
         val shards = states._1.shards ++ states._2.shards ++ states._3.shards
-        shards.flatMap(_.entityIds).toSet mustBe Set("aaa", "bbb", "ccc", "ddd", "eee")
+        shards.flatMap(_.entityIds).toSet mustBe Set("aa a", "bbb", "ccc", "ddd", "eee")
       }
     }
   }
@@ -136,7 +136,7 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
     "handle change dslink state" in {
       downstream3 ! DSLinkStateChanged("eee", DSLinkMode.Responder, true)
       downstream1 ! DSLinkStateChanged("bbb", DSLinkMode.Requester, false)
-      downstream2 ! DSLinkStateChanged("aaa", DSLinkMode.Responder, true)
+      downstream2 ! DSLinkStateChanged("aa a", DSLinkMode.Responder, true)
       downstream1 ! DSLinkStateChanged("ccc", DSLinkMode.Responder, false)
       downstream3 ! DSLinkStateChanged("ddd", DSLinkMode.Requester, true)
       Thread.sleep(1000)
@@ -149,7 +149,7 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
         stats.dualsOff mustBe 0
       }
       downstream1 ! DSLinkStateChanged("bbb", DSLinkMode.Requester, true)
-      downstream3 ! DSLinkStateChanged("aaa", DSLinkMode.Responder, false)
+      downstream3 ! DSLinkStateChanged("aa a", DSLinkMode.Responder, false)
       Thread.sleep(1000)
       whenReady((downstream1 ? GetDSLinkStats).mapTo[DSLinkStats]) { stats =>
         stats.requestersOn mustBe 2
@@ -165,13 +165,13 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   "FindDSLinks" should {
     "search for matching dslinks" in {
       whenReady((downstream2 ? FindDSLinks("a.*", 100, 0)).mapTo[FoundLinks]) {
-        _.flatMap(_._2) mustBe List("aaa")
+        _.flatMap(_._2) mustBe List("aa a")
       }
       whenReady((downstream1 ? FindDSLinks("[ad].*", 100, 0)).mapTo[FoundLinks]) {
-        _.flatMap(_._2).toSet mustBe Set("aaa", "ddd")
+        _.flatMap(_._2).toSet mustBe Set("aa a", "ddd")
       }
       whenReady((downstream3 ? FindDSLinks("[aed].*", 100, 0)).mapTo[FoundLinks]) {
-        _.flatMap(_._2).toSet mustBe Set("aaa", "ddd", "eee")
+        _.flatMap(_._2).toSet mustBe Set("aa a", "ddd", "eee")
       }
     }
   }
@@ -182,7 +182,7 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
           list.toSet mustBe rows(IsNode, "downstream" -> true,
-            "aaa" -> obj(IsNode), "bbb" -> obj(IsNode),
+            "aa a" -> obj(IsNode), "bbb" -> obj(IsNode),
             "ccc" -> obj(IsNode), "ddd" -> obj(IsNode),
             "eee" -> obj(IsNode)).toSet
       }
