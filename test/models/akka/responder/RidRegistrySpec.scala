@@ -21,7 +21,7 @@ class RidRegistrySpec extends AbstractActorSpec {
       registry.targetIdCount mustBe 0
       registry.originCount mustBe 0
       registry.pathCount mustBe 0
-      
+
       registry.saveListLookup("path1") mustBe 1
       val record = LookupRecord(List, 1, None, Some("path1"))
       registry.lookupByTargetId(1) mustBe Some(record)
@@ -29,7 +29,7 @@ class RidRegistrySpec extends AbstractActorSpec {
       registry.targetIdCount mustBe 1
       registry.originCount mustBe 0
       registry.pathCount mustBe 1
-      
+
       registry.removeLookup(record)
       registry.lookupByTargetId(1) mustBe None
       registry.lookupByPath("path1") mustBe None
@@ -45,7 +45,7 @@ class RidRegistrySpec extends AbstractActorSpec {
       registry.targetIdCount mustBe 1
       registry.originCount mustBe 1
       registry.pathCount mustBe 0
-      
+
       registry.removeLookup(record)
       registry.lookupByTargetId(2) mustBe None
       registry.lookupByOrigin(Origin(a1, 101)) mustBe None
@@ -61,7 +61,7 @@ class RidRegistrySpec extends AbstractActorSpec {
       registry.targetIdCount mustBe 1
       registry.originCount mustBe 1
       registry.pathCount mustBe 0
-      
+
       registry.removeLookup(record)
       registry.lookupByTargetId(3) mustBe None
       registry.lookupByOrigin(Origin(a2, 201)) mustBe None
@@ -77,7 +77,7 @@ class RidRegistrySpec extends AbstractActorSpec {
       registry.targetIdCount mustBe 1
       registry.originCount mustBe 1
       registry.pathCount mustBe 0
-      
+
       registry.removeLookup(record)
       registry.lookupByTargetId(4) mustBe None
       registry.lookupByOrigin(Origin(a3, 301)) mustBe None
@@ -93,7 +93,7 @@ class RidRegistrySpec extends AbstractActorSpec {
       registry.targetIdCount mustBe 1
       registry.originCount mustBe 1
       registry.pathCount mustBe 0
-      
+
       registry.removeLookup(record)
       registry.lookupByTargetId(5) mustBe None
       registry.lookupByOrigin(Origin(a1, 102)) mustBe None
@@ -109,7 +109,7 @@ class RidRegistrySpec extends AbstractActorSpec {
       registry.targetIdCount mustBe 1
       registry.originCount mustBe 1
       registry.pathCount mustBe 0
-      
+
       registry.removeLookup(record)
       registry.lookupByTargetId(6) mustBe None
       registry.lookupByOrigin(Origin(a2, 202)) mustBe None

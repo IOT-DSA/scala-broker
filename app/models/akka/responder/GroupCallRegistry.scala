@@ -127,6 +127,7 @@ class ListCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegi
   def deliverResponse(rsp: DSAResponse) = {
     getOrInsert(rsp.rid).setLastResponse(rsp).origins foreach { origin =>
       val response = rsp.copy(rid = origin.sourceId)
+      log.debug("{}: deliverResponse sends '{}' to '{}'", ownId, response, origin.source)
       origin.source ! ResponseEnvelope(List(response))
     }
     if (rsp.stream == Some(StreamState.Closed)) // shouldn't normally happen w/o CLOSE
@@ -164,9 +165,8 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
       log.debug("{}: deliverResponse results: {}", ownId, results)
       results groupBy (_._1) mapValues (_.map(_._2)) foreach {
         case (to, rsps) =>
-          log.debug("{}: deliverResponse SENDS to: '{}', rsps: {}", ownId, to, rsps)
+          log.debug("{}: deliverResponse sends '{}' to '{}'", ownId, rsps, to)
           to ! ResponseEnvelope(rsps)
-
       }
     }
   }
@@ -179,10 +179,8 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
     val rec = getOrInsert(targetSid)
     rec.setLastResponse(DSAResponse(0, stream, Some(List(row)), columns, error))
 
-    if (stream == Some(StreamState.Closed)) { // shouldn't normally happen w/o UNSUBSCRIBE
-      log.debug("{}: stream is closed by targetSid: '{}'", ownId, targetSid)
+    if (stream == Some(StreamState.Closed)) // shouldn't normally happen w/o UNSUBSCRIBE
       remove(targetSid)
-    }
 
     rec.origins map { origin =>
       val sourceRow = replaceSid(row, origin.sourceId)

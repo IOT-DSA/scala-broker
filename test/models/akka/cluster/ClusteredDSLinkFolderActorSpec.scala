@@ -1,19 +1,15 @@
 package models.akka.cluster
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.Inside
-
 import com.typesafe.config.ConfigFactory
-
-import akka.actor.{ ActorSystem, Props, actorRef2Scala }
+import akka.actor.{ActorSystem, Address, actorRef2Scala}
 import akka.pattern.ask
-import akka.testkit.TestKit
+import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
-import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
-import akka.actor.Address
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.akka.{AbstractActorSpec, DSLinkMode, IsNode, rows}
+import models.rpc.{CloseRequest, DSAResponse, ListRequest}
 
 /**
  * ClusteredDSLinkFolderActor test suite.
@@ -23,7 +19,6 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   import models.akka.Messages._
   import models.rpc.DSAValue._
   import models.Settings._
-
   import system.dispatcher
 
   type FoundLinks = Map[Address, Iterable[String]]
@@ -44,6 +39,8 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   val system3 = createActorSystem(0)
   val mgr3 = new ClusteredDSLinkManager(false)(system3)
   val downstream3 = system3.actorOf(ClusteredDSLinkFolderActor.props(dsaPath, mgr3.getDownlinkRoutee, extra), Nodes.Downstream)
+
+  val testProbe1 = new TestProbe(system1, "test-sender-111")
 
   override def afterAll = {
     super.afterAll
@@ -178,8 +175,9 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "ListRequest" should {
     "return all dslinks" in {
-      downstream1 ! RequestEnvelope(List(ListRequest(1, "/downstream")))
-      inside(receiveOne(timeout.duration)) {
+      // Using testProbe in order to set a sender needs to avoid NPE in inside of receiveOne as we migrated Origin from ActorRef to Routee.
+      downstream1.tell(RequestEnvelope(List(ListRequest(1, "/downstream"))), testProbe1.ref)
+      inside(testProbe1.receiveOne(timeout.duration)) {
         case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
           list.toSet mustBe rows(IsNode, "downstream" -> true,
             "aa a" -> obj(IsNode), "bbb" -> obj(IsNode),
@@ -189,15 +187,18 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
     }
     "send updates on added nodes" in {
       downstream1 ! GetOrCreateDSLink("fff")
-      val Seq(routee, env) = receiveN(2)
-      inside(env) {
+      inside(testProbe1.receiveOne(timeout.duration)) {
         case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
           list mustBe rows("fff" -> obj(IsNode))
+      }
+      inside(receiveOne(timeout.duration)) {
+        case ShardedRoutee(_, entityId) =>
+          entityId mustBe "fff"
       }
     }
     "send updates on removed nodes" in {
       downstream2 ! RemoveDSLink("ccc")
-      inside(receiveOne(timeout.duration)) {
+      inside(testProbe1.receiveOne(timeout.duration)) {
         case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
           list mustBe List(obj("name" -> "ccc", "change" -> "remove"))
       }
