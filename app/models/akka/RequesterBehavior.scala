@@ -47,7 +47,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     case m @ RequestMessage(msg, ack, requests) =>
       log.debug("{}: received {}", ownId, m)
       processRequests(requests)
-      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
+//      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
+      requests.lastOption foreach ( req => lastRid = req.rid )
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
@@ -201,6 +202,17 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
    */
   private def cleanupStoredTargets(responses: Seq[DSAResponse]) = {
 
+    def cleanupSids(rows: Seq[DSAVal]) = try {
+      rows collect extractSid foreach targetsBySid.remove
+    } catch {
+      case NonFatal(e) => log.error("Subscribe response does not have a valid SID")
+    }
+
+    responses filter (_.stream == Some(StreamState.Closed)) foreach {
+      case DSAResponse(0, _, Some(updates), _, _)   => cleanupSids(updates)
+      case DSAResponse(rid, _, _, _, _) if rid != 0 => targetsByRid.remove(rid)
+    }
+    /*
     def cleanupSids(rows: Seq[DSAVal]) = {
       val sids = Set[Int]()
       rows collect extractSid foreach sids.add
@@ -219,7 +231,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
           targetsByRid.remove(event.rid)
         }
     }
-
+    */
     log.debug("{}: RID targets: {}, SID targets: {}", ownId, targetsByRid.size, targetsBySid.size)
   }
 
@@ -264,15 +276,15 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
    */
   private def cacheRequestTarget(request: DSARequest, target: String) = request match {
     case r @ (_: ListRequest | _: InvokeRequest) =>
-      persist(RidTargetsRequesterState(r.rid, target)) { event =>
-        log.debug("{}: RID targets persisted {}", ownId, event)
-        targetsByRid.put(event.rid, event.target)
-      }
+//      persist(RidTargetsRequesterState(r.rid, target)) { event =>
+//        log.debug("{}: RID targets persisted {}", ownId, event)
+      targetsByRid.put(r.rid, target)
+//      }
     case r: SubscribeRequest =>
-      persist(SidTargetsRequesterState(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))) { event =>
-        log.debug("{}: SID targets persisted {}", ownId, event)
-        targetsBySid.put(event.sid, event.pathAndQos)
-      }
+//      persist(SidTargetsRequesterState(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))) { event =>
+//        log.debug("{}: SID targets persisted {}", ownId, event)
+      targetsBySid.put(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))
+//      }
     case _ => // do nothing
   }
 
@@ -299,23 +311,23 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   private def resolveTarget(request: DSARequest) = {
 
     val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
-      case UnsubscribeRequest(_, sids) =>
-        val target = targetsBySid.get(sids.head).get.path
-        persist(RemoveTargetBySid(sids.head)) { event =>
-          log.debug("{}: removing by SID persisted {}", ownId, event)
-          removeTargetBy(event.sids: _*)
-        }
-        target
+      case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get.path
+//        val target = targetsBySid.get(sids.head).get.path
+//        persist(RemoveTargetBySid(sids.head)) { event =>
+//          log.debug("{}: removing by SID persisted {}", ownId, event)
+//          removeTargetBy(event.sids: _*)
+//        }
+//        target
     }
 
     val resolveCloseTarget: PartialFunction[DSARequest, String] = {
-      case CloseRequest(rid) =>
-        val target = targetsByRid.get(rid).get
-        persist(RemoveTargetByRid(rid)) { event =>
-          log.debug("{}: removing by RID persisted {}", ownId, event)
-          targetsByRid.remove(event.rid)
-        }
-        target
+      case CloseRequest(rid) => targetsByRid.remove(rid).get
+//        val target = targetsByRid.get(rid).get
+//        persist(RemoveTargetByRid(rid)) { event =>
+//          log.debug("{}: removing by RID persisted {}", ownId, event)
+//          targetsByRid.remove(event.rid)
+//        }
+//        target
     }
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)

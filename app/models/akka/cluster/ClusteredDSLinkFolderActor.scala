@@ -59,34 +59,34 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
     case PeerMessage(msg) => peerMsgHandler(msg)
 
     case GetOrCreateDSLink(name) =>
-      persist(DSLinkCreated(name)) { event =>
-        log.info("{}: requested DSLink '{}'", ownId, event.name)
-        sender ! getOrCreateDSLink(event.name)
-      }
+//      persist(DSLinkCreated(name)) { event =>
+      log.info("{}: requested DSLink '{}'", ownId, name)
+      sender ! getOrCreateDSLink(name)
+//      }
 
     case msg @ RegisterDSLink(name, mode, connected) =>
-      persist(DSLinkRegistered(name, mode, connected)) { event =>
-        links += (event.name -> LinkState(event.mode, event.connected))
-        tellPeers(PeerMessage(msg))
-        log.info("{}: registered DSLink '{}'", ownId, event.name)
-      }
+//      persist(DSLinkRegistered(name, mode, connected)) { event =>
+      links += (name -> LinkState(mode, connected))
+      tellPeers(PeerMessage(msg))
+      log.info("{}: registered DSLink '{}'", ownId, name)
+//      }
 
     case GetDSLinkNames =>
       val nodeLinks = askPeers[Iterable[String]](PeerMessage(GetDSLinkNames)) map (_ flatMap (_._2))
       nodeLinks pipeTo sender
 
     case RemoveDSLink(name) =>
-      persist(DSLinkRemoved(name)) { event =>
-        removeDSLinks(event.names: _*)
-        log.info("{}: ordered to remove DSLink '{}'", ownId, event.names)
-      }
+//      persist(DSLinkRemoved(name)) { event =>
+      removeDSLinks(name)
+      log.info("{}: ordered to remove DSLink '{}'", ownId, name)
+//      }
 
     case msg @ UnregisterDSLink(name) =>
-      persist(DSLinkUnregistered(name)) { event =>
-        links -= event.name
-        tellPeers(PeerMessage(msg))
-        log.info("{}: removed DSLink '{}'", ownId, event.name)
-      }
+//      persist(DSLinkUnregistered(name)) { event =>
+      links -= name
+      tellPeers(PeerMessage(msg))
+      log.info("{}: removed DSLink '{}'", ownId, name)
+//      }
 
     case evt@DSLinkStateChanged(name, mode, connected) =>
       log.info("{}: DSLink state changed: '{}'", ownId, evt)
