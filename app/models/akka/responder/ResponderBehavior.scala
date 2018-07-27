@@ -43,7 +43,7 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    */
   val responderBehavior: Receive = {
     case env @ RequestEnvelope(requests) =>
-      log.info("{}: received {} from {}", ownId, env, sender)
+      log.debug("{}: received {} from {}", ownId, env, sender)
       persist(RequestsProcessed(requests)) { event =>
         val result = processRequests(event.requests)
         if (!result.requests.isEmpty)
@@ -54,11 +54,12 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
 
     case m @ ResponseMessage(_, _, responses) =>
       log.debug("{}: received {}", ownId, m)
-      persist(ResponsesProcessed(responses)) { event =>
+      val event = ResponsesProcessed(responses)
+     // persist(ResponsesProcessed(responses)) { event =>
         processResponses(event.responses) foreach {
           case (to, rsps) => to ! ResponseEnvelope(rsps)
         }
-      }
+     // }
   }
 
   /**
