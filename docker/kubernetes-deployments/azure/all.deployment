@@ -1,0 +1,57 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-cluster
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-cluster
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-cluster
+    spec:
+      containers:
+      - name: broker-cluster
+        image: acuityregistry.azurecr.io/broker-scala
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9000
+        - containerPort: 9005
+        - containerPort: 2551
+        - containerPort: 9443
+        env:
+        - name: JAVA_OPTS
+          value: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
+        - name: STATSD_HOST
+          value: "10.0.0.2"
+        - name: STATSD_PORT
+          value: "80"
+        - name: ZIPKIN_HOST
+          value: "10.0.0.2"
+        - name: ZIPKIN_PORT
+          value: "9411"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-service
+  labels:
+    app: cloud-broker-cluster
+spec:
+  clusterIP: 10.0.0.3
+  ports:
+  - name: dsabroker-webinterface
+    port: 9000
+    targetPort: 9000
+    nodePort: 30001
+  - name: dsa-9005
+    port: 9005
+    targetPort: 9005
+    nodePort: 30002
+  selector:
+    app: cloud-broker-cluster
+  status: loadBalancer
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
