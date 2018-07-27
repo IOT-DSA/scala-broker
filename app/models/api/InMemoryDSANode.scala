@@ -140,7 +140,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
   def onReceive(message: Any, sender: ActorRef) = message match {
 
     case e @ RequestEnvelope(requests) =>
-      log.info(s"$ownId: received $e")
+      log.debug(s"$ownId: received $e")
       val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
 

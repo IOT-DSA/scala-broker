@@ -62,13 +62,13 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
       sendAck(msg)
     case m @ RequestMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "request")
-      log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
+      log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
       meterTags(messageTags("request.in", ci):_*)
     case m @ ResponseMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "response")
-      log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
+      log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
       meterTags(messageTags("response.in", ci):_*)
