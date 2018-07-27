@@ -1,0 +1,26 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-cluster
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-cluster
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-cluster
+    spec:
+      containers:
+      - name: broker-cluster
+        image: iotdsa/broker-scala:0.4.0-SNAPSHOT
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 9000
+        - containerPort: 9005
+        - containerPort: 2551
+        - containerPort: 9443
+        env:
+        - name: JAVA_OPTS
+          value: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"

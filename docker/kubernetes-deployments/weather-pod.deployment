@@ -1,0 +1,23 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: weather-separate
+spec:
+  selector:
+    matchLabels:
+      app: weather-separate
+  template:
+    metadata:
+      labels:
+        app: weather-separate
+    spec:
+      containers:
+      - name: weather-dslink
+        image: weather-dslink:latest
+        imagePullPolicy: Never
+        env:
+        - name: BROKER_HOST
+          value: "10.97.200.241"
+        - name: BROKER_PORT
+          value: "9000"
