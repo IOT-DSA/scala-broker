@@ -27,7 +27,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   val qosState = context.actorOf(QoSState.props(
     reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
     maxCapacity = Settings.Subscriptions.queueCapacity
-  ), "stateKeeper")
+  ).withDispatcher("qos-dispatcher"), "stateKeeper")
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
