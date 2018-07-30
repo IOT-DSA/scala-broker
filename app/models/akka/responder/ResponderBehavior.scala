@@ -5,7 +5,7 @@ import akka.persistence.PersistentActor
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{DSLinkStateSnapshotter, MainResponderBehaviorState, RequestsProcessed, ResponsesProcessed}
+import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState}
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -19,18 +19,19 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   import RidRegistry._
   import models.akka.RichRoutee
 
-  protected def linkPath: String
+  private def routee = ActorSelectionRoutee(context.actorSelection(sender.path))
 
+  protected def linkPath: String
   protected def ownId: String
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
   type ResponseHandler = PartialFunction[DSAResponse, List[(Routee, DSAResponse)]]
 
   // stores call records for forward and reverse RID lookup
-  private var ridRegistry = new RidRegistry
+  private var ridRegistry = new RidRegistry(this)
 
   // stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
-  private var sidRegistry = new SidRegistry
+  private var sidRegistry = new SidRegistry(this)
 
   // stores responder's nodes' attributes locally
   private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
@@ -39,7 +40,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   private val requestHandler = handlePassthroughRequest orElse handleListRequest orElse
     handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
-  private def routee = ActorSelectionRoutee(context.actorSelection(sender.path))
+  private val mainResponderBehaviorState = MainResponderBehaviorState(ridRegistry, sidRegistry, attributes)
+
+  def onPersistRegistry: Unit = saveResponderBehaviorSnapshot(mainResponderBehaviorState)
 
   /**
    * Processes incoming requests and responses.
@@ -47,39 +50,32 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   val responderBehavior: Receive = {
     case env @ RequestEnvelope(requests) =>
       log.info("{}: received {} from {}", ownId, env, sender)
-      persist(RequestsProcessed(requests)) { event =>
-        log.debug("{}: persisting {}", ownId, event)
-        val result = processRequests(event.requests)
-        saveResponderBehaviorSnapshot(MainResponderBehaviorState(ridRegistry, sidRegistry, attributes))
-        if (!result.requests.isEmpty)
-          sendToEndpoint(RequestEnvelope(result.requests))
-        if (!result.responses.isEmpty)
-          sender ! ResponseEnvelope(result.responses)
-      }
+      val result = processRequests(requests)
+      if (!result.requests.isEmpty)
+        sendToEndpoint(RequestEnvelope(result.requests))
+      if (!result.responses.isEmpty)
+        sender ! ResponseEnvelope(result.responses)
 
     case m @ ResponseMessage(_, _, responses) =>
       log.debug("{}: received {}", ownId, m)
-      persist(ResponsesProcessed(responses)) { event =>
-        log.debug("{}: persisting {}", ownId, event)
-        processResponses(event.responses) foreach {
-          case (to, rsps) => to ! ResponseEnvelope(rsps)
-        }
-        saveResponderBehaviorSnapshot(MainResponderBehaviorState(ridRegistry, sidRegistry, attributes))
+      processResponses(responses) foreach {
+        case (to, rsps) => to ! ResponseEnvelope(rsps)
       }
   }
 
   /**
-    * Recovers events of responder behavior from the journal.
+    * Recovers events and snapshots of responder behavior.
     */
   val responderRecover: Receive = {
-    case event: RequestsProcessed =>
+    case event: LookupRidRestoreProcess =>
       log.debug("{}: recovering with event {}", ownId, event)
-      // TODO has to be improved to separate the functionality
-      processRequests(event.requests)
-    case event: ResponsesProcessed =>
+      ridRegistry.restoreRidRegistry(event)
+    case event: LookupSidRestoreProcess =>
       log.debug("{}: recovering with event {}", ownId, event)
-      // TODO has to be improved to separate the functionality
-      processResponses(event.responses)
+      sidRegistry.restoreSidRegistry(event)
+    case event: AttributeSaved =>
+      log.debug("{}: recovering with event {}", ownId, event)
+      addAttribute(event.nodePath, event.name, event.value)
     case offeredSnapshot: MainResponderBehaviorState =>
       log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
       ridRegistry = offeredSnapshot.ridRegistry
@@ -128,7 +124,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
       val origin = Origin(routee, rid)
       ridRegistry.lookupByPath(path) match {
         case None =>
-          val tgtId = ridRegistry.saveListLookup(path)
+          val tgtId = ridRegistry.nextTgtId
+          ridRegistry.saveListLookup(path, tgtId)
           addListOrigin(tgtId, origin)
           HandlerResult(ListRequest(tgtId, translatePath(path)))
         case Some(rec) =>
@@ -137,17 +134,29 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
       }
   }
 
+  private def addAttribute(nodePath: String, name: String, value: DSAVal) = {
+    val attrMap = attributes.getOrElse(nodePath, Map.empty)
+    attributes(nodePath) = attrMap + (name -> value)
+  }
+
   /**
    * Translates the original request before sending it to responder link.
    */
   private def handlePassthroughRequest: RequestHandler = {
 
-    def tgtId(srcId: Int, method: DSAMethod) = ridRegistry.savePassthroughLookup(method, Origin(routee, srcId))
+    def tgtId(srcId: Int, method: DSAMethod) = {
+      val tgtId = ridRegistry.nextTgtId
+      ridRegistry.savePassthroughLookup(method, Origin(routee, srcId), tgtId)
+      tgtId
+    }
 
     def saveAttribute(nodePath: String, name: String, value: DSAVal) = {
-      log.info(s"$ownId: saving attribute under $nodePath: $name = $value")
-      val attrMap = attributes.getOrElse(nodePath, Map.empty)
-      attributes(nodePath) = attrMap + (name -> value)
+      log.info("{}: saving attribute under {}: {} = {}", ownId, nodePath, name, value)
+      persist(AttributeSaved(nodePath, name, value)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
+        addAttribute(event.nodePath, event.name, event.value)
+        saveResponderBehaviorSnapshot(mainResponderBehaviorState)
+      }
     }
 
     {
@@ -192,8 +201,10 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
 
       sidRegistry.lookupByPath(srcPath.path) match {
         case None =>
-          val tgtRid = ridRegistry.saveSubscribeLookup(ridOrigin)
-          val tgtSid = sidRegistry.saveLookup(srcPath.path)
+          val tgtRid = ridRegistry.nextTgtId
+          ridRegistry.saveSubscribeLookup(ridOrigin, tgtRid)
+          val tgtSid = sidRegistry.nextTgtId
+          sidRegistry.saveLookup(srcPath.path, tgtSid)
           Kamon.currentSpan().tag("sid", tgtSid)
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
           addSubscribeOrigin(tgtSid, sidOrigin)
@@ -215,7 +226,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
       val sidOrigin = Origin(routee, req.sid)
       removeSubscribeOrigin(sidOrigin) map { targetSid =>
         sidRegistry.removeLookup(targetSid)
-        val tgtRid = ridRegistry.saveUnsubscribeLookup(ridOrigin)
+        val tgtRid = ridRegistry.nextTgtId
+        ridRegistry.saveUnsubscribeLookup(ridOrigin, tgtRid)
         HandlerResult(UnsubscribeRequest(tgtRid, List(targetSid)))
       } getOrElse HandlerResult(DSAResponse(rid, Some(StreamState.Closed)))
   }

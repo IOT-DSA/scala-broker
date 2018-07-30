@@ -4,15 +4,17 @@ import java.util.Date
 
 import akka.actor.ActorRef
 import akka.routing.ConsistentHashingPool
+import models.Origin
 import models.akka.DSLinkMode.DSLinkMode
 import models.akka.Messages.LinkState
 import models.akka.local.LocalDSLinkFolderActor
+import models.akka.responder.RidRegistry.LookupRecord
 import models.akka.responder._
+import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.DSAVal
-import models.rpc.{DSARequest, DSAResponse}
 
-import collection.mutable.{ Map => MutableMap }
-import collection.immutable.{ Map => ImmutableMap }
+import collection.mutable.{Map => MutableMap}
+import collection.immutable.{Map => ImmutableMap}
 
 /**
   * Internal states of DSLink Actor layers to be persist.
@@ -48,8 +50,16 @@ case class ResponderBehaviorState(main: MainResponderBehaviorState, additional: 
 case class MainResponderBehaviorState(ridRegistry: RidRegistry, sidRegistry: SidRegistry, attributes: MutableMap[String, ImmutableMap[String, DSAVal]])
 case class SimpleResponderBehaviorState(listBindings: ImmutableMap[Int, GroupCallRecord], subsBindings: ImmutableMap[Int, GroupCallRecord]) extends AbstractResponderBehaviorState
 case class PooledResponderBehaviorState(listPool: ConsistentHashingPool, subsPool: ConsistentHashingPool) extends AbstractResponderBehaviorState
-case class ResponsesProcessed(responses: List[DSAResponse])
-case class RequestsProcessed(requests: Seq[DSARequest])
+
+sealed trait LookupRidRestoreProcess
+case class LookupRidSaved(method: DSAMethod, origin: Option[Origin], path: Option[String], tgtId: Int) extends LookupRidRestoreProcess
+case class LookupRidRemoved(record: LookupRecord) extends LookupRidRestoreProcess
+
+sealed trait LookupSidRestoreProcess
+case class LookupSidSaved(path: String, tgtId: Int) extends LookupSidRestoreProcess
+case class LookupSidRemoved(tgtId: Int) extends LookupSidRestoreProcess
+
+case class AttributeSaved(nodePath: String, name: String, value: DSAVal)
 
 /**
   * Internal events to recover [[DSLinkFolderActor]] and [[LocalDSLinkFolderActor]] state.

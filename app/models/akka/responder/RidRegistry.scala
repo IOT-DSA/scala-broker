@@ -3,12 +3,12 @@ package models.akka.responder
 import models.Origin
 import models.rpc.DSAMethod
 import models.rpc.DSAMethod.DSAMethod
-import models.akka.IntCounter
+import models.akka.{IntCounter, LookupRidRemoved, LookupRidRestoreProcess, LookupRidSaved}
 
 /**
  * Request registry tied to RID.
  */
-class RidRegistry {
+class RidRegistry(responderBehavior: ResponderBehavior) {
   import RidRegistry._
 
   private val nextTargetId = new IntCounter(1)
@@ -20,39 +20,48 @@ class RidRegistry {
   /**
    * Saves lookup record for LIST call.
    */
-  def saveListLookup(path: String): Int = saveLookup(DSAMethod.List, None, Some(path))
+  def saveListLookup(path: String, tgtId: Int): Unit = saveLookup(DSAMethod.List, None, Some(path), tgtId)
 
   /**
    * Saves lookup record for Set, Remove or Invoke call.
    */
-  def savePassthroughLookup(method: DSAMethod, origin: Origin): Int = {
+  def savePassthroughLookup(method: DSAMethod, origin: Origin, tgtId: Int): Unit = {
     import DSAMethod._
     require(method == Set || method == Invoke || method == Remove, "Only SET, INVOKE and REMOVE allowed")
-    saveLookup(method, Some(origin), None)
+    saveLookup(method, Some(origin), None, tgtId)
   }
 
   /**
    * Saves lookup record for SUBSCRIBE call.
    */
-  def saveSubscribeLookup(origin: Origin): Int = saveLookup(DSAMethod.Subscribe, Some(origin), None)
+  def saveSubscribeLookup(origin: Origin, tgtId: Int): Unit = saveLookup(DSAMethod.Subscribe, Some(origin), None, tgtId)
 
   /**
    * Saves lookup record for UNSUBSCRIBE call.
    */
-  def saveUnsubscribeLookup(origin: Origin): Int = saveLookup(DSAMethod.Unsubscribe, Some(origin), None)
+  def saveUnsubscribeLookup(origin: Origin, tgtId: Int): Unit = saveLookup(DSAMethod.Unsubscribe, Some(origin), None, tgtId)
 
   /**
-   * Saves the lookup and returns the newly generated target RID.
-   */
-  private def saveLookup(method: DSAMethod, origin: Option[Origin], path: Option[String]): Int = {
-    val tgtId = nextTargetId.inc
-    val record = LookupRecord(method, tgtId, origin, path)
+    * Returns the newly generated target RID before lookup saving.
+    */
+  def nextTgtId: Int = nextTargetId.inc
 
+  /**
+   * Saves the lookup and persist this event.
+   */
+  private def saveLookup(method: DSAMethod, origin: Option[Origin], path: Option[String], tgtId: Int) = {
+    responderBehavior.persist(LookupRidSaved(method, origin, path, tgtId)) { event =>
+      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      addLookup(event.method, event.origin, event.path, event.tgtId)
+      responderBehavior.onPersistRegistry
+    }
+  }
+
+  private def addLookup(method: DSAMethod, origin: Option[Origin], path: Option[String], tgtId: Int) = {
+    val record = LookupRecord(method, tgtId, origin, path)
     callsByTargetId += tgtId -> record
     origin foreach (callsByOrigin += _ -> record)
     path foreach (callsByPath += _ -> record)
-
-    tgtId
   }
 
   /**
@@ -72,12 +81,28 @@ class RidRegistry {
   def lookupByPath(path: String): Option[LookupRecord] = callsByPath.get(path)
 
   /**
-   * Removes the call record.
+   * Removes the call record and persist this event.
    */
   def removeLookup(record: LookupRecord) = {
+    responderBehavior.persist(LookupRidRemoved(record)) { event =>
+      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      internalRemoveLookup(event.record)
+      responderBehavior.onPersistRegistry
+    }
+  }
+
+  private def internalRemoveLookup(record: LookupRecord) = {
     record.origin foreach (callsByOrigin -= _)
     record.path foreach (callsByPath -= _)
     callsByTargetId -= record.targetId
+  }
+
+  def restoreRidRegistry(event: LookupRidRestoreProcess) = event match {
+    case e: LookupRidSaved =>
+      nextTargetId.inc(e.tgtId)
+      addLookup(e.method, e.origin, e.path, e.tgtId)
+    case e: LookupRidRemoved =>
+      internalRemoveLookup(e.record)
   }
 
   /**

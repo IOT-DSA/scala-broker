@@ -1,24 +1,35 @@
 package models.akka.responder
 
-import models.akka.IntCounter
+import models.akka.{IntCounter, LookupSidRemoved, LookupSidRestoreProcess, LookupSidSaved}
 
 /**
  * Request registry tied to SID.
  */
-class SidRegistry {
+class SidRegistry(responderBehavior: ResponderBehavior) {
   private val targetSids = new IntCounter(1)
 
   private var pathBySid = Map.empty[Int, String]
   private var sidByPath = Map.empty[String, Int]
 
   /**
-   * Saves the lookup and returns the newly generated SID.
+    * Returns the newly generated target SID before lookup saving.
+    */
+  def nextTgtId: Int = targetSids.inc
+
+  /**
+   * Saves the lookup and persist this event.
    */
-  def saveLookup(path: String): Int = {
-    val tgtSid = targetSids.inc
+  def saveLookup(path: String, tgtId: Int): Unit = {
+    responderBehavior.persist(LookupSidSaved(path, tgtId)) { event =>
+      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      addLookup(event.path, event.tgtId)
+      responderBehavior.onPersistRegistry
+    }
+  }
+
+  private def addLookup(path: String, tgtSid: Int) = {
     sidByPath += path -> tgtSid
     pathBySid += tgtSid -> path
-    tgtSid
   }
 
   /**
@@ -29,10 +40,26 @@ class SidRegistry {
   /**
    * Removes the lookup.
    */
-  def removeLookup(targetSid: Int) = {
-    val path = pathBySid(targetSid)
+  def removeLookup(tgtId: Int) = {
+    responderBehavior.persist(LookupSidRemoved(tgtId)) { event =>
+      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      internalRemoveLookup(event.tgtId)
+      responderBehavior.onPersistRegistry
+    }
+  }
+
+  private def internalRemoveLookup(tgtId: Int) = {
+    val path = pathBySid(tgtId)
     sidByPath -= path
-    pathBySid -= targetSid
+    pathBySid -= tgtId
+  }
+
+  def restoreSidRegistry(event: LookupSidRestoreProcess) = event match {
+    case e: LookupSidSaved =>
+      targetSids.inc(e.tgtId)
+      addLookup(e.path, e.tgtId)
+    case e: LookupSidRemoved =>
+      internalRemoveLookup(e.tgtId)
   }
 
   /**
