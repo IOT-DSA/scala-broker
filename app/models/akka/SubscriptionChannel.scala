@@ -79,10 +79,9 @@ class SubscriptionChannel(val store: ActorRef)
 
     def pushNext = {
       // to avoid locking using 'getAsyncCallback' https://doc.akka.io/docs/akka/2.5/stream/stream-customize.html#using-asynchronous-side-channels
-      val futureMessage = (store ? GetAndRemoveNext).mapTo[Option[Queue[SubscriptionNotificationMessage]]]
+      val futureMessage = (store ? GetAndRemoveNext).mapTo[Seq[SubscriptionNotificationMessage]]
 
-      val callback = getAsyncCallback[Option[Queue[SubscriptionNotificationMessage]]] {
-        _ foreach {
+      val callback = getAsyncCallback[Seq[SubscriptionNotificationMessage]] {
           toResponseMsg(_).foreach { m =>
             log.debug("push(out, {})", m)
             push(out, m)
@@ -90,7 +89,6 @@ class SubscriptionChannel(val store: ActorRef)
               pull(in)
             }
           }
-        }
       }
 
       futureMessage foreach {
