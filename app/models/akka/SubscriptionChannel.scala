@@ -11,6 +11,7 @@ import models.akka.Messages._
 import models.akka.QoSState.{GetAllMessages, GetAndRemoveNext, PutNotification}
 
 import scala.collection.immutable.Queue
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
 
@@ -59,7 +60,7 @@ class SubscriptionChannel(val store: ActorRef)
       }
 
       override def onUpstreamFinish(): Unit = {
-        val futureTail = (store ? GetAllMessages).mapTo[Map[Int, Queue[SubscriptionNotificationMessage]]]
+        val futureTail = (store ? GetAllMessages).mapTo[Map[Int, mutable.Queue[SubscriptionNotificationMessage]]]
         val tail = Await.result(futureTail, timeout)
         if (tail.nonEmpty) {
           val leftItems = tail.mapValues(toResponseMsg(_)).values.filter(_.isDefined).map(_.get)

@@ -8,7 +8,6 @@ import models.akka.Messages.SubscriptionNotificationMessage
 import models.rpc.{DSAMessage, DSAResponse, ResponseMessage}
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
 
-import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -41,7 +40,7 @@ class SubscriptionChannelSpec extends WordSpecLike
 
             Then("some messages should be delivered (last state for every sid for every pull)")
             totalSize should be > 5
-            totalSize should be < 200
+            totalSize should be <= 200
         }
       }
 
