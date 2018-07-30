@@ -1,11 +1,12 @@
 package models.akka
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import models.Settings
 import models.akka.Messages._
 import models.akka.QoSState._
 import models.metrics.Meter
 
-import scala.collection.immutable.Queue
+import scala.collection.mutable.Queue
 import scala.collection.mutable
 import scala.concurrent.duration._
 
@@ -20,6 +21,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
 
   val subscriptionsQueue = mutable.HashMap[Int, Queue[SubscriptionNotificationMessage]]()
   var connected = false
+  val maxBatch = Settings.Subscriptions.maxBatchSize
 
   var iter = subscriptionsQueue.iterator
 
@@ -72,20 +74,19 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
         histogramValue(s"qos.level.0.queue.size")(1)
         item.sid
       case item @ SubscriptionNotificationMessage(_, _, _, _, _) =>
-        val queue = subscriptionsQueue.get(item.sid) map { q =>
-          val newQ = if (shouldDislodge(item.sid)) {
-            countTags("qos.dislodge")
-            q.dequeue._2
-          } else q
-          newQ enqueue message
-        } getOrElse {
-          Queue(message)
+        val maybeQ = subscriptionsQueue.get(item.sid).orElse(Some(Queue[SubscriptionNotificationMessage]()))
+
+        if(maybeQ.isEmpty){
+          subscriptionsQueue.put(item.sid, maybeQ.get)
         }
 
-        histogramValue(s"qos.level.${item.qos.index}.queue.size")(queue.size)
-        subscriptionsQueue += (item.sid -> queue)
-        log.debug("QoS > 0. Adding new value to queue:{}", message)
+        maybeQ.foreach{ q =>
+          q.enqueue(message)
+          histogramValue(s"qos.level.${item.qos.index}.queue.size")(q.size)
+          log.debug("QoS > 0. Adding new value to queue:{}", message)
+        }
         item.sid
+      case other => log.error(s"Unexpected message type: ${other.getClass}")
     }
 
     histogramValue("qos.sids.size")(subscriptionsQueue.size)
@@ -95,7 +96,7 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
 
   def getAndRemoveNext() = {
 
-    var next:Option[(Int, Queue[SubscriptionNotificationMessage])] =
+    def next:Option[(Int, Queue[SubscriptionNotificationMessage])] =
       if(iter.hasNext){
         Some(iter.next())
       } else {
@@ -104,12 +105,24 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
         else None
       }
 
-    next foreach { case (sid, queue) =>
-      subscriptionsQueue -= sid
-      histogramValue("qos.sids.size")(subscriptionsQueue.size)
+    val toSend = mutable.ArrayBuffer[SubscriptionNotificationMessage]()
+
+    while(!subscriptionsQueue.isEmpty && toSend.size < maxBatch){
+      next.foreach{
+        case (key, messages) =>
+          if(!messages.isEmpty){
+            toSend += messages.dequeue()
+          }
+          if(messages.isEmpty) subscriptionsQueue -= key
+      }
     }
-    log.debug("send and remove {}", next)
-    sender ! next.map(_._2)
+
+    histogramValue("qos.sids.size")(subscriptionsQueue.size)
+    histogramValue("qos.send.batch")(1)
+    histogramValue("qos.send.messages")(toSend.size)
+
+    log.debug("send and remove {}", toSend)
+    sender ! toSend
   }
 
   // in case of data overflow

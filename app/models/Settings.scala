@@ -94,6 +94,7 @@ object Settings {
     private val cfg = rootConfig.getConfig("broker.subscriptions")
     val reconnectionTimeout = Option(cfg.getInt("reconnectionTimeout")).getOrElse(30)
     val queueCapacity = Option(cfg.getInt("queue.capacity")).getOrElse(30)
+    val maxBatchSize = Option(cfg.getInt("send.batch.size")).getOrElse(100)
   }
 
   object MetricsReporters{
