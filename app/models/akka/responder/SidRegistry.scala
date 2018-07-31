@@ -1,11 +1,11 @@
 package models.akka.responder
 
-import models.akka.{IntCounter, LookupSidRemoved, LookupSidRestoreProcess, LookupSidSaved}
+import models.akka.{IntCounter, LookupSidRemoved, LookupSidRestoreProcess, LookupSidSaved, PartOfPersistenceBehavior}
 
 /**
  * Request registry tied to SID.
  */
-class SidRegistry(responderBehavior: ResponderBehavior) {
+class SidRegistry(persistenceBehavior: PartOfPersistenceBehavior) {
   private val targetSids = new IntCounter(1)
 
   private var pathBySid = Map.empty[Int, String]
@@ -20,10 +20,10 @@ class SidRegistry(responderBehavior: ResponderBehavior) {
    * Saves the lookup and persist this event.
    */
   def saveLookup(path: String, tgtId: Int): Unit = {
-    responderBehavior.persist(LookupSidSaved(path, tgtId)) { event =>
-      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+    persistenceBehavior.persist(LookupSidSaved(path, tgtId)) { event =>
+      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
       addLookup(event.path, event.tgtId)
-      responderBehavior.onPersistRegistry
+      persistenceBehavior.onPersist
     }
   }
 
@@ -41,10 +41,10 @@ class SidRegistry(responderBehavior: ResponderBehavior) {
    * Removes the lookup.
    */
   def removeLookup(tgtId: Int) = {
-    responderBehavior.persist(LookupSidRemoved(tgtId)) { event =>
-      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+    persistenceBehavior.persist(LookupSidRemoved(tgtId)) { event =>
+      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
       internalRemoveLookup(event.tgtId)
-      responderBehavior.onPersistRegistry
+      persistenceBehavior.onPersist
     }
   }
 

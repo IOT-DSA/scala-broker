@@ -5,7 +5,7 @@ import akka.persistence.PersistentActor
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState}
+import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState, PartOfPersistenceBehavior}
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -28,10 +28,10 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   type ResponseHandler = PartialFunction[DSAResponse, List[(Routee, DSAResponse)]]
 
   // stores call records for forward and reverse RID lookup
-  private var ridRegistry = new RidRegistry(this)
+  private var ridRegistry = new RidRegistry(new RegistryPersistenceBehavior)
 
   // stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
-  private var sidRegistry = new SidRegistry(this)
+  private var sidRegistry = new SidRegistry(new RegistryPersistenceBehavior)
 
   // stores responder's nodes' attributes locally
   private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
@@ -302,6 +302,14 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
       array("$base", linkPath + v.value.tail.head.toString)
     case v: MapValue if v.value.contains("$base") =>
       MapValue(v.value + ("$base" -> (linkPath + v.value("$base").toString)))
+  }
+
+  private class RegistryPersistenceBehavior extends PartOfPersistenceBehavior {
+    import _root_.akka.event.LoggingAdapter
+
+    override def persist[A](event: A)(handler: A => Unit): Unit = me.persist(event)(handler)
+    override def onPersist: Unit = onPersistRegistry
+    override def log: LoggingAdapter = me.log
   }
 
   /**

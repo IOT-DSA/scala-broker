@@ -3,12 +3,12 @@ package models.akka.responder
 import models.Origin
 import models.rpc.DSAMethod
 import models.rpc.DSAMethod.DSAMethod
-import models.akka.{IntCounter, LookupRidRemoved, LookupRidRestoreProcess, LookupRidSaved}
+import models.akka.{IntCounter, LookupRidRemoved, LookupRidRestoreProcess, LookupRidSaved, PartOfPersistenceBehavior}
 
 /**
  * Request registry tied to RID.
  */
-class RidRegistry(responderBehavior: ResponderBehavior) {
+class RidRegistry(persistenceBehavior: PartOfPersistenceBehavior) {
   import RidRegistry._
 
   private val nextTargetId = new IntCounter(1)
@@ -50,10 +50,10 @@ class RidRegistry(responderBehavior: ResponderBehavior) {
    * Saves the lookup and persist this event.
    */
   private def saveLookup(method: DSAMethod, origin: Option[Origin], path: Option[String], tgtId: Int) = {
-    responderBehavior.persist(LookupRidSaved(method, origin, path, tgtId)) { event =>
-      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+    persistenceBehavior.persist(LookupRidSaved(method, origin, path, tgtId)) { event =>
+      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
       addLookup(event.method, event.origin, event.path, event.tgtId)
-      responderBehavior.onPersistRegistry
+      persistenceBehavior.onPersist
     }
   }
 
@@ -84,10 +84,10 @@ class RidRegistry(responderBehavior: ResponderBehavior) {
    * Removes the call record and persist this event.
    */
   def removeLookup(record: LookupRecord) = {
-    responderBehavior.persist(LookupRidRemoved(record)) { event =>
-      responderBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+    persistenceBehavior.persist(LookupRidRemoved(record)) { event =>
+      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
       internalRemoveLookup(event.record)
-      responderBehavior.onPersistRegistry
+      persistenceBehavior.onPersist
     }
   }
 
