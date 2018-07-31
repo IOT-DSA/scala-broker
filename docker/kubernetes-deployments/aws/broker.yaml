@@ -61,6 +61,69 @@ spec:
             memory: "6500Mi"
             cpu: "3700m"
 ---
+apiVersion: apps/v1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-cluster-squad
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-cluster
+  replicas: 3
+  serviceName: cloud-broker-internal
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-cluster
+    spec:
+      subdomain: "cloud-broker-internal"
+      podManagementPolicy: Parallel
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+          searches:
+            - cloud-broker-internal.default.svc.cluster.local
+      containers:
+      - name: broker-cluster
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
+        imagePullPolicy: Always
+        serviceName: "cloud-broker-internal"
+        ports:
+        - containerPort: 9000
+        - containerPort: 9005
+        - containerPort: 2551
+        - containerPort: 9443
+        env:
+        - name: JAVA_OPTS
+          value: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
+        - name: STATSD_HOST
+          value: cloud-metrics-internal
+        - name: STATSD_PORT
+          value: "8125"
+        - name: ZIPKIN_HOST
+          value: cloud-metrics-internal
+        - name: ZIPKIN_PORT
+          value: "9411"
+        - name: AKKA_REMOTING_BIND_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: AKKA_REMOTING_BIND_PORT
+          value: "2551"
+        - name: AKKA_SEED_NODES
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
+        - name: AKKA_ACTOR_SYSTEM_NAME
+          value: DSASystem
+        - name: CONF_FILE
+          value: "/opt/docker/conf/backend.conf"
+        resources:
+          requests:
+            memory: "6500Mi"
+            cpu: "3700m"
+          limits:
+            memory: "6500Mi"
+            cpu: "3700m"
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -98,4 +161,21 @@ spec:
   status: loadBalancer
   type: NodePort
   externalTrafficPolicy: Cluster
-
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cloud-broker-cluster-autoscaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cloud-broker-cluster-squad
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: 80
