@@ -93,6 +93,10 @@ class RootNodeActor extends Actor with ActorLogging {
           node.profile = "static"
           StandardActions.bindDataRootActions(node)
         }
+        node.addChild("token") foreach {node =>
+          node.profile = "static"
+          StandardActions.bindTokenNodeActions(node)
+        }
       }
     }
     defsNode

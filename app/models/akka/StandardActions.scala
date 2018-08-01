@@ -246,15 +246,15 @@ object StandardActions {
         node.addChild(tokenId) foreach { child =>
           child.profile = "broker/tokenNode"
           child.addConfigs(
-            ("group" -> groupName)
-            , ("token" -> token)
-            , ("is" -> "broker/Token")
+            ("$$group" -> groupName)
+            , ("$$token" -> token)
+            , ("$is" -> "broker/token")
           )
           child.addConfigs(
-            ("$count"->count)
-            , ("$managed"->managed)
-            , ("$maxSession"->maxSession)
-            , ("$timeRange"->timeRange)
+            ("$$count"->count)
+            , ("$$managed"->managed)
+            , ("$$maxSession"->maxSession)
+            , ("$$timeRange"->timeRange)
 
           )
           bindTokenNodeActions(child)
@@ -265,8 +265,9 @@ object StandardActions {
 
       (token.substring(0, 16), token)
     }
-    , Map[String, DSAVal]("name"->"Group", "type"->DSAString, "editor"->"enum[none,list,read,write,config]")
-    , Map[String, DSAVal]("name"->"TimeRange", "type"->DSAString, "editor"->"daterange", "writable"->"config")
+    , Map[String, DSAVal]("name"->"Group", "type"->DSAString)
+    , Map[String, DSAVal]("name"->"TimeRange", "type"->DSAString, "editor"->"daterange"
+      , "writable"->"config")
     , Map[String, DSAVal]("name"->"Count", "type"->DSANumber)
     , Map[String, DSAVal]("name"->"MaxSession", "type"->DSANumber)
     , Map[String, DSAVal]("name"->"Managed", "type"->DSABoolean)
@@ -301,7 +302,7 @@ object StandardActions {
 
       node.addConfigs("group" -> group)
     }
-    , Map[String, DSAVal]("name"->"Group", "type"-> DSAString, "editor"->"enum[none,list,read,write,config]")
+    , Map[String, DSAVal]("name"->"Group", "type"-> DSAString)
   )
 
   implicit val duration: Timeout = 20 seconds
