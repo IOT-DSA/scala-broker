@@ -352,7 +352,10 @@ object StandardActions {
     ctx.node.parent foreach { parent =>
       val roleName = ctx.args("Name").value.toString
       parent.addChild(roleName, Some("node")) foreach { child =>
+//        child.addConfigs(RootNodeActor.DEFAULT_ROLE_CONFIG.toList:_*)
+        child.profile = "node"
         bindRoleNodeActions(child)
+        RootNodeActor.createFallbackRole(child)
       }
     }
     , Map[String, DSAVal]("name"->"Name", "type"->DSAString)
@@ -367,6 +370,9 @@ object StandardActions {
       val perm = ctx.args("Permission")
 
       parent.addChild(URLEncoder.encode(path, "UTF-8"), "$permission"->perm) foreach { ruleNode =>
+        ruleNode.value = perm.value.toString
+        ruleNode.profile = "node"
+//        ruleNode.addConfigs(RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*)
         bindActions(ruleNode, commonActions(REMOVE_RULE))
       }
     }

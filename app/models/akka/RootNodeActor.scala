@@ -1,5 +1,7 @@
 package models.akka
 
+import java.net.URLEncoder
+
 import akka.actor._
 import akka.cluster.singleton._
 import models.akka.StandardActions.bindTokenNodeActions
@@ -169,13 +171,21 @@ object RootNodeActor {
     ClusterSingletonProxy.props("/user/" + Root,
       settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + dsaPath.forAkka)))
 
-
   val DEFAULT_ROLE  = "default"
-  val DEFAULT_ROLE_CONFIG = Map[String, DSAVal]("$is"->"broker/permissionRole")
-  val DEFAULT_RULE = "fallback"
-  val DEFAULT_RULE_CONFIG = Map[String, DSAVal]("$is"->"broker/permissionRole"
-                                                , "$type"->DSAValueType.DSAString
-                                                , "$writable"->"config")
+  val DEFAULT_ROLE_CONFIG = Map[String, DSAVal](
+    "$is"->"broker/permissionRole"
+    , "type" -> DSAValueType.DSAString
+    , "$writable"->"config"
+  )
+
+  val FALLBACK_ROLE = "fallback"
+
+  val DEFAULT_RULE_CONFIG = Map[String, DSAVal](
+    "$is"->"broker/permissionRule"
+    , "$type"->DSAValueType.DSAString
+    , "$writable"->"config"
+  )
+
   /**
     * Create Roles nodes in the parent node (usualy in /sys)
     * The roles are related to tokens and permission
@@ -184,9 +194,37 @@ object RootNodeActor {
     */
   private def createRolesNode(parentNode: DSANode) = {
     parentNode.addChild("roles").foreach { node =>
-      node.profile = "node"
+      node.profile = "static"
       node.displayName = "Roles"
       StandardActions.bindRolesNodeActions(node)
+
+      // Add default role
+      node.addChild(DEFAULT_ROLE, DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
+        child.profile = "node"
+        child.displayName = "Default role"
+
+        createFallbackRole(child)
+      }
+    }
+  }
+
+  def createFallbackRole(node: DSANode): Unit = {
+    node.addChild(FALLBACK_ROLE, DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
+      child.profile = "static"
+      child.displayName = "Fallback role"
+
+      createFallBackRules(child)
+    }
+  }
+
+  private def createFallBackRules(node: DSANode) : Unit = {
+    val path = URLEncoder.encode("/", "UTF-8")
+    node.addChild(path, DEFAULT_RULE_CONFIG.toList:_*) foreach { child =>
+      val perm = "read"
+      child.profile = "static"
+      child.displayName = "/"
+      child.value = perm
+      child.addConfigs("$permission"->perm)
     }
   }
 
@@ -210,6 +248,7 @@ object RootNodeActor {
 
       // Add default token
       val tokenId = DEFAULT_TOKEN
+
       node.addChild(tokenId) foreach { child =>
         child.profile = "broker/TokenNode"
         child.addConfigs(DEFAULT_TOKEN_CONFIG.toList:_*)
