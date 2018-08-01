@@ -61,6 +61,11 @@ case class LookupSidRemoved(tgtId: Int) extends LookupSidRestoreProcess
 
 case class AttributeSaved(nodePath: String, name: String, value: DSAVal)
 
+sealed trait GroupCallRegistryRestoreProcess { val value: RegistryType.Registry }
+case class OriginAdded(targetId: Int, origin: Origin, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value = regTypeVal }
+case class OriginRemoved(origin: Origin, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value = regTypeVal }
+case class RecordRemoved(targetId: Int, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value = regTypeVal }
+
 /**
   * Internal events to recover [[DSLinkFolderActor]] and [[LocalDSLinkFolderActor]] state.
   */

@@ -21,7 +21,7 @@ class SidRegistry(persistenceBehavior: PartOfPersistenceBehavior) {
    */
   def saveLookup(path: String, tgtId: Int): Unit = {
     persistenceBehavior.persist(LookupSidSaved(path, tgtId)) { event =>
-      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
       addLookup(event.path, event.tgtId)
       persistenceBehavior.onPersist
     }
@@ -42,7 +42,7 @@ class SidRegistry(persistenceBehavior: PartOfPersistenceBehavior) {
    */
   def removeLookup(tgtId: Int) = {
     persistenceBehavior.persist(LookupSidRemoved(tgtId)) { event =>
-      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
       internalRemoveLookup(event.tgtId)
       persistenceBehavior.onPersist
     }

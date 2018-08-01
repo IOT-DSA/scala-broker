@@ -51,7 +51,7 @@ class RidRegistry(persistenceBehavior: PartOfPersistenceBehavior) {
    */
   private def saveLookup(method: DSAMethod, origin: Option[Origin], path: Option[String], tgtId: Int) = {
     persistenceBehavior.persist(LookupRidSaved(method, origin, path, tgtId)) { event =>
-      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
       addLookup(event.method, event.origin, event.path, event.tgtId)
       persistenceBehavior.onPersist
     }
@@ -85,7 +85,7 @@ class RidRegistry(persistenceBehavior: PartOfPersistenceBehavior) {
    */
   def removeLookup(record: LookupRecord) = {
     persistenceBehavior.persist(LookupRidRemoved(record)) { event =>
-      persistenceBehavior.log.debug("{}: persisting {}", getClass.getSimpleName, event)
+      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
       internalRemoveLookup(event.record)
       persistenceBehavior.onPersist
     }

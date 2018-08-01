@@ -4,6 +4,7 @@ import akka.event.LoggingAdapter
 import models.akka.PartOfPersistenceBehavior
 
 class PartOfPersistenceBehaviorStub extends PartOfPersistenceBehavior {
+  override val ownId: String = ""
   override def persist[A](event: A)(handler: A => Unit): Unit = handler(event)
   override def onPersist: Unit = {}
   override def log: LoggingAdapter = new LoggingAdapter {

@@ -11,6 +11,7 @@ import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
 import _root_.akka.routing.ActorSelectionRoutee
 import _root_.akka.routing.Routee
+import _root_.akka.event.LoggingAdapter
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
@@ -28,10 +29,10 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   type ResponseHandler = PartialFunction[DSAResponse, List[(Routee, DSAResponse)]]
 
   // stores call records for forward and reverse RID lookup
-  private var ridRegistry = new RidRegistry(new RegistryPersistenceBehavior)
+  private var ridRegistry = new RidRegistry(new PartOfPersistentResponderBehavior(ownId, log))
 
   // stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
-  private var sidRegistry = new SidRegistry(new RegistryPersistenceBehavior)
+  private var sidRegistry = new SidRegistry(new PartOfPersistentResponderBehavior(ownId, log))
 
   // stores responder's nodes' attributes locally
   private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
@@ -304,12 +305,11 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
       MapValue(v.value + ("$base" -> (linkPath + v.value("$base").toString)))
   }
 
-  private class RegistryPersistenceBehavior extends PartOfPersistenceBehavior {
-    import _root_.akka.event.LoggingAdapter
-
+  protected class PartOfPersistentResponderBehavior(val _ownId: String, val _log: LoggingAdapter) extends PartOfPersistenceBehavior {
+    override val ownId = _ownId
     override def persist[A](event: A)(handler: A => Unit): Unit = me.persist(event)(handler)
     override def onPersist: Unit = onPersistRegistry
-    override def log: LoggingAdapter = me.log
+    override def log: LoggingAdapter = _log
   }
 
   /**

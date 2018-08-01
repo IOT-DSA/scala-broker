@@ -1,6 +1,6 @@
 package models.akka.responder
 
-import akka.event.LoggingAdapter
+import models.akka.{GroupCallRegistryRestoreProcess, OriginAdded, OriginRemoved, PartOfPersistenceBehavior, RecordRemoved}
 import models.{Origin, ResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
@@ -24,9 +24,21 @@ class GroupCallRecord {
 /**
  * Manages the call bindings for multi-recipient responses.
  */
-abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
+abstract class GroupCallRegistry(persistenceBehavior: PartOfPersistenceBehavior) {
 
   private var _bindings = Map.empty[Int, GroupCallRecord]
+
+  /**
+    * Internal API for [[_bindings]] changing
+    */
+  private def internalRemove(targetId: Int) = _bindings -= targetId
+  private def internalAddOrigin(targetId: Int, origin: Origin) = getOrInsert(targetId).addOrigin(origin)
+  private def internalRemoveOrigin(origin: Origin) = _bindings.find(_._2.origins contains origin) flatMap {
+    case (targetId, record) =>
+      record.removeOrigin(origin)
+      if (record.origins isEmpty) internalRemove(targetId)
+      None
+  }
 
   /**
     * Returns all bindings especially for quick snapshotting.
@@ -44,9 +56,15 @@ abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
   def lookupTargetId(origin: Origin): Option[Int] = _bindings.find(_._2.origins.contains(origin)).map(_._1)
 
   /**
-   * Removes the entry for the specified target Id.
+   * Removes the entry for the specified target Id and persist the current event.
    */
-  def remove(targetId: Int): Unit = _bindings -= targetId
+  def remove(targetId: Int, regTypeVal: RegistryType.Registry): Unit = {
+    persistenceBehavior.persist(RecordRemoved(targetId, regTypeVal)) { event =>
+      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
+      internalRemove(event.targetId)
+      persistenceBehavior.onPersist
+    }
+  }
 
   /**
    * Returns the origins for the specified target Id, or an empty set if the key is not found.
@@ -66,23 +84,43 @@ abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
   /**
    * Adds the origin to the list of recipients for the given target Id.
    */
-  def addOrigin(targetId: Int, origin: Origin): Unit = {
-    val record = getOrInsert(targetId).addOrigin(origin)
-    log.debug(s"$ownId: added binding $targetId -> $origin")
-    onAddOrigin(targetId, origin, record)
+  def addOrigin(targetId: Int, origin: Origin, regTypeVal: RegistryType.Registry): Unit = {
+    persistenceBehavior.persist(OriginAdded(targetId, origin, regTypeVal)) { event =>
+      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
+      val record = internalAddOrigin(event.targetId, event.origin)
+      persistenceBehavior.log.debug("{}: added binding {} -> {}", persistenceBehavior.ownId, event.targetId, event.origin)
+      onAddOrigin(event.targetId, event.origin, record)
+      persistenceBehavior.onPersist
+    }
   }
 
   /**
    * Removes the origin from the collection of recipients it belongs to. Returns `Some(targetId)`
    * if the call record can be removed (i.e. no listeners left), or None otherwise.
    */
-  def removeOrigin(origin: Origin): Option[Int] = _bindings.find(_._2.origins contains origin) flatMap {
+  def removeOrigin(origin: Origin, regTypeVal: RegistryType.Registry): Option[Int] = _bindings.find(_._2.origins contains origin) flatMap {
     case (targetId, record) =>
-      record.removeOrigin(origin)
-      if (record.origins isEmpty) {
-        _bindings -= targetId
-        Some(targetId)
-      } else None
+      // check for the last origin, will be removed
+      var theLastOne = false
+      if (record.origins.size == 1) theLastOne = true
+
+      persistenceBehavior.persist(OriginRemoved(origin, regTypeVal)) { event =>
+        persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
+        record.removeOrigin(event.origin)
+        if (theLastOne) internalRemove(targetId)
+        persistenceBehavior.onPersist
+      }
+
+      if (theLastOne) Some(targetId) else None
+  }
+
+  def restoreGroupCallRegistry(event: GroupCallRegistryRestoreProcess) = event match {
+    case e: RecordRemoved =>
+      internalRemove(e.targetId)
+    case e: OriginAdded =>
+      internalAddOrigin(e.targetId, e.origin)
+    case e: OriginRemoved =>
+      internalRemoveOrigin(e.origin)
   }
 
   /**
@@ -109,7 +147,7 @@ abstract class GroupCallRegistry(log: LoggingAdapter, ownId: String) {
 /**
  * LIST call registry.
  */
-class ListCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegistry(log, ownId) {
+class ListCallRegistry(persistenceBehavior: PartOfPersistenceBehavior) extends GroupCallRegistry(persistenceBehavior) {
   import models.akka.RichRoutee
 
   /**
@@ -127,18 +165,18 @@ class ListCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegi
   def deliverResponse(rsp: DSAResponse) = {
     getOrInsert(rsp.rid).setLastResponse(rsp).origins foreach { origin =>
       val response = rsp.copy(rid = origin.sourceId)
-      log.debug("{}: deliverResponse sends '{}' to '{}'", ownId, response, origin.source)
+      persistenceBehavior.log.debug("{}: deliverResponse sends '{}' to '{}'", persistenceBehavior.ownId, response, origin.source)
       origin.source ! ResponseEnvelope(List(response))
     }
     if (rsp.stream == Some(StreamState.Closed)) // shouldn't normally happen w/o CLOSE
-      remove(rsp.rid)
+      remove(rsp.rid, RegistryType.LIST)
   }
 }
 
 /**
  * SUBSCRIBE  call registry.
  */
-class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegistry(log, ownId) {
+class SubscribeCallRegistry(persistenceBehavior: PartOfPersistenceBehavior) extends GroupCallRegistry(persistenceBehavior) {
   import models.rpc.StreamState._
   import models.akka.RichRoutee
 
@@ -159,13 +197,13 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
   def deliverResponse(rsp: DSAResponse) = {
     val list = rsp.updates.getOrElse(Nil)
     if (list.isEmpty) {
-      log.warning(s"$ownId: cannot find updates in Subscribe response $rsp")
+      persistenceBehavior.log.warning("{}: cannot find updates in Subscribe response {}", persistenceBehavior.ownId, rsp)
     } else {
       val results = list flatMap handleSubscribeResponseRow(rsp.stream, rsp.columns, rsp.error)
-      log.debug("{}: deliverResponse results: {}", ownId, results)
+      persistenceBehavior.log.debug("{}: deliverResponse results: {}", persistenceBehavior.ownId, results)
       results groupBy (_._1) mapValues (_.map(_._2)) foreach {
         case (to, rsps) =>
-          log.debug("{}: deliverResponse sends '{}' to '{}'", ownId, rsps, to)
+          persistenceBehavior.log.debug("{}: deliverResponse sends '{}' to '{}'", persistenceBehavior.ownId, rsps, to)
           to ! ResponseEnvelope(rsps)
       }
     }
@@ -180,7 +218,7 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
     rec.setLastResponse(DSAResponse(0, stream, Some(List(row)), columns, error))
 
     if (stream == Some(StreamState.Closed)) // shouldn't normally happen w/o UNSUBSCRIBE
-      remove(targetSid)
+      remove(targetSid, RegistryType.SUBS)
 
     rec.origins map { origin =>
       val sourceRow = replaceSid(row, origin.sourceId)
@@ -188,4 +226,9 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
       (origin.source, response)
     }
   }
+}
+
+object RegistryType extends Enumeration {
+  type Registry = Value
+  val LIST, SUBS, DEFAULT = Value
 }
