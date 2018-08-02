@@ -7,7 +7,7 @@ spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster
-  replicas: 2
+  replicas: 3
   serviceName: cloud-broker-internal
   template:
     metadata:
@@ -55,11 +55,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "2000Mi"
+            cpu: "1000m"
           limits:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "2000Mi"
+            cpu: "1000m"
 ---
 apiVersion: apps/v1
 kind: Deployment
