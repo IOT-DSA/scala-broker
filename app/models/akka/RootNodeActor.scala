@@ -195,15 +195,15 @@ object RootNodeActor {
   private def createRolesNode(parentNode: DSANode) = {
     parentNode.addChild("roles").foreach { node =>
       node.profile = "static"
-      node.displayName = "Roles"
+      node.displayName = "roles"
       StandardActions.bindRolesNodeActions(node)
 
       // Add default role
       node.addChild(DEFAULT_ROLE, DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
-        child.profile = "node"
-        child.displayName = "Default role"
-
-        createFallbackRole(child)
+//        child.profile = "node"
+        child.displayName = "default role"
+        StandardActions.bindRoleNodeActions(child)
+        createFallbackRules(child)
       }
     }
   }
@@ -211,20 +211,21 @@ object RootNodeActor {
   def createFallbackRole(node: DSANode): Unit = {
     node.addChild(FALLBACK_ROLE, DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
       child.profile = "static"
-      child.displayName = "Fallback role"
-
-      createFallBackRules(child)
+      child.displayName = "fallback role"
+      StandardActions.bindRoleNodeActions(child)
+      createFallbackRules(child)
     }
   }
 
-  private def createFallBackRules(node: DSANode) : Unit = {
-    val path = URLEncoder.encode("/", "UTF-8")
+  private def createFallbackRules(node: DSANode) : Unit = {
+    val path = URLEncoder.encode("", "UTF-8")
     node.addChild(path, DEFAULT_RULE_CONFIG.toList:_*) foreach { child =>
-      val perm = "read"
+      val perm = "none"
       child.profile = "static"
-      child.displayName = "/"
+      child.displayName = "Empty path"
       child.value = perm
       child.addConfigs("$permission"->perm)
+      StandardActions.bindRuleNodeActions(child)
     }
   }
 
