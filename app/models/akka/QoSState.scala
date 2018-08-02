@@ -68,12 +68,12 @@ class QoSState(val maxCapacity: Int = 30, val reconnectionTime:Int = 30) extends
   def putMessage(message:SubscriptionNotificationMessage) = {
     meterTags("qos.in.level."+message.qos.index.toString)
     val result = message match {
-      case item @ SubscriptionNotificationMessage(_, _, _, _, QoS.Default) =>
+      case item @ SubscriptionNotificationMessage( _, _, QoS.Default) =>
         subscriptionsQueue += (item.sid -> Queue(message))
         log.debug("QoS == 0. Replacing with new queue")
         histogramValue(s"qos.level.0.queue.size")(1)
         item.sid
-      case item @ SubscriptionNotificationMessage(_, _, _, _, _) =>
+      case item @ SubscriptionNotificationMessage( _, _, _) =>
         val maybeQ = subscriptionsQueue.get(item.sid).orElse(Some(Queue[SubscriptionNotificationMessage]()))
 
         if(maybeQ.isEmpty){
