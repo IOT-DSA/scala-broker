@@ -3,7 +3,7 @@ package models.akka.responder
 import akka.actor._
 import akka.persistence.PersistentActor
 import models.Origin
-import models.akka.{GroupCallRegistryRestoreProcess, MainResponderBehaviorState, OriginAdded, OriginRemoved, RecordRemoved, ResponderBehaviorState, SimpleResponderBehaviorState}
+import models.akka.{GroupCallRegistryRestoreProcess, MainResponderBehaviorState, ResponderBehaviorState, SimpleResponderBehaviorState}
 import models.rpc.DSAResponse
 
 /**
@@ -13,7 +13,7 @@ import models.rpc.DSAResponse
 trait SimpleResponderBehavior extends ResponderBehavior { me: PersistentActor with ActorLogging =>
 
   private val listRegistry = new ListCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-LIST", log))
-  private val subsRegistry = new SubscribeCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-LIST", log))
+  private val subsRegistry = new SubscribeCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-SUBS", log))
 
   val simpleResponderRecover: Receive = {
     case  event: GroupCallRegistryRestoreProcess =>
