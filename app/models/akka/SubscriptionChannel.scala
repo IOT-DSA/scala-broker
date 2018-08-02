@@ -25,6 +25,7 @@ class SubscriptionChannel(log: LoggingAdapter)
   val timeout = Settings.QueryTimeout
   var iter = subscriptionsQueue.iterator
   val maxBatch = Settings.Subscriptions.maxBatchSize
+  val maxQosCapacity = Settings.Subscriptions.queueCapacity
   implicit val implTimeout = Timeout(timeout)
 
   override def shape: FlowShape[SubscriptionNotificationMessage, DSAResponse] = FlowShape.of(in, out)
@@ -40,14 +41,16 @@ class SubscriptionChannel(log: LoggingAdapter)
       case item@SubscriptionNotificationMessage(_, _, _) =>
         val maybeQ = subscriptionsQueue.get(item.sid).orElse(Some(Queue[SubscriptionNotificationMessage]()))
 
-        if (maybeQ.isEmpty) {
-          subscriptionsQueue.put(item.sid, maybeQ.get)
-        }
-
         maybeQ.foreach { q =>
+          if(q.size > maxQosCapacity){
+            q.dequeue()
+          }
           q.enqueue(message)
           histogramValue(s"qos.level.${item.qos.index}.queue.size")(q.size)
         }
+
+        subscriptionsQueue += (item.sid -> maybeQ.get)
+
         item.sid
       case other =>
     }
@@ -57,12 +60,15 @@ class SubscriptionChannel(log: LoggingAdapter)
     result
   }
 
-  def next: Option[(Int, Queue[SubscriptionNotificationMessage])] = if (iter.hasNext) {
-    Some(iter.next())
-  } else {
-    iter = subscriptionsQueue.iterator
-    if (iter.hasNext) Some(iter.next())
-    else None
+  def next: Option[(Int, Queue[SubscriptionNotificationMessage])] = {
+    if (iter.hasNext) {
+      Some(iter.next())
+    } else {
+      iter = subscriptionsQueue.iterator
+      if (iter.hasNext) Some(iter.next())
+      else None
+
+    }
   }
 
 
@@ -82,11 +88,8 @@ class SubscriptionChannel(log: LoggingAdapter)
         log.debug("on push: {}", in)
         val message = grab(in)
         putMessage(message)
-        log.debug("storing {}", message)
         if (isAvailable(out)) {
           pushNext
-        } else {
-          log.debug("out is unavailable.")
         }
       }
 

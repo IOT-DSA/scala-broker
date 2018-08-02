@@ -145,7 +145,6 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
         // in connected state pushing to stream with backpressure logic
         toSocket offer toSend
       } else if(message.qos >= QoS.Durable){
-//        //in disconnected - just send qos state
         channel.putMessage(toSend)
       }
     }
