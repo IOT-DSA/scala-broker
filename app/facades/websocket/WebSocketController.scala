@@ -289,10 +289,6 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     import akka.actor.Status._
 
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
-      .map{ m =>
-        log.info(s"out: ${m}")
-        m
-      }
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()(materializer)
 
@@ -321,7 +317,6 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
             case Terminated(_)           => context.stop(self)
             case other                   =>
               wsActor ! other
-              log.info(s"in: ${other}")
           }
 
           override def supervisorStrategy = OneForOneStrategy() {

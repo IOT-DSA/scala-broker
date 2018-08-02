@@ -94,8 +94,6 @@ class SubscriptionChannelSpec extends WordSpecLike
         Sink[DSAResponse, Future[Set[Int]]]
       ) => Unit) = {
 
-        val stateKeeper = as.actorOf(QoSState.props(100))
-
         val ch = new SubscriptionChannel(DefaultNoLogging)
         val flow = Flow.fromGraph(ch)
         val list = 0 until iterations map { i => SubscriptionNotificationMessage(DSAResponse(i, None, None, None, None), i % sids, qosLevel)}
