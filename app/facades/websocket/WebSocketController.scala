@@ -25,7 +25,7 @@ import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
 import models.akka.QoSState.SubscriptionSourceMessage
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
-import models.rpc.{DSAMessage, EmptyMessage, MsgpackTransformer, PingMessage}
+import models.rpc.{DSAMessage, EmptyMessage, MsgpackTransformer, PingMessage, ResponseMessage}
 import models.util.UrlBase64
 import play.api.cache.SyncCacheApi
 import play.api.libs.json.{JsValue, Json}
@@ -289,6 +289,10 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
     import akka.actor.Status._
 
     val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
+      .map{ m =>
+        log.info(s"out: ${m}")
+        m
+      }
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()(materializer)
 
@@ -298,7 +302,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
     fRoutee map   { routee =>
 
-      val (subscriptionsPusher, subscriptionsPublisher) = Source.actorRef[SubscriptionSourceMessage](bufferSize, overflow)
+      val (subscriptionsPusher, subscriptionsPublisher) = Source.actorRef[ResponseMessage](bufferSize, overflow)
         .toMat(Sink.asPublisher(false))(Keep.both)
         .run()(materializer)
 
@@ -315,7 +319,9 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           def receive = {
             case Success(_) | Failure(_) => wsActor ! PoisonPill
             case Terminated(_)           => context.stop(self)
-            case other                   => wsActor ! other
+            case other                   =>
+              wsActor ! other
+              log.info(s"in: ${other}")
           }
 
           override def supervisorStrategy = OneForOneStrategy() {

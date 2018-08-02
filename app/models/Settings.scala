@@ -4,7 +4,7 @@ import _root_.akka.stream.OverflowStrategy
 
 import scala.collection.JavaConverters.asScalaSetConverter
 import scala.concurrent.duration.DurationLong
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import play.api.libs.json.{JsArray, JsString, Json}
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
@@ -92,9 +92,10 @@ object Settings {
 
   object Subscriptions{
     private val cfg = rootConfig.getConfig("broker.subscriptions")
-    val reconnectionTimeout = Option(cfg.getInt("reconnectionTimeout")).getOrElse(30)
-    val queueCapacity = Option(cfg.getInt("queue.capacity")).getOrElse(30)
-    val maxBatchSize = Option(cfg.getInt("send.batch.size")).getOrElse(100)
+    val reconnectionTimeout = cfg.intOrDefault("reconnectionTimeout", 30)
+    val queueCapacity = cfg.intOrDefault("queue.capacity", 30)
+    val maxBatchSize = cfg.intOrDefault("send.batch.size", 100)
+    val aggregationPeriod = cfg.intOrDefault("send.batch.aggregation.period.ms", 5)
   }
 
   object MetricsReporters{
@@ -187,5 +188,17 @@ object Settings {
     private val cfg = rootConfig.getConfig("broker.logging")
 
     val ShowWebSocketPayload = cfg.getBoolean("show.ws.payload")
+  }
+
+  implicit class ConfigWrapper(config:Config){
+
+    def getOrDefault[T](extractor: String => T)(path:String, default:T) = if(config.hasPath(path)){
+      extractor(path)
+    } else {
+      default
+    }
+
+    def intOrDefault = getOrDefault(path => config.getInt(path))(_,_)
+
   }
 }
