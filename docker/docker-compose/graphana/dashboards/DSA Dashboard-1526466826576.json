@@ -8,7 +8,7 @@
   "hideControls": false,
   "id": null,
   "links": [],
-  "refresh": false,
+  "refresh": "10s",
   "rows": [
     {
       "collapse": false,
@@ -34,7 +34,7 @@
           "lines": true,
           "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
+          "nullPointMode": null,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -112,25 +112,27 @@
       "panels": [
         {
           "aliasColors": {},
-          "bars": false,
+          "bars": true,
+          "cacheTimeout": "",
           "dashLength": 10,
           "dashes": false,
           "datasource": null,
           "fill": 1,
+          "hideTimeOverride": false,
           "id": 2,
           "legend": {
             "avg": false,
             "current": false,
-            "max": false,
-            "min": false,
+            "max": true,
+            "min": true,
             "show": true,
             "total": false,
-            "values": false
+            "values": true
           },
-          "lines": true,
+          "lines": false,
           "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
+          "nullPointMode": null,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -142,27 +144,36 @@
           "steppedLine": false,
           "targets": [
             {
+              "hide": false,
+              "refId": "E",
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.response_in.count, 0.1667)), 'responses.in.cluster')"
+            },
+            {
+              "hide": false,
               "refId": "A",
-              "target": "alias(stats.gauges.$Application.$Host.out_requests_batch_requests, 'out.batches.requests')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.response_in.count, 0.1667), 'responses.in.node')"
             },
             {
+              "hide": false,
               "refId": "B",
-              "target": "alias(stats.gauges.$Application.$Host.out_requests_batch, 'out.request.batches')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.request_in.count, 0.1667), 'requests.in.node')"
             },
             {
+              "hide": false,
               "refId": "C",
-              "target": "alias(stats.gauges.$Application.$Host.request_out, 'out.request')"
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.request_in.count, 0.1667)), 'requests.in.cluster')"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "Out messages",
+          "title": "requests/responses",
           "tooltip": {
             "shared": true,
             "sort": 0,
             "value_type": "individual"
           },
+          "transparent": true,
           "type": "graph",
           "xaxis": {
             "buckets": null,
@@ -192,12 +203,12 @@
         },
         {
           "aliasColors": {},
-          "bars": false,
+          "bars": true,
           "dashLength": 10,
           "dashes": false,
           "datasource": null,
           "fill": 1,
-          "id": 4,
+          "id": 3,
           "legend": {
             "avg": false,
             "current": false,
@@ -207,10 +218,10 @@
             "total": false,
             "values": false
           },
-          "lines": true,
+          "lines": false,
           "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
+          "nullPointMode": null,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -222,18 +233,53 @@
           "steppedLine": false,
           "targets": [
             {
+              "hide": false,
               "refId": "A",
-              "target": "alias(stats.gauges.$Application.$Host.request_in, 'requests')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_notification_out.count, 0.1667), 'subscriptions.node.out')"
             },
             {
+              "hide": false,
+              "refId": "C",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_0_dropped.count, 'node.qos0.dropped')"
+            },
+            {
+              "hide": false,
+              "refId": "D",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_1_dropped.count, 'qos.node.dropped.1.per.minute')",
+              "textEditor": true
+            },
+            {
+              "hide": false,
+              "refId": "E",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_2_dropped.count, 'qos.node.dropped.2.per.minute')",
+              "textEditor": true
+            },
+            {
+              "hide": false,
+              "refId": "F",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_3_dropped.count, 'qos.node.dropped.3.per.minute')",
+              "textEditor": true
+            },
+            {
+              "hide": false,
               "refId": "B",
-              "target": "alias(stats.gauges.$Application.$Host.response_in, 'responses')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.subscribe_response_in.count, 0.1667), 'subscriptions.node.in')"
+            },
+            {
+              "hide": false,
+              "refId": "G",
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.subscribe_response_in.count, 0.1667)), 'subscriptions.cluster.in')"
+            },
+            {
+              "hide": false,
+              "refId": "H",
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_notification_out.count, 0.1667)), 'subscriptions.cluster.out')"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "In messages",
+          "title": "subscriptions out statistics",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -285,7 +331,7 @@
           "dashes": false,
           "datasource": null,
           "fill": 1,
-          "id": 5,
+          "id": 4,
           "legend": {
             "avg": false,
             "current": false,
@@ -298,7 +344,7 @@
           "lines": true,
           "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
+          "nullPointMode": null,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -311,20 +357,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.gauges.$Application.$Host.qos_in_level_0, '0')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_level_0_total.count, 0.1667), '0')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.gauges.$Application.$Host.qos_in_level_1, '1')"
-            },
-            {
-              "refId": "C",
-              "target": "alias(stats.gauges.$Application.$Host.qos_in_level_2, '2')"
-            },
-            {
-              "refId": "D",
-              "target": "alias(stats.gauges.$Application.$Host.qos_in_level_3.select metric, '3')",
-              "textEditor": true
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_level_0_total.count, 0.1667)), '0')"
             }
           ],
           "thresholds": [],
@@ -370,7 +407,7 @@
           "dashes": false,
           "datasource": null,
           "fill": 1,
-          "id": 6,
+          "id": 5,
           "legend": {
             "avg": false,
             "current": false,
@@ -383,7 +420,7 @@
           "lines": true,
           "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
+          "nullPointMode": null,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -395,34 +432,16 @@
           "steppedLine": false,
           "targets": [
             {
+              "hide": true,
               "refId": "A",
               "target": "alias(stats.timers.$Application.$Host.qos_sids_size.count, 'sids sizes')",
-              "textEditor": true
+              "textEditor": false
             },
             {
+              "hide": false,
               "refId": "B",
-              "target": "alias(stats.timers.$Application.$Host.qos_level_0_queue_size.count, 'qos.0.queue.size')",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_0_total.count, 'sids sizes')",
               "textEditor": false
-            },
-            {
-              "refId": "C",
-              "target": "alias(stats.timers.$Application.$Host.qos_level_1_queue_size.count, 'qos.1.queue.size')",
-              "textEditor": false
-            },
-            {
-              "refId": "D",
-              "target": "alias(stats.timers.$Application.$Host.qos_level_2_queue_size.count, 'qos.2.queue.size')",
-              "textEditor": false
-            },
-            {
-              "refId": "F",
-              "target": "alias(stats.counters.$Application.$Host.qos_dislodge.select metric, 'dislodge')",
-              "textEditor": true
-            },
-            {
-              "refId": "G",
-              "target": "alias(stats.timers.$Application.$Host.qos_level_3_queue_size.count, 'qos.3.queue.size')",
-              "textEditor": true
             }
           ],
           "thresholds": [],
@@ -462,107 +481,6 @@
           ]
         }
       ],
-      "repeat": null,
-      "repeatIteration": null,
-      "repeatRowId": null,
-      "showTitle": false,
-      "title": "Dashboard Row",
-      "titleSize": "h6"
-    },
-    {
-      "collapse": false,
-      "height": 336,
-      "panels": [
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": null,
-          "fill": 1,
-          "id": 3,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "span": 12,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "hide": false,
-              "refId": "A",
-              "target": "alias(stats.gauges.$Application.$Host.requester_benchmark_in_responses_updatesArrayBufferrequester_benchmark_in_responses_updates_address_localhost, 'in.responses')"
-            },
-            {
-              "hide": false,
-              "refId": "C",
-              "target": "alias(stats.gauges.$Application.$Host.requester_benchmark_out_requestsArrayBufferrequester_benchmark_out_requests_address_localhost, 'out.request.batches')"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "Benchmark",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ]
-        }
-      ],
-      "repeat": null,
-      "repeatIteration": null,
-      "repeatRowId": null,
-      "showTitle": false,
-      "title": "Dashboard Row",
-      "titleSize": "h6"
-    },
-    {
-      "collapse": false,
-      "height": 250,
-      "panels": [],
       "repeat": null,
       "repeatIteration": null,
       "repeatRowId": null,
@@ -619,7 +537,7 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -649,5 +567,5 @@
   },
   "timezone": "",
   "title": "DSA Dashboard",
-  "version": 2
+  "version": 1
 }
