@@ -31,12 +31,16 @@ class SubscriptionChannel(log: LoggingAdapter)
   override def shape: FlowShape[SubscriptionNotificationMessage, DSAResponse] = FlowShape.of(in, out)
 
   def putMessage(message: SubscriptionNotificationMessage) = {
-    meterTags("qos.in.level." + message.qos.index.toString)
+    countTags("qos.notification.in.counter")
+    histogramValue("qos.notification.in.hist")(1)
     val result = message match {
       case item@SubscriptionNotificationMessage(_, _, QoS.Default) =>
+        if(subscriptionsQueue.contains(item.sid)){
+          countTags(s"qos.level.0.dropped")
+        }
         subscriptionsQueue += (item.sid -> Queue(message))
         log.debug("QoS == 0. Replacing with new queue")
-        histogramValue(s"qos.level.0.queue.size")(1)
+        countTags(s"qos.level.0.total")
         item.sid
       case item@SubscriptionNotificationMessage(_, _, _) =>
         val maybeQ = subscriptionsQueue.get(item.sid).orElse(Some(Queue[SubscriptionNotificationMessage]()))
@@ -44,6 +48,7 @@ class SubscriptionChannel(log: LoggingAdapter)
         maybeQ.foreach { q =>
           if(q.size > maxQosCapacity){
             q.dequeue()
+            countTags(s"qos.level.${item.qos.index}.dropped")
           }
           q.enqueue(message)
           histogramValue(s"qos.level.${item.qos.index}.queue.size")(q.size)
@@ -113,6 +118,7 @@ class SubscriptionChannel(log: LoggingAdapter)
 
       getAndRemoveNext().foreach { message =>
         val resp = message.response
+        countTags("qos.notification.out")
         push(out, resp)
       }
       if (!hasBeenPulled(in)) {
