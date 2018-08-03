@@ -65,13 +65,13 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
       log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      meterTags(messageTags("request.in", ci):_*)
+      countTags(messageTags("request.in", ci):_*)
     case m @ ResponseMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "response")
       log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      meterTags(messageTags("response.in", ci):_*)
+      countTags(messageTags("response.in", ci):_*)
     case e @ RequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
@@ -86,7 +86,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty) {
     val msg = ResponseMessage(localMsgId.inc, None, responses.toList)
     sendToSocket(msg)
-    meterTags(messageTags("response.out", ci):_*)
+    countTags(messageTags("response.out", ci):_*)
   }
 
   /**
@@ -95,7 +95,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty) {
     val msg = RequestMessage(localMsgId.inc, None, requests.toList)
     sendToSocket(msg)
-    meterTags(messageTags("request.out", ci):_*)
+    countTags(messageTags("request.out", ci):_*)
   }
 
   /**

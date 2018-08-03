@@ -2,12 +2,11 @@ package models.akka.responder
 
 import scala.util.control.NonFatal
 import akka.persistence.PersistentActor
-
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{ ResponsesProcessed, RequestsProcessed }
-
+import models.akka.{RequestsProcessed, ResponsesProcessed}
+import models.metrics.Meter
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -15,7 +14,7 @@ import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: PersistentActor with ActorLogging =>
+trait ResponderBehavior extends Meter { me: PersistentActor with ActorLogging  =>
   import RidRegistry._
 
   protected def linkPath: String
@@ -103,7 +102,6 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
 
     log.debug("{}: RID after Rsp: {}", ownId, ridRegistry.info)
     log.debug("{}: SID after Rsp: {}", ownId, sidRegistry.info)
-
     results groupBy (_._1) mapValues (_.map(_._2))
   }
 
@@ -227,7 +225,10 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    * Forwards response to the recipients and returns nothing.
    */
   private def handleSubscribeResponse: ResponseHandler = {
-    case rsp @ DSAResponse(0, _, _, _, _) => deliverSubscribeResponse(rsp); Nil
+    case rsp @ DSAResponse(0, _, _, _, _) =>
+      deliverSubscribeResponse(rsp)
+      countTagsNTimes("subscribe.response.in")(rsp.updates.map(_.size).getOrElse(0))
+      Nil
   }
 
   /**
