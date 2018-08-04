@@ -195,7 +195,6 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
     }
   }
 
-
   private def isNotCommon(name: String): Boolean = !StandardActions.commonActions.contains(name)
 
   private def validPath(in: String) = if (in.startsWith("/")) in else s"/$in"
@@ -225,6 +224,4 @@ object DistributedNodesRegistry {
   }
 
   def props(replicator: ActorRef, cluster: Cluster, system: ActorSystem) = Props(new DistributedNodesRegistry(replicator)(cluster, system))
-
-
 }

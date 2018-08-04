@@ -95,9 +95,29 @@ class RootNodeActor extends Actor with ActorLogging {
           node.profile = "static"
           StandardActions.bindDataRootActions(node)
         }
+        node.addChild("rolesRoot") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindRolesNodeActions(node)
+        }
+        node.addChild("tokensRoot") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindTokenNodeActions(node)
+        }
         node.addChild("token") foreach {node =>
           node.profile = "static"
           StandardActions.bindTokenNodeActions(node)
+        }
+        node.addChild("tokenNode") foreach {node =>
+          node.profile = "static"
+          StandardActions.bindTokenNodeActions(node)
+        }
+        node.addChild("permissionRole") foreach {node =>
+          node.profile = "static"
+          StandardActions.bindRoleNodeActions(node)
+        }
+        node.addChild("permissionRule") foreach {node =>
+          node.profile = "static"
+          StandardActions.bindRuleNodeActions(node)
         }
       }
     }
@@ -122,12 +142,12 @@ class RootNodeActor extends Actor with ActorLogging {
 
     // The method call was commented as it does need in cluster mode.
     // TODO: Uncomment it in future
-    RootNodeActor.createTokensNode(sysNode)
+//    RootNodeActor.createTokensNode(sysNode)
 
     // Add root node for roles
     // The method call was commented as it does need in cluster mode.
     // TODO: Uncomment it in future
-    RootNodeActor.createRolesNode(sysNode)
+//    RootNodeActor.createRolesNode(sysNode)
 
     sysNode
   }
@@ -174,7 +194,7 @@ object RootNodeActor {
   val DEFAULT_ROLE  = "default"
   val DEFAULT_ROLE_CONFIG = Map[String, DSAVal](
     "$is"->"broker/permissionRole"
-    , "type" -> DSAValueType.DSAString
+    , "$type" -> DSAValueType.DSAString
     , "$writable"->"config"
   )
 
@@ -200,8 +220,8 @@ object RootNodeActor {
 
       // Add default role
       node.addChild(DEFAULT_ROLE, DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
-//        child.profile = "node"
-        child.displayName = "default role"
+        child.profile = "static"
+        child.displayName = "default"
         StandardActions.bindRoleNodeActions(child)
         createFallbackRules(child)
       }
@@ -211,18 +231,18 @@ object RootNodeActor {
   def createFallbackRole(node: DSANode): Unit = {
     node.addChild(FALLBACK_ROLE, DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
       child.profile = "static"
-      child.displayName = "fallback role"
+      child.displayName = "fallback"
       StandardActions.bindRoleNodeActions(child)
       createFallbackRules(child)
     }
   }
 
   private def createFallbackRules(node: DSANode) : Unit = {
-    val path = URLEncoder.encode("", "UTF-8")
+    val path = URLEncoder.encode("empty", "UTF-8")
     node.addChild(path, DEFAULT_RULE_CONFIG.toList:_*) foreach { child =>
       val perm = "none"
       child.profile = "static"
-      child.displayName = "Empty path"
+      child.displayName = "empty"
       child.value = perm
       child.addConfigs("$permission"->perm)
       StandardActions.bindRuleNodeActions(child)
@@ -244,14 +264,14 @@ object RootNodeActor {
   private def createTokensNode(parentNode: DSANode) = {
     parentNode.addChild("tokens").foreach { node =>
       node.profile = "node"
-      node.displayName = "Tokens"
+      node.displayName = "tokens"
       StandardActions.bindTokenGroupNodeActions(node)
 
       // Add default token
       val tokenId = DEFAULT_TOKEN
 
       node.addChild(tokenId) foreach { child =>
-        child.profile = "broker/TokenNode"
+        child.profile = "broker/tokenNode"
         child.addConfigs(DEFAULT_TOKEN_CONFIG.toList:_*)
         child.addConfigs(DEFAULT_TOKEN_PROFILE.toList:_*)
         bindTokenNodeActions(child)

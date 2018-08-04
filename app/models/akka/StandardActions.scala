@@ -12,11 +12,10 @@ import models.akka.Messages.{DisconnectEndpoint, GetOrCreateDSLink, RemoveDSLink
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-
 import akka.actor.ActorSystem
+import akka.actor.Status._
 import akka.pattern.ask
 import akka.routing.Routee
-
 import akka.util.Timeout
 
 
@@ -351,13 +350,27 @@ object StandardActions {
   val AddRoleNode: DSAAction = DSAAction((ctx: ActionContext) =>
     ctx.node.parent foreach { parent =>
       val roleName = ctx.args("Name").value.toString
-      parent.addChild(roleName, RootNodeActor.DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
-//        child.addConfigs(RootNodeActor.DEFAULT_ROLE_CONFIG.toList:_*)
-//        child.profile = "node"
+      parent.addChild(roleName, RootNodeActor.DEFAULT_ROLE_CONFIG.toList: _*) map { child =>
+        child.profile = "static"
         bindRoleNodeActions(child)
         RootNodeActor.createFallbackRole(child)
       }
     }
+//        .onComplete(
+//        {
+//          case Success(_) => {
+//            //Do something with my list
+//          }
+//          case Failure(e) => {
+//            println("Error while adding new rule: " + e.getMessage)
+//            //Do something with my error
+//          }
+//        }
+//      )
+
+//    recover {
+//      case e: RuntimeException => println("Error while adding new rule: " + e.getMessage)
+//    }
     , Map[String, DSAVal]("name"->"Name", "type"->DSAString)
   )
 
@@ -369,11 +382,13 @@ object StandardActions {
       val path = ctx.args("Path").value.toString
       val perm = ctx.args("Permission")
 
-      parent.addChild(URLEncoder.encode(path, "UTF-8"), "$permission"->perm) foreach { ruleNode =>
+      parent.addChild(URLEncoder.encode(path, "UTF-8"), "$permission"->perm) map { ruleNode =>
         ruleNode.value = perm.toString
-//        ruleNode.profile = "static"
+        ruleNode.profile = "static"
         ruleNode.addConfigs(RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*)
         bindActions(ruleNode, commonActions(REMOVE_RULE))
+      } recover {
+        case e: RuntimeException => println("Error while adding new rule: " + e.getMessage)
       }
     }
     , Map[String, DSAVal]("name"->"Path", "type"-> DSAString)

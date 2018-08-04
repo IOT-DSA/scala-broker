@@ -134,7 +134,6 @@ class DistributedDSANode(_parent: Option[DSANode],
     old.copy(configs = old.configs + ("$is" -> p))
   }
 
-
   override def configs: Future[Map[String, DSAVal]] = Future.successful(data.configs)
 
   override def config(name: String): Future[Option[DSAVal]] = Future.successful(data.configs.get(name))
@@ -181,7 +180,6 @@ class DistributedDSANode(_parent: Option[DSANode],
       }
     }
   }
-
 
   override def addChild(name: String, node: DSANode): Future[DSANode] = {
     _children += (name -> node)
@@ -240,7 +238,6 @@ class DistributedDSANode(_parent: Option[DSANode],
   }
 
   private[this] def isLocal(ref: ActorRef): Boolean = ref.path.address == self.path.address
-
 
   private[this] def updateLocalState(update: ReplicatedData) = update match {
     case d: DistributedDSANodeState =>
@@ -438,8 +435,6 @@ class DistributedDSANode(_parent: Option[DSANode],
       stash = stash :+ u
     }
   }
-
-
 
   private[this] def empty = DistributedDSANodeState.empty
 

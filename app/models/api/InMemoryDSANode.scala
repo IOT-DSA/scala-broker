@@ -94,7 +94,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
   def addChild(name: String, profile:Option[String] = None, valueType:Option[DSAValueType] = None) = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
     val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
-    profile foreach{child.profile = _}
+    profile foreach {child.profile = _}
     valueType.foreach(child.valueType = _)
     addChild(name, child)
   }
