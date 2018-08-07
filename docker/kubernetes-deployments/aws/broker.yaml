@@ -22,7 +22,7 @@ spec:
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "sed -i 's/search.*/search cloud-broker-internal.default.svc.cluster.local/g' /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -82,13 +82,13 @@ spec:
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
-      dnsPolicy: None
       dnsConfig:
         searches:
         - cloud-broker-internal.default.svc.cluster.local
-        nameservers:
-        - 10.100.0.10
-        - 8.8.8.8
+      initContainers:
+      - name: init-resolv
+        image: "busybox"
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
