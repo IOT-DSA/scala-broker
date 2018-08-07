@@ -34,21 +34,9 @@ spec:
       - name: zipkin
         image: openzipkin/zipkin
         imagePullPolicy: Always
-        volumeMounts:
-        - name: monitoring-data
-          mountPath: "/data"   #тут надо вставить правильный путь
         ports:
         - containerPort: 9411
 
-  volumeClaimTemplates:
-  - metadata:
-      name: monitoring-data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi  #размер диска надо определить и выставить
 ---
 apiVersion: v1
 kind: Service
