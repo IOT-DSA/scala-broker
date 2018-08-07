@@ -47,19 +47,35 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.gauges.$Application.$Host.connected, 'Total')"
+              "target": "alias(stats.gauges.$Application.$Host.connected, 'Total connections on node')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.gauges.$Application.$Host.connected_mode_Requester, 'Requesters')"
+              "target": "alias(stats.gauges.$Application.$Host.connected_mode_Requester, 'Requesters on node')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.gauges.$Application.$Host.connected_mode_Responder, 'Responders')"
+              "target": "alias(stats.gauges.$Application.$Host.connected_mode_Responder, 'Responders on node')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.gauges.$Application.$Host.handshake, 'Handshakes')"
+              "target": "alias(stats.gauges.$Application.$Host.handshake, 'Handshakes on node')"
+            },
+            {
+              "refId": "E",
+              "target": "alias(sumSeries(stats.gauges.$Application.*.connected), 'Total connections on cluster')"
+            },
+            {
+              "refId": "F",
+              "target": "alias(sumSeries(stats.gauges.$Application.*.connected_mode_Requester), 'Requesters on cluster')"
+            },
+            {
+              "refId": "G",
+              "target": "alias(sumSeries(stats.gauges.$Application.*.connected_mode_Responder), 'Responders on cluster')"
+            },
+            {
+              "refId": "H",
+              "target": "alias(stats.gauges.$Application.$Host.handshake, 'Handshakes on cluster')"
             }
           ],
           "thresholds": [],
@@ -112,7 +128,7 @@
       "panels": [
         {
           "aliasColors": {},
-          "bars": true,
+          "bars": false,
           "cacheTimeout": "",
           "dashLength": 10,
           "dashes": false,
@@ -129,7 +145,7 @@
             "total": false,
             "values": true
           },
-          "lines": false,
+          "lines": true,
           "linewidth": 1,
           "links": [],
           "nullPointMode": null,
@@ -146,22 +162,22 @@
             {
               "hide": false,
               "refId": "E",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.response_in.count, 0.1667)), 'responses.in.cluster')"
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.response_in.count, 1)), 'responses.in.cluster')"
             },
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.response_in.count, 0.1667), 'responses.in.node')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.response_in.count, 1), 'responses.in.node')"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.request_in.count, 0.1667), 'requests.in.node')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.request_in.count, 1), 'requests.in.node')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.request_in.count, 0.1667)), 'requests.in.cluster')"
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.request_in.count, 1)), 'requests.in.cluster')"
             }
           ],
           "thresholds": [],
@@ -203,7 +219,7 @@
         },
         {
           "aliasColors": {},
-          "bars": true,
+          "bars": false,
           "dashLength": 10,
           "dashes": false,
           "datasource": null,
@@ -218,7 +234,7 @@
             "total": false,
             "values": false
           },
-          "lines": false,
+          "lines": true,
           "linewidth": 1,
           "links": [],
           "nullPointMode": null,
@@ -235,51 +251,51 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_notification_out.count, 0.1667), 'subscriptions.node.out')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_notification_out.count, 1), 'subscriptions sent from node to requester')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_0_dropped.count, 'node.qos0.dropped')"
+              "target": "alias(stats.counters.$Application.$Host.qos_level_0_dropped.select metric, 'qos0 replacement count')"
             },
             {
               "hide": false,
               "refId": "D",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_1_dropped.count, 'qos.node.dropped.1.per.minute')",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_1_dropped.count, 'qos1 replacement count')",
               "textEditor": true
             },
             {
               "hide": false,
               "refId": "E",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_2_dropped.count, 'qos.node.dropped.2.per.minute')",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_2_dropped.count, 'qos2 replacement count')",
               "textEditor": true
             },
             {
               "hide": false,
               "refId": "F",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_3_dropped.count, 'qos.node.dropped.3.per.minute')",
+              "target": "alias(stats.counters.$Application.$Host.qos_level_3_dropped.count, 'qos3 replacement count')",
               "textEditor": true
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.subscribe_response_in.count, 0.1667), 'subscriptions.node.in')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.subscribe_response_in.count, 1), 'subscriptions received by node from responders')"
             },
             {
               "hide": false,
               "refId": "G",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.subscribe_response_in.count, 0.1667)), 'subscriptions.cluster.in')"
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.subscribe_response_in.count, 1)), 'subscriptions received by cluster from responders')"
             },
             {
               "hide": false,
               "refId": "H",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_notification_out.count, 0.1667)), 'subscriptions.cluster.out')"
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_notification_out.count, 1)), 'subscriptions sent from cluster to requester')"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "subscriptions out statistics",
+          "title": "subscriptions  statistics",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -357,11 +373,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_level_0_total.count, 0.1667), '0')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_level_0_total.count, 1), 'qos 0 on node')"
             },
             {
               "refId": "B",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_level_0_total.count, 0.1667)), '0')"
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_level_0_total.count, 1)), 'qos 0 on cluster')"
             }
           ],
           "thresholds": [],
@@ -537,7 +553,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {
@@ -567,5 +583,5 @@
   },
   "timezone": "",
   "title": "DSA Dashboard",
-  "version": 1
+  "version": 3
 }
