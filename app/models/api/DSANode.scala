@@ -196,7 +196,7 @@ trait DSANodeRequestHandler { self:DSANode =>
     // TODO this needs to be rewritten to remove blocking
     case ListRequest(rid, _) =>
       list(rid, sender)
-      val cfgUpdates = array("$is", _configs("$is")) +: toUpdateRows(_configs - "$is")
+      val cfgUpdates = array("$is", _configs.getOrElse("$is", StringValue(""))) +: toUpdateRows(_configs - "$is")
       val attrUpdates = toUpdateRows(_attributes)
       val childUpdates = Await.result(Future.sequence(_children map {
         case (name, node) => node.configs map (cfgs => name -> cfgs)
