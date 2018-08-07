@@ -16,10 +16,13 @@ spec:
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
-      dnsPolicy: ClusterFirst
       dnsConfig:
-          searches:
-            - cloud-broker-internal.default.svc.cluster.local
+        searches:
+        - cloud-broker-internal.default.svc.cluster.local
+      initContainers:
+      - name: init-resolv
+        image: "busybox"
+        command: ["sh", "-c", "sed -i 's/search.*/search cloud-broker-internal.default.svc.cluster.local/g' /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -65,11 +68,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "2000Mi"
-            cpu: "1000m"
+            memory: "6500Mi"
+            cpu: "3700m"
           limits:
-            memory: "2000Mi"
-            cpu: "1000m"
+            memory: "6500Mi"
+            cpu: "3700m"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -80,7 +83,7 @@ spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster
-  replicas: 1
+  replicas: 0
   serviceName: cloud-broker-internal
   template:
     metadata:
@@ -89,10 +92,13 @@ spec:
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
-      dnsPolicy: ClusterFirst
+      dnsPolicy: None
       dnsConfig:
-          searches:
-            - cloud-broker-internal.default.svc.cluster.local
+        searches:
+        - cloud-broker-internal.default.svc.cluster.local
+        nameservers:
+        - 10.100.0.10
+        - 8.8.8.8
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
