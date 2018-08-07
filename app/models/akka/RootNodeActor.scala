@@ -101,7 +101,7 @@ class RootNodeActor extends Actor with ActorLogging {
         }
         node.addChild("tokensRoot") foreach { node =>
           node.profile = "static"
-          StandardActions.bindTokenNodeActions(node)
+          StandardActions.bindTokenGroupNodeActions(node)
         }
         node.addChild("token") foreach {node =>
           node.profile = "static"
@@ -142,12 +142,12 @@ class RootNodeActor extends Actor with ActorLogging {
 
     // The method call was commented as it does need in cluster mode.
     // TODO: Uncomment it in future
-    RootNodeActor.createTokensNode(sysNode)
+//    RootNodeActor.createTokensNode(sysNode)
 
     // Add root node for roles
     // The method call was commented as it does need in cluster mode.
     // TODO: Uncomment it in future
-    RootNodeActor.createRolesNode(sysNode)
+//    RootNodeActor.createRolesNode(sysNode)
 
     sysNode
   }
@@ -257,25 +257,17 @@ object RootNodeActor {
     *
     **/
   val DEFAULT_TOKEN = "1234567891234567"
-  val DEFAULT_TOKEN_CONFIG = Map[String, DSAVal]("$is"->"broker/token", "$role"->"config", "token" -> "tokenId")
-  val DEFAULT_TOKEN_PROFILE = Map[String, DSAVal]("$$count" -> null, "$$managed" -> false, "$$maxSession" -> null
-    , "$$timeRange" -> null)
+  val DEFAULT_TOKEN_CONFIG = Map[String, DSAVal]("$is"->"broker/token")
+  val DEFAULT_TOKEN_CHILD_CONFIG = Map[String, DSAVal]("$type"->"string", "$writable"->"config")
 
   private def createTokensNode(parentNode: DSANode) = {
     parentNode.addChild("tokens").foreach { node =>
-      node.profile = "node"
+//      node.profile = "static"
       node.displayName = "tokens"
       StandardActions.bindTokenGroupNodeActions(node)
 
       // Add default token
-      val tokenId = DEFAULT_TOKEN
-
-      node.addChild(tokenId) foreach { child =>
-        child.profile = "broker/tokenNode"
-        child.addConfigs(DEFAULT_TOKEN_CONFIG.toList:_*)
-        child.addConfigs(DEFAULT_TOKEN_PROFILE.toList:_*)
-        bindTokenNodeActions(child)
-      }
+      StandardActions.createTokenNode(node, DEFAULT_TOKEN, "config")
     }
   }
 

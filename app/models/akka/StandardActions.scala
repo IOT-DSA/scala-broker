@@ -13,7 +13,6 @@ import models.akka.Messages.{DisconnectEndpoint, GetOrCreateDSLink, RemoveDSLink
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import akka.actor.ActorSystem
-import akka.actor.Status._
 import akka.pattern.ask
 import akka.routing.Routee
 import akka.util.Timeout
@@ -28,8 +27,8 @@ object StandardActions {
 
 
   case class ActionDescription(name:String, displayName:String, action: DSAAction
-                               , invokable: Option[String] = Option("write")
-                               , is: Option[String] = Option("node")
+                               , invokable: Option[String] = Some("config")
+                               , is: Option[String] = None
                               )
 
   val ADD_NODE = "addNode"
@@ -127,13 +126,14 @@ object StandardActions {
         } map
         { item => MapValue(item) }
 
-      val configs:Map[String, DSAVal] = Map(
+      var configs:Map[String, DSAVal] = Map(
         "$params" -> ArrayValue(params),
-        "$invokable" -> ad.invokable.getOrElse("config"),
-        "$is" -> ad.is.getOrElse("static"),
         "$name" -> ad.displayName,
-        "$columns" -> ArrayValue(columns)
+        "$columns" -> ArrayValue(columns),
+        "$is" -> ""
       )
+      ad.is foreach { v => configs += ("$is"->v) }
+      ad.invokable foreach { v => configs += ("$invokable"->v) }
 
       node.addChild(ad.name, configs.toSeq:_*).foreach { child =>
         child.action = ad.action
@@ -241,25 +241,10 @@ object StandardActions {
         token <- fToken
       )
       {
-        val tokenId = token.substring(0, 16);
-        node.addChild(tokenId) foreach { child =>
-          child.profile = "broker/tokenNode"
-          child.addConfigs(
-            ("$$group" -> groupName)
-            , ("$$token" -> token)
-            , ("$is" -> "broker/token")
-          )
-          child.addConfigs(
-            ("$$count"->count)
-            , ("$$managed"->managed)
-            , ("$$maxSession"->maxSession)
-            , ("$$timeRange"->timeRange)
-
-          )
-          bindTokenNodeActions(child)
-        }
+        createTokenNode(node, token, groupName, timeRange, count, maxSession, managed)
       }
 
+      // TODO: Change it to non-blocking way
       val token = Await.result(fToken, Duration.Inf)
 
       (token.substring(0, 16), token)
@@ -273,6 +258,48 @@ object StandardActions {
     , Map[String, DSAVal]("name"->"TokenName", "type"->DSAString, "output"->true)
     , Map[String, DSAVal]("name"->"Token", "type"->DSAString, "output"->true)
   )
+
+  def createTokenNode(node: DSANode, token: String, groupName: String, timeRange: String="", count: String=""
+                      , maxSession: String="", managed: String="") =
+  {
+    val tokenId = token.substring(0, 16);
+
+    node.addChild(tokenId) foreach { child =>
+      initTokenNode(child, token, groupName, timeRange, count, maxSession, managed)
+    }
+  }
+
+  def initTokenNode(node: DSANode, token: String, groupName: String, timeRange: String = "", count: String = "", maxSession: String = "", managed: String = "") = {
+    node.profile = "broker/tokenNode"
+    node.addConfigs(RootNodeActor.DEFAULT_TOKEN_CONFIG.toList: _*)
+
+    bindTokenNodeActions(node)
+
+    node.addChild("count", (RootNodeActor.DEFAULT_TOKEN_CHILD_CONFIG + ("$type" -> StringValue("number"))).toList: _*) foreach {
+      childNode =>
+        childNode.value = count
+    }
+    node.addChild("managed", (RootNodeActor.DEFAULT_TOKEN_CHILD_CONFIG + ("$type" -> StringValue("bool"))).toList: _*) foreach {
+      childNode =>
+        childNode.value = managed
+    }
+    node.addChild("max_session", (RootNodeActor.DEFAULT_TOKEN_CHILD_CONFIG + ("$type" -> StringValue("number"))).toList: _*) foreach {
+      childNode =>
+        childNode.value = maxSession
+    }
+    node.addChild("role", (RootNodeActor.DEFAULT_TOKEN_CHILD_CONFIG).toList: _*) foreach {
+      childNode =>
+        childNode.value = groupName
+    }
+    node.addChild("time_range", (RootNodeActor.DEFAULT_TOKEN_CHILD_CONFIG).toList: _*) foreach {
+      childNode =>
+        childNode.value = timeRange
+    }
+    node.addChild("token", (RootNodeActor.DEFAULT_TOKEN_CHILD_CONFIG - "writable").toList: _*) foreach {
+      childNode =>
+        childNode.value = token
+    }
+  }
 
   /**
     * Regenerate the token, first 18 bytes became the same, rest ones

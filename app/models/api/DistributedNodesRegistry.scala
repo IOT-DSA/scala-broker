@@ -165,27 +165,27 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
 
         parent match {
           // Processing /sys/tokens node - add all required actions
-          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Tokens) =>
-            StandardActions.bindTokenGroupNodeActions(newOne)
+          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Tokens) => None
+//            StandardActions.bindTokenGroupNodeActions(newOne)
 
           // Processing /sys/tokens/<tokenid> - bind token actions
-          case parent if (parent + "/" + name).startsWith(Paths.Tokens + "/") && isNotCommon(name) =>
-            StandardActions.bindTokenNodeActions(newOne)
+          case parent if (parent + "/" + name).startsWith(Paths.Tokens + "/") && isNotCommon(name) => None
+//            StandardActions.bindTokenNodeActions(newOne)
 
           // Processing /sys/roles node - add all roles actions
-          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Roles) =>
-            StandardActions.bindRolesNodeActions(newOne)
+          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Roles) => None
+//            StandardActions.bindRolesNodeActions(newOne)
 
           // Processing /sys/roles/<role> - bind role actions
-          case parent if (parent + "/" + name).startsWith(Paths.Roles + "/")  && isNotCommon(name) =>
-            StandardActions.bindRoleNodeActions(newOne)
+          case parent if (parent + "/" + name).startsWith(Paths.Roles + "/")  && isNotCommon(name) => None
+//            StandardActions.bindRoleNodeActions(newOne)
 
           // Processing non common nodes (actions)
           case parent if isNotCommon(name) =>
             StandardActions.bindDataNodeActions(newOne)
 
           // Processing any other nodes - do nothing
-          case parent =>
+          case parent => None
         }
         newOne
       }

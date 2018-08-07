@@ -44,15 +44,16 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
 
   (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Tokens, Some("broker/tokensRoot"))))
     .mapTo[DSANode] foreach {
-
     node =>
       node.displayName = "tokens"
+      StandardActions.bindTokenGroupNodeActions(node)
   }
 
   (distrubutedNodeRegistry ? AddNode(DSANodeDescription(Paths.Tokens + "/" + RootNodeActor.DEFAULT_TOKEN
     , RootNodeActor.DEFAULT_TOKEN_CONFIG))).mapTo[DSANode] foreach {
     node =>
       node.displayName = RootNodeActor.DEFAULT_TOKEN
+      StandardActions.initTokenNode(node, RootNodeActor.DEFAULT_TOKEN, "config")
   }
 
   (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Roles, Some("broker/rolesRoot"))))
@@ -60,6 +61,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
 
     node =>
       node.displayName = "roles"
+      StandardActions.bindRolesNodeActions(node)
   }
 
   (distrubutedNodeRegistry ? AddNode(DSANodeDescription(Paths.Roles + "/" + RootNodeActor.DEFAULT_ROLE
@@ -69,6 +71,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     node =>
       node.displayName = "default"
       node.value = "none"
+      StandardActions.bindRoleNodeActions(node)
   }
 
   log.info("Clustered DSLink Manager created")
