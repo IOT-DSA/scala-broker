@@ -25,8 +25,8 @@ spec:
         - 8.8.8.8
       initContainers:
       - name: init-resolv
-        image": "busybox"
-        command": ["sh", "-c", "sed 's/search/search cloud-broker-internal.default.svc.cluster.local/g' /etc/resolv.conf > /etc/resolv.conf"]
+        image: "busybox"
+        command: ["sh", "-c", "sed 's/search/search cloud-broker-internal.default.svc.cluster.local/g' /etc/resolv.conf > /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
