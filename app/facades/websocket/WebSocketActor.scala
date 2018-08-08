@@ -6,6 +6,8 @@ import org.joda.time.DateTime
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
 import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
+import akka.stream.{Materializer, OverflowStrategy, SinkRef}
+import akka.stream.scaladsl.{Keep, Source}
 import kamon.Kamon
 import models.{RequestEnvelope, ResponseEnvelope, formatMessage}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
@@ -21,11 +23,16 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, sal
 /**
  * Represents a WebSocket connection and communicates to the DSLink actor.
  */
-class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig)
+class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSocketActorConfig)(implicit mat: Materializer)
   extends Actor with ActorLogging with RequiresMessageQueue[BoundedMessageQueueSemantics]
   with Meter{
 
   protected val ci = config.connInfo
+
+  protected val out = Source.queue(100, OverflowStrategy.backpressure)
+    .toMat(sinkRef.sink())(Keep.left)
+    .run()
+
   protected val linkName = ci.linkName
   protected val ownId = s"WSActor[$linkName]-${UUID.randomUUID.toString}"
 
@@ -113,7 +120,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
    */
   private def sendToSocket(msg: DSAMessage) = {
     log.debug("{}: sending {} to WebSocket", ownId, formatMessage(msg))
-    out ! msg
+    out.offer(msg)
   }
 }
 
@@ -124,6 +131,6 @@ object WebSocketActor {
   /**
    * Creates a new [[WebSocketActor]] props.
    */
-  def props(out: ActorRef, routee: Routee, config: WebSocketActorConfig) =
+  def props(out: SinkRef[DSAMessage], routee: Routee, config: WebSocketActorConfig)(implicit mat: Materializer) =
     Props(new WebSocketActor(out, routee, config))
 }

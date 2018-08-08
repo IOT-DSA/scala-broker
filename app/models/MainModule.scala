@@ -4,8 +4,8 @@ package models
 import scala.collection.Seq
 import _root_.akka.actor.ActorSystem
 import _root_.akka.cluster.Cluster
+import com.romix.akka.serialization.kryo.ActorRefSerializer
 import javax.inject.{Inject, Provider, Singleton}
-
 import kamon.Kamon
 import kamon.statsd.StatsDReporter
 import kamon.system.SystemMetrics
@@ -31,6 +31,8 @@ class MainModule extends Module {
       bind[BrokerActors].toSelf.eagerly,
       bind[SystemGuard].toSelf.eagerly,
       bind[StatsDConnection].toSelf.eagerly())
+
+    kryo.addDefaultSerializer(classOf[ActorRef], new ActorRefSerializer(system))
   }
 }
 

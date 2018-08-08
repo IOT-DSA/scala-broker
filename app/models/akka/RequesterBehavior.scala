@@ -3,9 +3,10 @@ package models.akka
 import akka.actor.ActorRef
 import akka.actor.Status.Success
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.{ActorMaterializer, OverflowStrategy, SinkRef}
 import models.akka.Messages._
 import models.metrics.Meter
+
 import scala.util.control.NonFatal
 import scala.concurrent.duration._
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
@@ -59,8 +60,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
         sendToEndpoint(ResponseEnvelope(other))
       }
 
-    case SubscriptionSourceMessage(actorRef) =>
-      getSubscriptionSource(actorRef)
+    case SubscriptionSourceMessage(sinkRef) =>
+      getSubscriptionSource(sinkRef)
 
   }
 
@@ -89,16 +90,16 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource(actor:ActorRef) = {
+  private def getSubscriptionSource(sinkRef:SinkRef[ResponseMessage]) = {
 
-    log.info("new subscription source connected: {}", actor)
+    log.info("new subscription source connected: {}", sinkRef)
 
-    val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
+    val toSocketVal = Source.queue(100, OverflowStrategy.backpressure)
       .via(Flow.fromGraph(channel))
       .groupedWithin(Settings.Subscriptions.maxBatchSize,
         Settings.Subscriptions.aggregationPeriod milliseconds)
       .map{ in => new ResponseMessage(-1, None, in.toList )}
-      .toMat(Sink.actorRef(actor, Success(())))(Keep.both)
+      .toMat(sinkRef.sink())(Keep.left)
       .run()
 
     toSocket = toSocketVal
