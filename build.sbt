@@ -69,7 +69,7 @@ dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
 dockerExposedPorts := Seq(9000, 9443, 2551)
-dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
+dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs", "/opt/docker/journal", "/opt/docker/snapshots")
 dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
@@ -88,7 +88,6 @@ dockerCommands :=
     case ExecCmd("ENTRYPOINT", args @ _*) => Seq(Cmd("ENTRYPOINT", args.mkString(" ")))
     case v => Seq(v)
   }
-
 
 mappings in Universal ++= Seq(
   file("scripts/start-broker") -> "bin/start-broker",
