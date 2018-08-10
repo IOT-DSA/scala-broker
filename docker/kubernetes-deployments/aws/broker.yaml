@@ -27,6 +27,16 @@ spec:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
         imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /cluster
+            port: 9000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
         serviceName: "cloud-broker-internal"
         ports:
         - containerPort: 9000
@@ -93,6 +103,16 @@ spec:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
         imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /cluster
+            port: 9000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
         serviceName: "cloud-broker-internal"
         ports:
         - containerPort: 9000
