@@ -103,7 +103,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
    * Processes a DSA payload and forwards the results to [[models.akka.responder.ResponderBehavior]].
    */
   protected def sendToEndpoint(msg: Any): Unit = msg match {
-    case RequestEnvelope(requests) => requests foreach handleRequest
+    case RequestEnvelope(requests, header) => requests foreach handleRequest
     case _                         => log.warning("Unknown message received: {}", msg)
   }
 

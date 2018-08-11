@@ -17,7 +17,8 @@ import models.akka.QoSState._
 /**
  * Handles communication with a remote DSLink in Requester mode.
  */
-trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
+trait RequesterBehavior {
+  me: AbstractDSLinkActor with Meter =>
 
   implicit val materializer = ActorMaterializer()
 
@@ -236,7 +237,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
     requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) =>
-        val envelope = RequestEnvelope(reqs.toSeq)
+        val header = Map("dsId"->DSAValue.StringValue(me.connInfo.dsId))
+        val envelope = RequestEnvelope(reqs.toSeq, Some(header))
         log.debug("{}: sending {} to [{}]", ownId, envelope, to)
         dslinkMgr.dsaSend(to, envelope)
         logRequestBatch(to, envelope.requests)

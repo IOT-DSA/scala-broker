@@ -132,8 +132,8 @@ object StandardActions {
         "$columns" -> ArrayValue(columns),
         "$is" -> ""
       )
-      ad.is foreach { v => configs += ("$is"->v) }
-      ad.invokable foreach { v => configs += ("$invokable"->v) }
+      ad.is foreach { v => configs += ("$is"-> StringValue(v)) }
+      ad.invokable foreach { v => configs += ("$invokable"->StringValue(v)) }
 
       node.addChild(ad.name, configs.toSeq:_*).foreach { child =>
         child.action = ad.action

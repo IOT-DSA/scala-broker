@@ -63,12 +63,12 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       ws.expectMsg(RequestEnvelope(List(CloseRequest(2))))
     }
     "handle Set requests" in {
-      responder.tell(RequestEnvelope(List(SetRequest(111, "/downstream/R 1/blah", 5))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(SetRequest(211, "/downstream/R 1/blah blah", 3))), requesters(2).ref)
+      responder.tell(RequestEnvelope(List(SetRequest(111, "/downstream/R 1/blah", DSAValue.NumericValue(5)))), requesters(1).ref)
+      responder.tell(RequestEnvelope(List(SetRequest(211, "/downstream/R 1/blah blah", DSAValue.NumericValue(3)))), requesters(2).ref)
 
       ws.receiveN(2).toSet mustBe Set(
-        RequestEnvelope(List(SetRequest(3, "/blah", 5))),
-        RequestEnvelope(List(SetRequest(4, "/blah blah", 3))))
+        RequestEnvelope(List(SetRequest(3, "/blah", DSAValue.NumericValue(5)))),
+        RequestEnvelope(List(SetRequest(4, "/blah blah", DSAValue.NumericValue(3)))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(3, Some(Closed)), DSAResponse(4, Some(Closed)))))
 
@@ -140,36 +140,36 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
         SubscriptionPath("/blahB", 2))))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 11, stream = Some(Closed)))))
-      val rsp1 = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> 1, "data" -> 111))))
+      val rsp1 = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> DSAValue.NumericValue(1), "data" -> DSAValue.NumericValue(111)))))
       ws.reply(ResponseMessage(1, None, List(rsp1)))
 
       requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 151, stream = Some(Closed)))))
       requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(
         rid = 0,
-        updates = Some(List(obj("sid" -> 1001, "data" -> 111)))))))
+        updates = Some(List(obj("sid" -> DSAValue.NumericValue(1001), "data" -> DSAValue.NumericValue(111))))))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 12, stream = Some(Closed)))))
-      val rsp2 = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> 2, "data" -> 222))))
+      val rsp2 = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> DSAValue.NumericValue(2), "data" -> DSAValue.NumericValue(222)))))
       ws.reply(ResponseMessage(1, None, List(rsp2)))
 
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 251, stream = Some(Closed)))))
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(
         rid = 0,
-        updates = Some(List(obj("sid" -> 2001, "data" -> 222)))))))
+        updates = Some(List(obj("sid" -> DSAValue.NumericValue(2001), "data" -> DSAValue.NumericValue(222))))))))
 
       responder.tell(RequestEnvelope(List(SubscribeRequest(351, List(
         SubscriptionPath("/downstream/R 1/blahA", 3001))))), requesters(3).ref)
 
       requesters(3).receiveN(2).toSet mustBe Set(
         ResponseEnvelope(List(DSAResponse(rid = 351, stream = Some(Closed)))),
-        ResponseEnvelope(List(DSAResponse(rid = 0, updates = Some(List(obj("sid" -> 3001, "data" -> 111)))))))
+        ResponseEnvelope(List(DSAResponse(rid = 0, updates = Some(List(obj("sid" -> DSAValue.NumericValue(3001), "data" -> DSAValue.NumericValue(111))))))))
 
-      val rsp2a = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> 2, "data" -> 2222))))
+      val rsp2a = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> DSAValue.NumericValue(2), "data" -> DSAValue.NumericValue(2222)))))
       ws.reply(ResponseMessage(1, None, List(rsp2a)))
 
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(
         rid = 0,
-        updates = Some(List(obj("sid" -> 2001, "data" -> 2222)))))))
+        updates = Some(List(obj("sid" -> DSAValue.NumericValue(2001), "data" -> DSAValue.NumericValue(2222))))))))
 
       responder.tell(RequestEnvelope(List(UnsubscribeRequest(152, List(1001)))), requesters(1).ref)
       ws.expectNoMessage(1 second)

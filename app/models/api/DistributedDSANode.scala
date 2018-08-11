@@ -196,7 +196,7 @@ class DistributedDSANode(_parent: Option[DSANode],
       val map: Map[String, DSAVal] = paramsAndConfigs.toMap
       val description = DSANodeDescription(s"$path/$name", map)
       (registry ? AddNode(description)).mapTo[DSANode] flatMap { actor =>
-        log.debug("Adding child: {} ->  {}", name, actor)
+        log.debug("Adding child: {} descr {} ->  {}", name, description, actor)
         addChild(name, actor)
       }
     }
@@ -360,9 +360,8 @@ class DistributedDSANode(_parent: Option[DSANode],
         case a:Any =>
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
-      case e@RequestEnvelope(requests) =>
+      case e@RequestEnvelope(requests, header) =>
         log.info("{}: received {}", ownId, e)
-//        checkPermission()
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
       case u: UpdateResponse[_] ⇒ // ignore

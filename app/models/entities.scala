@@ -3,11 +3,12 @@ package models
 import models.rpc.{DSARequest, DSAResponse}
 import _root_.akka.actor.ActorRef
 import models.akka.QoS
+import models.rpc.DSAValue.DSAVal
 
 /**
  * Envelope for internal request routing.
  */
-case class RequestEnvelope(requests: Seq[DSARequest]) {
+case class RequestEnvelope(requests: Seq[DSARequest], header: Option[Map[String, DSAVal]] = None) {
 
   /**
    * Outputs only the first request for compact logging.

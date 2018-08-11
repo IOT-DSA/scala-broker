@@ -148,7 +148,7 @@ class SimpleResponderBehaviorSpec extends AbstractActorSpec {
         updates = Some(List(obj("sid" -> 1001, "data" -> 111)))))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 12, stream = Some(Closed)))))
-      val rsp2 = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> 2, "data" -> 222))))
+      val rsp2 = DSAResponse(rid = 0, updates = Some(List(obj("sid" -> DSAValue.NumericValue(2), "data" -> 222))))
       ws.reply(ResponseMessage(1, None, List(rsp2)))
 
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 251, stream = Some(Closed)))))

@@ -1,20 +1,17 @@
 package models.akka
 
-import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
 import scala.util.Random
-
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
 import org.objenesis.strategy.StdInstantiatorStrategy
 import org.scalatestplus.play.PlaySpec
 import org.slf4j.LoggerFactory
-
 import com.esotericsoftware.kryo.Kryo
-import com.esotericsoftware.kryo.io.{ Input, Output, UnsafeInput, UnsafeOutput }
-
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.rpc.{ ColumnInfo, DSAResponse, InvokeRequest, StreamState }
+import com.esotericsoftware.kryo.io.{Input, Output, UnsafeInput, UnsafeOutput}
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.rpc.{ColumnInfo, DSAResponse, DSAValue, InvokeRequest, StreamState}
 import models.rpc.DSAValue.DSAMap
 
 /**
@@ -210,8 +207,9 @@ class SerializationSpec extends PlaySpec {
   def createRequestEnvelope(count: Int) = {
     val requests = (1 to count) map { index =>
       val path = Random.alphanumeric.take(50).mkString("")
-      val params: DSAMap = Map("a" -> Random.nextInt(100), "b" -> Random.nextBoolean,
-        "c" -> Random.alphanumeric.take(20).mkString(""))
+      val params: DSAMap = Map("a" -> DSAValue.NumericValue(Random.nextInt(100))
+                             , "b" -> DSAValue.BooleanValue(Random.nextBoolean)
+                             , "c" -> Random.alphanumeric.take(20).mkString(""))
       InvokeRequest(index, path, params)
     }
     RequestEnvelope(requests)
@@ -222,7 +220,7 @@ class SerializationSpec extends PlaySpec {
    */
   def createResponseEnvelope(count: Int) = {
     val responses = (1 to count) map { index =>
-      val updates = rows("$is" -> "node", "a" -> Random.nextInt(100), "b" -> Random.nextBoolean,
+      val updates = rows("$is" -> "node", "a" -> DSAValue.NumericValue(Random.nextInt(100)), "b" -> Random.nextBoolean,
         "c" -> Random.alphanumeric.take(20).mkString(""))
       val columns = List(ColumnInfo("$is", "string"), ColumnInfo("a", "number"), ColumnInfo("b", "boolean"))
       DSAResponse(index, Some(StreamState.Open), Some(updates), Some(columns), None)
