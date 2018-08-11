@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: StatefulSet
+namespace: default
+metadata:
+  name: cloud-broker-metrics
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-metrics
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-metrics
+    spec:
+      subdomain: "cloud-metrics-internal"
+      containers:
+      - name: grafana
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/graphana"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        - containerPort: 81
+        - containerPort: 2003
+        - containerPort: 8125
+          protocol: UDP
+        - containerPort: 8126
+        resources:
+          requests:
+            memory: "3000Mi"
+            cpu: "1500m"
+          limits:
+            memory: "3000Mi"
+            cpu: "1500m"
+   
+        volumeMounts:
+        - name: metrics-data
+          mountPath: "/data"
+
+        restartPolicy: Always
+  
+  volumeClaimTemplates:
+  - metadata:
+      name: metrics-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-metrics
+  labels:
+    app: cloud-broker-metrics
+spec:
+  ports:
+  - name: udp-8125
+    port: 8125
+    targetPort: 8125
+    protocol: UDP
+  - name: tcp-8126
+    port: 8126
+    targetPort: 8126
+    protocol: TCP
+  selector:
+    app: cloud-broker-metrics
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-metrics
+  labels:
+    app: cloud-broker-metrics
+spec:
+  clusterIP: 10.100.200.1
+  ports:
+  - name: grafana
+    port: 80
+    targetPort: 80
+  selector:
+    app: cloud-broker-metrics
+  status: loadBalancer
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 0.0.0.0/0
+  externalTrafficPolicy: Cluster
