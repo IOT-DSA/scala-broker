@@ -43,14 +43,11 @@ trait ResponderBehavior extends Meter { me: PersistentActor with ActorLogging  =
   val responderBehavior: Receive = {
     case pack @ InResponseEnvelope(messages) =>
       log.debug("{}: received pack {}", ownId, pack)
-      messages foreach { m =>
-          log.debug("{}: received {}", ownId, m)
-          //      persist(ResponsesProcessed(responses)) { event =>
-          processResponses(m.responses) foreach {
-            case (to, rsps) => to ! OutResponseEnvelope(rsps)
-          }
-        //      }
+      val resp = messages.flatMap(_.responses)
+      processResponses(resp) foreach {
+        case (to, rsps) => to ! OutResponseEnvelope(rsps)
       }
+
     case env @ OutRequestEnvelope(requests) =>
       log.debug("{}: received {} from {}", ownId, env, sender)
 //      persist(RequestsProcessed(requests)) { event =>
