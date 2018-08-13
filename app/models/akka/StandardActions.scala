@@ -82,7 +82,7 @@ object StandardActions {
       , commonActions(REMOVE_TOKEN)
       , commonActions(TOKEN_REMOVE_CLIENTS)
       , commonActions(REGENERATE_TOKEN)
-      , commonActions(UPDATE_TOKEN)
+//      , commonActions(UPDATE_TOKEN)
     )
 
   /**
@@ -308,11 +308,13 @@ object StandardActions {
   val RegenerateToken: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
 
-    val fToken = node.config("token")
+    val fToken = node.child("token")
     for (oToken <- fToken) {
       oToken foreach { token =>
-        val newToken = models.util.Tokens.regenerate(token.toString)
-        node.addConfigs("token" -> newToken)
+        token.value foreach { value123 =>
+          val newToken = models.util.Tokens.regenerate(value123.toString)
+          token.value = newToken
+        }
       }
     }
   }
@@ -434,7 +436,7 @@ object StandardActions {
     REMOVE_TOKEN -> ActionDescription(REMOVE_TOKEN, "Remove token", DeleteNode, Option("config")),
     TOKEN_REMOVE_CLIENTS -> ActionDescription(TOKEN_REMOVE_CLIENTS, "Remove clients", RemoveTokenClients, Option("config")),
     REGENERATE_TOKEN -> ActionDescription(REGENERATE_TOKEN, "Regenerate", RegenerateToken, Option("config")),
-    UPDATE_TOKEN -> ActionDescription(UPDATE_TOKEN, "Update token", UpdateToken, Option("config")),
+//    UPDATE_TOKEN -> ActionDescription(UPDATE_TOKEN, "Update token", UpdateToken, Option("config")),
     ADD_ROLE -> ActionDescription(ADD_ROLE, "Add permission group", AddRoleNode, Option("config")),
     ADD_RULE -> ActionDescription(ADD_RULE, "Add rule", AddRuleNode, Option("config")),
     REMOVE_ROLE -> ActionDescription(REMOVE_ROLE, "Remove group", DeleteNode, Option("config")),
