@@ -29,8 +29,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
 
   private val replicator = DistributedData(system).replicator
   private val distrubutedNodeRegistry:ActorRef = system
-    .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), "distributedNodesRegistry")
-
+    .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), ClusteredDSLinkManager.ACTOR_NAME)
 
   (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Data, Some("broker/dataRoot")))).mapTo[DSANode] foreach {
     node =>
@@ -154,6 +153,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
    */
   private def createRegion(typeName: String, linkProps: Props) = {
     val sharding = ClusterSharding(system)
+
     if (proxyMode)
       sharding.startProxy(typeName, Some("backend"), extractEntityId, extractShardId)
     else
@@ -165,4 +165,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
 
   private def ask4Distributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Future[Any] =
     distrubutedNodeRegistry ? RouteMessage(path, message, sender)
+}
+
+object ClusteredDSLinkManager {
+  val ACTOR_NAME = "distributedNodesRegistry"
 }

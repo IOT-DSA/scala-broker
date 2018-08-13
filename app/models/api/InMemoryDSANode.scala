@@ -186,6 +186,10 @@ class InMemoryDSANode(val parent: Option[DSANode])
       log.error("Unknown message: " + msg)
   }
 
+  def initPermission() = {
+
+
+  }
 
   // event handlers
 
