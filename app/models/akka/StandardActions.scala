@@ -411,14 +411,16 @@ object StandardActions {
       val path = ctx.args("Path").value.toString
       val perm = ctx.args("Permission")
 
-      parent.addChild(URLEncoder.encode(path, "UTF-8"), "$permission"->perm) map { ruleNode =>
+      parent.addChild(URLEncoder.encode(path, "UTF-8"), RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*) foreach {
+        ruleNode =>
         ruleNode.value = perm.toString
         ruleNode.profile = "static"
-        ruleNode.addConfigs(RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*)
+//        ruleNode.addConfigs(RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*)
         bindActions(ruleNode, commonActions(REMOVE_RULE))
-      } recover {
-        case e: RuntimeException => println("Error while adding new rule: " + e.getMessage)
       }
+//      recover {
+//        case e: RuntimeException => println("Error while adding new rule: " + e.getMessage)
+//      }
     }
     , Map[String, DSAVal]("name"->"Path", "type"-> DSAString)
     , Map[String, DSAVal]("name"->"Permission", "type"-> DSADynamic
