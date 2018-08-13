@@ -6,12 +6,12 @@ package object models {
   /**
    * RequestEnvelope <-> JSON
    */
-  implicit val RequestEnvelopeFormat = Json.format[RequestEnvelope]
+  implicit val RequestEnvelopeFormat = Json.format[OutRequestEnvelope]
 
   /**
    * ResponseEnvelope <-> JSON
    */
-  implicit val ResponseEnvelopeFormat = Json.format[ResponseEnvelope]
+  implicit val ResponseEnvelopeFormat = Json.format[OutResponseEnvelope]
 
   /* Special actions */
   val AddAttributeAction = "addAttribute"

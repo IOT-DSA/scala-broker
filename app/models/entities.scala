@@ -1,13 +1,13 @@
 package models
 
-import models.rpc.{DSARequest, DSAResponse}
+import models.rpc.{DSARequest, DSAResponse, ResponseMessage}
 import _root_.akka.actor.ActorRef
 import models.akka.QoS
 
 /**
  * Envelope for internal request routing.
  */
-case class RequestEnvelope(requests: Seq[DSARequest]) {
+case class OutRequestEnvelope(requests: Seq[DSARequest]) {
 
   /**
    * Outputs only the first request for compact logging.
@@ -18,14 +18,30 @@ case class RequestEnvelope(requests: Seq[DSARequest]) {
     s"RequestEnvelope(List(${requests.head},...${requests.size - 1} more))"
 }
 
+case class MessagePack(messages:List[Any])
+
 /**
  * Envelope for internal response routing.
  */
-case class ResponseEnvelope(responses: Seq[DSAResponse]) {
+case class OutResponseEnvelope(responses: Seq[DSAResponse]) {
 
   /**
    * Outputs only the first response for compact logging.
    */
+  override def toString = if (responses.size < 2)
+    s"ResponseEnvelope($responses})"
+  else
+    s"ResponseEnvelope(List(${responses.head},...${responses.size - 1} more))"
+}
+
+/**
+  * Envelope for internal response routing.
+  */
+case class InResponseEnvelope(responses: Seq[ResponseMessage]) {
+
+  /**
+    * Outputs only the first response for compact logging.
+    */
   override def toString = if (responses.size < 2)
     s"ResponseEnvelope($responses})"
   else

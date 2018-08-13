@@ -4,7 +4,7 @@ import scala.concurrent.duration.DurationInt
 import org.scalatest.Inside
 import akka.routing.ActorRefRoutee
 import akka.testkit.TestProbe
-import models.RequestEnvelope
+import models.OutRequestEnvelope
 import models.akka.{AbstractActorSpec, ConnectionInfo}
 import models.akka.Messages.ConnectEndpoint
 import models.rpc._
@@ -30,13 +30,13 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
     }
     "handle Subscribe request" in {
       val req = SubscribeRequest(11, SubscriptionPath("/data1", 101))
-      val env = RequestEnvelope(List(req))
+      val env = OutRequestEnvelope(List(req))
       probe.send(responder, env)
       probe.expectMsg(ResponseMessage(1, None, List(DSAResponse(11, Some(StreamState.Closed)))))
     }
     "handle Invoke(incCounter) and send notification" in {
       val req = InvokeRequest(12, "/data1/incCounter")
-      val env = RequestEnvelope(List(req))
+      val env = OutRequestEnvelope(List(req))
       probe.send(responder, env)
       inside(probe.receiveOne(5 seconds)) {
         case ResponseMessage(2, None, List(
@@ -48,7 +48,7 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
     }
     "handle Invoke(resetCounter) and send notification" in {
       val req = InvokeRequest(13, "/data1/resetCounter")
-      val env = RequestEnvelope(List(req))
+      val env = OutRequestEnvelope(List(req))
       probe.send(responder, env)
       inside(probe.receiveOne(5 seconds)) {
         case ResponseMessage(3, None, List(
@@ -66,7 +66,7 @@ class BenchmarkResponderSpec extends AbstractActorSpec with Inside {
     }
     "handle Unsubscribe request" in {
       val req = UnsubscribeRequest(14, List(101))
-      val env = RequestEnvelope(List(req))
+      val env = OutRequestEnvelope(List(req))
       probe.send(responder, env)
       probe.expectMsg(ResponseMessage(4, None, List(DSAResponse(14, Some(StreamState.Closed)))))
     }

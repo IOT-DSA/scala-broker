@@ -6,7 +6,7 @@ import akka.actor.{Address, PoisonPill, actorRef2Scala}
 import akka.pattern.ask
 import akka.routing.ActorRefRoutee
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope, Settings }
+import models.{ OutRequestEnvelope, ResponseEnvelope, Settings }
 import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
 import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
 import akka.actor.Address
@@ -109,7 +109,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "ListRequest" should {
     "return all dslinks" in {
-      downstream ! RequestEnvelope(List(ListRequest(1, "/downstream")))
+      downstream ! OutRequestEnvelope(List(ListRequest(1, "/downstream")))
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
           list.toSet mustBe rows(IsNode, "downstream" -> true, "aaa" -> obj(IsNode), "bb b" -> obj(IsNode)).toSet
@@ -134,7 +134,7 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "CloseRequest" should {
     "return valid response" in {
-      downstream ! RequestEnvelope(List(CloseRequest(1)))
+      downstream ! OutRequestEnvelope(List(CloseRequest(1)))
       downstream ! GetOrCreateDSLink("ddd")
       expectMsgClass(classOf[ActorRefRoutee])
       expectNoMessage(timeout.duration)

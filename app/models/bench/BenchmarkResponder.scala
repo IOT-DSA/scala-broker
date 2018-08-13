@@ -5,7 +5,7 @@ import org.joda.time.{DateTime, Interval}
 import BenchmarkResponder.{BenchmarkResponderConfig, RspStatsSample}
 import akka.actor.{ActorRef, Props}
 import akka.routing.Routee
-import models.RequestEnvelope
+import models.OutRequestEnvelope
 import models.akka.{DSLinkMode, RegexContext, RichRoutee}
 import models.metrics.Meter
 import models.rpc.{DSAValue, _}
@@ -47,7 +47,7 @@ class BenchmarkResponder(linkName: String, routee: Routee, config: BenchmarkResp
    * Event loop.
    */
   override def receive = super.receive orElse {
-    case env: RequestEnvelope =>
+    case env: OutRequestEnvelope =>
       val requests = viaJson(env).requests
       log.debug("[{}]: received {}", linkName, env)
       val responses = requests flatMap processRequest

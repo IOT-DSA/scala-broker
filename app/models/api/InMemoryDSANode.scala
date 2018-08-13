@@ -2,7 +2,7 @@ package models.api
 
 import akka.actor.{ActorRef, TypedActor, TypedProps}
 import akka.event.Logging
-import models.{RequestEnvelope, ResponseEnvelope}
+import models.{OutRequestEnvelope, OutResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
 import models.util.LoggingAdapterInside
@@ -139,10 +139,10 @@ class InMemoryDSANode(val parent: Option[DSANode])
     */
   def onReceive(message: Any, sender: ActorRef) = message match {
 
-    case e @ RequestEnvelope(requests) =>
+    case e @ OutRequestEnvelope(requests) =>
       log.debug(s"$ownId: received $e")
       val responses = requests flatMap handleRequest(sender)
-      sender ! ResponseEnvelope(responses)
+      sender ! OutResponseEnvelope(responses)
 
     case msg @ _ => log.error("Unknown message: " + msg)
   }

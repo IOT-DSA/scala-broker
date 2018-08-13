@@ -8,7 +8,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.DistributedData
 import akka.testkit.{TestActors, TestKit, TestProbe}
 import akka.util.Timeout
-import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import models.{OutRequestEnvelope, ResponseEnvelope, Settings}
 import models.akka.{AbstractActorSpec, DSLinkMode, RootNodeActor}
 import models.akka.Messages.RegisterDSLink
 import models.api.DistributedNodesRegistry
@@ -89,7 +89,7 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
     "send a message to the top node" in {
       managers zip probes foreach {
         case (mgr, probe) =>
-          mgr.dsaSend("/", RequestEnvelope(ListRequest(1, "/") :: Nil))(probe.ref)
+          mgr.dsaSend("/", OutRequestEnvelope(ListRequest(1, "/") :: Nil))(probe.ref)
           inside(probe.receiveOne(timeout.duration)) {
             case ResponseEnvelope(DSAResponse(1, Some(closed), _, _, _) :: Nil) => true
           }
@@ -98,7 +98,7 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
     "send a message to a /sys node" in {
       managers zip probes foreach {
         case (mgr, probe) =>
-          mgr.dsaSend("/sys", RequestEnvelope(ListRequest(2, "/sys") :: Nil))(probe.ref)
+          mgr.dsaSend("/sys", OutRequestEnvelope(ListRequest(2, "/sys") :: Nil))(probe.ref)
           inside(probe.receiveOne(timeout.duration)) {
             case ResponseEnvelope(DSAResponse(2, _, _, _, _) :: Nil) => true
           }
@@ -107,7 +107,7 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
     "send a message to a /defs/profile node" in {
       managers zip probes foreach {
         case (mgr, probe) =>
-          mgr.dsaSend("/defs/profile", RequestEnvelope(ListRequest(3, "/defs/profile") :: Nil))(probe.ref)
+          mgr.dsaSend("/defs/profile", OutRequestEnvelope(ListRequest(3, "/defs/profile") :: Nil))(probe.ref)
           inside(probe.receiveOne(timeout.duration)) {
             case ResponseEnvelope(DSAResponse(3, _, _, _, _) :: Nil) => true
           }

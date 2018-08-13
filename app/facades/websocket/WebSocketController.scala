@@ -19,7 +19,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
 import akka.util.ByteString
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
-import models.Settings
+import models.{MessagePack, Settings}
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
 import models.akka.Messages.{GetOrCreateDSLink, RemoveDSLink}
 import models.akka.QoSState.SubscriptionSourceMessage
@@ -325,7 +325,11 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           }
         }))
 
-        val messageSink = Sink.actorRef(fromSocket, Success(()))
+
+        val messageSink = Flow[Any].conflateWithSeed(first => MessagePack(List(first))){
+          (pack, next) => pack.copy(messages = pack.messages :+ next)
+        }.to(Sink.actorRef(fromSocket, Success(())))
+
         val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
 
         Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)

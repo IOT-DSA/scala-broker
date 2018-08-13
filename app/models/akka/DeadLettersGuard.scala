@@ -2,7 +2,7 @@ package models.akka
 
 import akka.actor.{Actor, ActorLogging, DeadLetter, Props}
 import models.rpc.{DSAError, DSAResponse, StreamState}
-import models.{RequestEnvelope, ResponseEnvelope}
+import models.{OutRequestEnvelope, OutResponseEnvelope}
 
 class DeadLettersGuard extends Actor with ActorLogging {
 
@@ -12,7 +12,7 @@ class DeadLettersGuard extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case DeadLetter(msg, toAnswer, requested) => msg match {
-      case RequestEnvelope(requests) => {
+      case OutRequestEnvelope(requests) => {
         val responses = requests.map {
           r =>
             DSAResponse(r.rid, Some(StreamState.Closed), None, None, Some(DSAError(
@@ -27,7 +27,7 @@ class DeadLettersGuard extends Actor with ActorLogging {
             )))
         }
 
-        toAnswer ! ResponseEnvelope(responses)
+        toAnswer ! OutResponseEnvelope(responses)
       }
       case _ =>
     }

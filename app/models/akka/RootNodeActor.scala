@@ -2,7 +2,7 @@ package models.akka
 
 import akka.actor._
 import akka.cluster.singleton._
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{ OutRequestEnvelope, OutResponseEnvelope }
 import models.api.DSANode
 import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
 import models.rpc.DSAValue.{ StringValue, array, obj }
@@ -27,10 +27,10 @@ class RootNodeActor extends Actor with ActorLogging {
   override def postStop() = log.info("[RootNode] actor stopped")
 
   def receive = {
-    case env @ RequestEnvelope(reqs) =>
+    case env @ OutRequestEnvelope(reqs) =>
       log.info(s"Received: $env")
       val responses = reqs map processDSARequest
-      sender ! ResponseEnvelope(responses)
+      sender ! OutResponseEnvelope(responses)
 
     case msg @ _ => log.error(s"Unknown message received: $msg")
   }

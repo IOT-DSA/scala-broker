@@ -11,7 +11,7 @@ import models.akka.DSLinkMode.DSLinkMode
 import models.akka.Messages.{DSLinkNodeStats, LinkState}
 import models.akka.responder.SimpleResponderBehavior
 import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
-import models.{RequestEnvelope, Settings}
+import models.{OutRequestEnvelope, Settings}
 
 /**
  * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.
@@ -103,7 +103,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
    * Processes a DSA payload and forwards the results to [[models.akka.responder.ResponderBehavior]].
    */
   protected def sendToEndpoint(msg: Any): Unit = msg match {
-    case RequestEnvelope(requests) => requests foreach handleRequest
+    case OutRequestEnvelope(requests) => requests foreach handleRequest
     case _                         => log.warning("Unknown message received: {}", msg)
   }
 

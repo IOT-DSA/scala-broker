@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ Input, Output, UnsafeInput, UnsafeOutput }
 
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{ OutRequestEnvelope, ResponseEnvelope }
 import models.rpc.{ ColumnInfo, DSAResponse, InvokeRequest, StreamState }
 import models.rpc.DSAValue.DSAMap
 
@@ -32,7 +32,7 @@ class SerializationSpec extends PlaySpec {
   "Java Serialization" should {
     "handle request envelopes" in {
       val tgt = runTest("Java", reqEnv.requests.size, serializeWithJava, deserializeWithJava)(reqEnv)
-      compareRequests(reqEnv, tgt.asInstanceOf[RequestEnvelope])
+      compareRequests(reqEnv, tgt.asInstanceOf[OutRequestEnvelope])
     }
     "handle response envelopes" in {
       val tgt = runTest("Java", rspEnv.responses.size, serializeWithJava, deserializeWithJava)(rspEnv)
@@ -44,12 +44,12 @@ class SerializationSpec extends PlaySpec {
     "handle request envelopes without registration" in {
       val tgt = runTest("Kryo Safe NoReg", reqEnv.requests.size, serializeWithKryo(kryoU, false),
         deserializeWithKryo(kryoU, false))(reqEnv)
-      compareRequests(reqEnv, tgt.asInstanceOf[RequestEnvelope])
+      compareRequests(reqEnv, tgt.asInstanceOf[OutRequestEnvelope])
     }
     "handle request envelopes with registration" in {
       val tgt = runTest("Kryo Safe Reg", reqEnv.requests.size, serializeWithKryo(kryoR, false),
         deserializeWithKryo(kryoR, false))(reqEnv)
-      compareRequests(reqEnv, tgt.asInstanceOf[RequestEnvelope])
+      compareRequests(reqEnv, tgt.asInstanceOf[OutRequestEnvelope])
     }
     "handle response envelopes without registration" in {
       val tgt = runTest("Kryo Safe NoReg", rspEnv.responses.size, serializeWithKryo(kryoU, false),
@@ -67,12 +67,12 @@ class SerializationSpec extends PlaySpec {
     "handle request envelopes without registration" in {
       val tgt = runTest("Kryo Unsafe NoReg", reqEnv.requests.size, serializeWithKryo(kryoU, true),
         deserializeWithKryo(kryoU, true))(reqEnv)
-      compareRequests(reqEnv, tgt.asInstanceOf[RequestEnvelope])
+      compareRequests(reqEnv, tgt.asInstanceOf[OutRequestEnvelope])
     }
     "handle request envelopes with registration" in {
       val tgt = runTest("Kryo Unsafe Reg", reqEnv.requests.size, serializeWithKryo(kryoR, true),
         deserializeWithKryo(kryoR, true))(reqEnv)
-      compareRequests(reqEnv, tgt.asInstanceOf[RequestEnvelope])
+      compareRequests(reqEnv, tgt.asInstanceOf[OutRequestEnvelope])
     }
     "handle response envelopes without registration" in {
       val tgt = runTest("Kryo Unsafe NoReg", rspEnv.responses.size, serializeWithKryo(kryoU, true),
@@ -89,7 +89,7 @@ class SerializationSpec extends PlaySpec {
   /**
    * Compares two request envelopes.
    */
-  private def compareRequests(env1: RequestEnvelope, env2: RequestEnvelope) = {
+  private def compareRequests(env1: OutRequestEnvelope, env2: OutRequestEnvelope) = {
     env1.requests.size mustBe env2.requests.size
     env1.requests zip env2.requests foreach {
       case (r1, r2) => r1.toString mustEqual r2.toString
@@ -173,7 +173,7 @@ class SerializationSpec extends PlaySpec {
     kryo.setInstantiatorStrategy(new StdInstantiatorStrategy)
     if (registered) {
       kryo.setRegistrationRequired(true)
-      kryo.register(classOf[RequestEnvelope])
+      kryo.register(classOf[OutRequestEnvelope])
       kryo.register(classOf[ResponseEnvelope])
       kryo.register(classOf[ColumnInfo])
       kryo.register(classOf[DSAResponse])
@@ -214,7 +214,7 @@ class SerializationSpec extends PlaySpec {
         "c" -> Random.alphanumeric.take(20).mkString(""))
       InvokeRequest(index, path, params)
     }
-    RequestEnvelope(requests)
+    OutRequestEnvelope(requests)
   }
 
   /**

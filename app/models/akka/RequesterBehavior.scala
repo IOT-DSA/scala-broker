@@ -9,16 +9,17 @@ import models.metrics.Meter
 
 import scala.util.control.NonFatal
 import scala.concurrent.duration._
-import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
+import models.{MessagePack, OutRequestEnvelope, OutResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 import org.reactivestreams.Publisher
 import models.akka.QoSState._
 
 /**
- * Handles communication with a remote DSLink in Requester mode.
- */
-trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
+  * Handles communication with a remote DSLink in Requester mode.
+  */
+trait RequesterBehavior {
+  me: AbstractDSLinkActor with Meter =>
 
   implicit val materializer = ActorMaterializer()
 
@@ -36,28 +37,28 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   var subscriptionsPublisher: Publisher[DSAMessage] = _
 
   /**
-   * Processes incoming messages from Requester DSLink and dispatches responses to it.
-   */
+    * Processes incoming messages from Requester DSLink and dispatches responses to it.
+    */
   val requesterBehavior: Receive = {
-    case m @ RequestMessage(msg, ack, requests) =>
+    case m@RequestMessage(msg, ack, requests) =>
       log.debug("{}: received {}", ownId, m)
       processRequests(requests)
-//      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
-      requests.lastOption foreach ( req => lastRid = req.rid )
-    case e @ ResponseEnvelope(responses) =>
+      //      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
+      requests.lastOption foreach (req => lastRid = req.rid)
+    case e @ OutResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
 
-      val(subscriptions, other) = responses.partition(isSubscription)
+      val (subscriptions, other) = responses.partition(isSubscription)
 
-      if(subscriptions.nonEmpty){
+      if (subscriptions.nonEmpty) {
         log.debug("handle subscriptions: {}", subscriptions)
         handleSubscriptions(subscriptions)
       }
 
-      if(other.nonEmpty){
+      if (other.nonEmpty) {
         log.debug("send to endpoint other: {}", other)
-        sendToEndpoint(ResponseEnvelope(other))
+        sendToEndpoint(OutResponseEnvelope(other))
       }
 
     case SubscriptionSourceMessage(sinkRef) =>
@@ -69,20 +70,20 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   val requesterDisconnected: Receive = {
     case SubscriptionSourceMessage(actorRef) =>
       getSubscriptionSource(actorRef)
-    case e @ ResponseEnvelope(responses) =>
+    case e@OutResponseEnvelope(responses) =>
 
-      log.debug("{}: received {}", ownId, e)
+      log.info("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
 
-      val(subscriptions, other) = responses.partition(isSubscription)
+      val (subscriptions, other) = responses.partition(isSubscription)
 
-      if(subscriptions.nonEmpty){
-        log.debug("handle subscriptions: {}", subscriptions)
+      if (subscriptions.nonEmpty) {
+        log.info("handle subscriptions: {}", subscriptions)
         handleSubscriptions(subscriptions, false)
       }
 
-      if(other.nonEmpty){
-        log.debug("stashing other: {}", other)
+      if (other.nonEmpty) {
+        log.info("stashing other: {}", other)
         stash()
       }
   }
@@ -90,15 +91,15 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource(sinkRef:SinkRef[ResponseMessage]) = {
+  private def getSubscriptionSource(sinkRef: SinkRef[ResponseMessage]) = {
 
     log.info("new subscription source connected: {}", sinkRef)
 
     val toSocketVal = Source.queue(100, OverflowStrategy.backpressure)
       .via(Flow.fromGraph(channel))
-      .groupedWithin(Settings.Subscriptions.maxBatchSize,
-        Settings.Subscriptions.aggregationPeriod milliseconds)
-      .map{ in => new ResponseMessage(-1, None, in.toList )}
+      .conflateWithSeed(resp => new ResponseMessage(-1, None, List(resp))) {
+        (message, next) => message.copy(responses = message.responses :+ next)
+      }
       .toMat(sinkRef.sink())(Keep.left)
       .run()
 
@@ -127,8 +128,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   }
 
   /**
-   * Sends Unsubscribe for all open subscriptions and Close for List commands.
-   */
+    * Sends Unsubscribe for all open subscriptions and Close for List commands.
+    */
   def stopRequester() = {
     batchAndRoute(targetsByRid map { case (rid, target) => target -> CloseRequest(rid) })
     batchAndRoute(targetsBySid.zipWithIndex map {
@@ -136,43 +137,44 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     })
   }
 
-  private def handleSubscriptions(subscriptions:Seq[DSAResponse], connected: Boolean = true) = subscriptions foreach {
-    r => withQosAndSid(r) foreach {
-      message =>
-      log.debug("sending subscription message: {}", message)
-      val toSend = SubscriptionNotificationMessage(message.response, message.sid, message.qos)
+  private def handleSubscriptions(subscriptions: Seq[DSAResponse], connected: Boolean = true) = subscriptions foreach {
+    r =>
+      withQosAndSid(r) foreach {
+        message =>
+          log.debug("sending subscription message: {}", message)
+          val toSend = SubscriptionNotificationMessage(message.response, message.sid, message.qos)
 
-      if(connected){
-        // in connected state pushing to stream with backpressure logic
-        toSocket offer toSend
-      } else if(message.qos >= QoS.Durable){
-        channel.putMessage(toSend)
+          if (connected) {
+            // in connected state pushing to stream with backpressure logic
+            toSocket offer toSend
+          } else if (message.qos >= QoS.Durable) {
+            channel.putMessage(toSend)
+          }
       }
-    }
   }
 
-  private def isSubscription(response:DSAResponse):Boolean = response.rid == 0
+  private def isSubscription(response: DSAResponse): Boolean = response.rid == 0
 
-  private def withQosAndSid(response:DSAResponse):Seq[SubscriptionResponseEnvelope] = {
-    response.updates.map{
-      _.map{
-          update =>
-            val sid = extractSid(update)
-            val qos = targetsBySid.get(sid).map(_.qos) getOrElse(QoS.Default)
-            SubscriptionResponseEnvelope(response, sid, qos)
-        }
-    } getOrElse(List())
+  private def withQosAndSid(response: DSAResponse): Seq[SubscriptionResponseEnvelope] = {
+    response.updates.map {
+      _.map {
+        update =>
+          val sid = extractSid(update)
+          val qos = targetsBySid.get(sid).map(_.qos) getOrElse (QoS.Default)
+          SubscriptionResponseEnvelope(response, sid, qos)
+      }
+    } getOrElse (List())
   }
 
   /**
-   * Processes and routes requests.
-   */
+    * Processes and routes requests.
+    */
   private def processRequests(requests: Iterable[DSARequest]) = {
 
     def splitRequest(request: DSARequest) = request match {
-      case req: SubscribeRequest   => req.split
+      case req: SubscribeRequest => req.split
       case req: UnsubscribeRequest => req.split
-      case req @ _                 => req :: Nil
+      case req@_ => req :: Nil
     }
 
     val results = requests flatMap splitRequest flatMap (request => try {
@@ -189,8 +191,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   }
 
   /**
-   * Removes stored targets when the response's stream is closed.
-   */
+    * Removes stored targets when the response's stream is closed.
+    */
   private def cleanupStoredTargets(responses: Seq[DSAResponse]) = {
 
     def cleanupSids(rows: Seq[DSAVal]) = try {
@@ -200,7 +202,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     }
 
     responses filter (_.stream == Some(StreamState.Closed)) foreach {
-      case DSAResponse(0, _, Some(updates), _, _)   => cleanupSids(updates)
+      case DSAResponse(0, _, Some(updates), _, _) => cleanupSids(updates)
       case DSAResponse(rid, _, _, _, _) if rid != 0 => targetsByRid.remove(rid)
     }
     /*
@@ -234,12 +236,12 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     }
 
   /**
-   * Groups the requests by their target and routes each batch as one envelope.
-   */
+    * Groups the requests by their target and routes each batch as one envelope.
+    */
   private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
     requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) =>
-        val envelope = RequestEnvelope(reqs.toSeq)
+        val envelope = OutRequestEnvelope(reqs.toSeq)
         log.debug("{}: sending {} to [{}]", ownId, envelope, to)
         dslinkMgr.dsaSend(to, envelope)
         logRequestBatch(to, envelope.requests)
@@ -247,8 +249,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   }
 
   /**
-   * Logs requests.
-   */
+    * Logs requests.
+    */
   private def logRequestBatch(to: String, requests: Seq[DSARequest]) = {
     import models.Settings.Paths._
 
@@ -257,95 +259,102 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     else
       "broker"
 
-    meterTags(tagsForConnection("out.requests.batch")(connInfo):_*)
-    incrementTagsNTimes(tagsForConnection("out.requests.batch.requests")(connInfo):_*)(requests.size)
+    meterTags(tagsForConnection("out.requests.batch")(connInfo): _*)
+    incrementTagsNTimes(tagsForConnection("out.requests.batch.requests")(connInfo): _*)(requests.size)
 
   }
 
   /**
-   * Saves the request's target indexed by its RID or SID, where applicable.
-   */
+    * Saves the request's target indexed by its RID or SID, where applicable.
+    */
   private def cacheRequestTarget(request: DSARequest, target: String) = request match {
-    case r @ (_: ListRequest | _: InvokeRequest) =>
-//      persist(RidTargetsRequesterState(r.rid, target)) { event =>
-//        log.debug("{}: RID targets persisted {}", ownId, event)
+    case r@(_: ListRequest | _: InvokeRequest) =>
+      //      persist(RidTargetsRequesterState(r.rid, target)) { event =>
+      //        log.debug("{}: RID targets persisted {}", ownId, event)
       targetsByRid.put(r.rid, target)
-//      }
+    //      }
     case r: SubscribeRequest =>
-//      persist(SidTargetsRequesterState(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))) { event =>
-//        log.debug("{}: SID targets persisted {}", ownId, event)
+      //      persist(SidTargetsRequesterState(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))) { event =>
+      //        log.debug("{}: SID targets persisted {}", ownId, event)
       targetsBySid.put(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))
-//      }
+    //      }
     case _ => // do nothing
   }
 
   /**
-   * Resolves target link by analyzing the path.
-   */
+    * Resolves target link by analyzing the path.
+    */
   private val resolveTargetByPath = {
 
     val extractPath: PartialFunction[DSARequest, String] = {
-      case ListRequest(_, path)         => path
-      case SetRequest(_, path, _, _)    => path
-      case RemoveRequest(_, path)       => path
+      case ListRequest(_, path) => path
+      case SetRequest(_, path, _, _) => path
+      case RemoveRequest(_, path) => path
       case InvokeRequest(_, path, _, _) => path
-      case SubscribeRequest(_, paths)   => paths.head.path // assuming one path after split
+      case SubscribeRequest(_, paths) => paths.head.path // assuming one path after split
     }
 
     extractPath andThen resolveLinkPath
   }
 
   /**
-   * Tries to resolve the request target by path or by cached RID/SID (for Close/Unsubscribe, and
-   * also removes the target from the cache after the look up).
-   */
+    * Tries to resolve the request target by path or by cached RID/SID (for Close/Unsubscribe, and
+    * also removes the target from the cache after the look up).
+    */
   private def resolveTarget(request: DSARequest) = {
 
     val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
       case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get.path
-//        val target = targetsBySid.get(sids.head).get.path
-//        persist(RemoveTargetBySid(sids.head)) { event =>
-//          log.debug("{}: removing by SID persisted {}", ownId, event)
-//          removeTargetBy(event.sids: _*)
-//        }
-//        target
+      //        val target = targetsBySid.get(sids.head).get.path
+      //        persist(RemoveTargetBySid(sids.head)) { event =>
+      //          log.debug("{}: removing by SID persisted {}", ownId, event)
+      //          removeTargetBy(event.sids: _*)
+      //        }
+      //        target
     }
 
     val resolveCloseTarget: PartialFunction[DSARequest, String] = {
       case CloseRequest(rid) => targetsByRid.remove(rid).get
-//        val target = targetsByRid.get(rid).get
-//        persist(RemoveTargetByRid(rid)) { event =>
-//          log.debug("{}: removing by RID persisted {}", ownId, event)
-//          targetsByRid.remove(event.rid)
-//        }
-//        target
+      //        val target = targetsByRid.get(rid).get
+      //        persist(RemoveTargetByRid(rid)) { event =>
+      //          log.debug("{}: removing by RID persisted {}", ownId, event)
+      //          targetsByRid.remove(event.rid)
+      //        }
+      //        target
     }
 
-    (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)
+    (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget) (request)
   }
 }
 
-case class PathAndQos(path:String, qos:QoS.Level)
+case class PathAndQos(path: String, qos: QoS.Level)
 
 object QoS {
-  sealed abstract class Level(val index:Int){
-    def <(other:Level) = index < other.index
-    def >(other:Level) = index > other.index
-    def >=(other:Level) = index >= other.index
-    def <=(other:Level) = index <= other.index
+
+  sealed abstract class Level(val index: Int) {
+    def <(other: Level) = index < other.index
+
+    def >(other: Level) = index > other.index
+
+    def >=(other: Level) = index >= other.index
+
+    def <=(other: Level) = index <= other.index
   }
 
   case object Default extends Level(0)
+
   case object Queued extends Level(1)
+
   case object Durable extends Level(2)
+
   case object DurableAndPersist extends Level(3)
 
 
-  def apply(level:Int): QoS.Level = level match {
+  def apply(level: Int): QoS.Level = level match {
     case 0 => Default
     case 1 => Queued
     case 2 => Durable
     case 3 => DurableAndPersist
-    case  _ => throw new RuntimeException(s"unsupported QoS level: $level")
+    case _ => throw new RuntimeException(s"unsupported QoS level: $level")
   }
 }

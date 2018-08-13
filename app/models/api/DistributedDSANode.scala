@@ -11,7 +11,7 @@ import akka.cluster.ddata.Replicator._
 import akka.event.Logging
 import akka.pattern.{PromiseRef, ask}
 import akka.util.Timeout
-import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import models.{OutRequestEnvelope, OutResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.{AddNode, GetNodesByDescription}
 import models.rpc.DSAValue
@@ -364,10 +364,10 @@ class DistributedDSANode(_parent: Option[DSANode],
         case a:Any =>
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
-      case e@RequestEnvelope(requests) =>
+      case e@OutRequestEnvelope(requests) =>
         log.debug("{}: received {}", ownId, e)
         val responses = requests flatMap handleRequest(sender)
-        sender ! ResponseEnvelope(responses)
+        sender ! OutResponseEnvelope(responses)
       case u: UpdateResponse[_] ⇒ // ignore
         log.debug("{}: state successfully updated: {}", ownId, u.key)
       case c@Changed(dataKey) ⇒

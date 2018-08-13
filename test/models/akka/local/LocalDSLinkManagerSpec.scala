@@ -8,7 +8,7 @@ import org.scalatest.Inside
 import akka.pattern.ask
 import akka.routing.ActorSelectionRoutee
 import akka.util.Timeout
-import models.{RequestEnvelope, ResponseEnvelope, Settings}
+import models.{OutRequestEnvelope, ResponseEnvelope, Settings}
 import models.akka.{AbstractActorSpec, RootNodeActor}
 import models.akka.Messages.{GetDSLinkNames, GetLinkInfo, GetOrCreateDSLink, LinkInfo}
 import models.api.DistributedNodesRegistry
@@ -67,19 +67,19 @@ class LocalDSLinkManagerSpec extends AbstractActorSpec with Inside {
     }
 
     "send a message to the top node" in {
-      mgr.dsaSend("/", RequestEnvelope(ListRequest(1, "/") :: Nil))
+      mgr.dsaSend("/", OutRequestEnvelope(ListRequest(1, "/") :: Nil))
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(DSAResponse(1, Some(closed), _, _, _) :: Nil) => true
       }
     }
     "send a message to a /sys node" in {
-      mgr.dsaSend("/sys", RequestEnvelope(ListRequest(2, "/sys") :: Nil))
+      mgr.dsaSend("/sys", OutRequestEnvelope(ListRequest(2, "/sys") :: Nil))
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(DSAResponse(2, _, _, _, _) :: Nil) => true
       }
     }
     "send a message to a /defs/profile node" in {
-      mgr.dsaSend("/defs/profile", RequestEnvelope(ListRequest(3, "/defs/profile") :: Nil))
+      mgr.dsaSend("/defs/profile", OutRequestEnvelope(ListRequest(3, "/defs/profile") :: Nil))
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(DSAResponse(3, _, _, _, _) :: Nil) => true
       }

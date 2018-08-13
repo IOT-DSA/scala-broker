@@ -31,8 +31,6 @@ class MainModule extends Module {
       bind[BrokerActors].toSelf.eagerly,
       bind[SystemGuard].toSelf.eagerly,
       bind[StatsDConnection].toSelf.eagerly())
-
-    kryo.addDefaultSerializer(classOf[ActorRef], new ActorRefSerializer(system))
   }
 }
 

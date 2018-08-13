@@ -10,7 +10,7 @@ import akka.actor.{ ActorSystem, Props, actorRef2Scala }
 import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{ OutRequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, DSLinkMode, IsNode, rows }
 import models.rpc.{ CloseRequest, DSAResponse, ListRequest }
 import akka.actor.Address
@@ -178,7 +178,7 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "ListRequest" should {
     "return all dslinks" in {
-      downstream1 ! RequestEnvelope(List(ListRequest(1, "/downstream")))
+      downstream1 ! OutRequestEnvelope(List(ListRequest(1, "/downstream")))
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(List(DSAResponse(1, Some(open), Some(list), _, _))) =>
           list.toSet mustBe rows(IsNode, "downstream" -> true,
@@ -206,7 +206,7 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
 
   "CloseRequest" should {
     "return valid response" in {
-      downstream1 ! RequestEnvelope(List(CloseRequest(1)))
+      downstream1 ! OutRequestEnvelope(List(CloseRequest(1)))
       downstream2 ! GetOrCreateDSLink("ggg")
       expectMsgClass(classOf[ShardedRoutee])
       expectNoMessage(timeout.duration)

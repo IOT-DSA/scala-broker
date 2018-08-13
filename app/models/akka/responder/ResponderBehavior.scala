@@ -41,21 +41,31 @@ trait ResponderBehavior extends Meter { me: PersistentActor with ActorLogging  =
    * Processes incoming requests and responses.
    */
   val responderBehavior: Receive = {
-    case env @ RequestEnvelope(requests) =>
-      log.info("{}: received {} from {}", ownId, env, sender)
+    case pack @ InResponseEnvelope(messages) =>
+      log.debug("{}: received pack {}", ownId, pack)
+      messages foreach { m =>
+          log.debug("{}: received {}", ownId, m)
+          //      persist(ResponsesProcessed(responses)) { event =>
+          processResponses(m.responses) foreach {
+            case (to, rsps) => to ! OutResponseEnvelope(rsps)
+          }
+        //      }
+      }
+    case env @ OutRequestEnvelope(requests) =>
+      log.debug("{}: received {} from {}", ownId, env, sender)
 //      persist(RequestsProcessed(requests)) { event =>
       val result = processRequests(requests)
       if (!result.requests.isEmpty)
-        sendToEndpoint(RequestEnvelope(result.requests))
+        sendToEndpoint(OutRequestEnvelope(result.requests))
       if (!result.responses.isEmpty)
-        sender ! ResponseEnvelope(result.responses)
+        sender ! OutResponseEnvelope(result.responses)
 //      }
 
     case m @ ResponseMessage(_, _, responses) =>
       log.debug("{}: received {}", ownId, m)
 //      persist(ResponsesProcessed(responses)) { event =>
       processResponses(responses) foreach {
-        case (to, rsps) => to ! ResponseEnvelope(rsps)
+        case (to, rsps) => to ! OutResponseEnvelope(rsps)
       }
 //      }
   }
@@ -65,11 +75,11 @@ trait ResponderBehavior extends Meter { me: PersistentActor with ActorLogging  =
     */
   val responderRecover: Receive = {
     case event: RequestsProcessed =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.info("{}: trying to recover {}", ownId, event)
       // TODO has to be improved to separate the functionality
       processRequests(event.requests)
     case event: ResponsesProcessed =>
-      log.debug("{}: trying to recover {}", ownId, event)
+      log.info("{}: trying to recover {}", ownId, event)
       // TODO has to be improved to separate the functionality
       processResponses(event.responses)
   }

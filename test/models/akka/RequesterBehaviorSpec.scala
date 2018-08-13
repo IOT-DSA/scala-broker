@@ -3,7 +3,7 @@ package models.akka
 import akka.actor.{Actor, PoisonPill, Props, actorRef2Scala}
 import akka.routing.{ActorRefRoutee, Routee}
 import akka.testkit.TestProbe
-import models.{RequestEnvelope, ResponseEnvelope}
+import models.{OutRequestEnvelope, ResponseEnvelope}
 import models.akka.Messages._
 import akka.pattern.ask
 import akka.util.Timeout
@@ -57,17 +57,17 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
     "route requests to broker root" in {
       val requests = List(ListRequest(1, "/"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      brokerProbe.expectMsg(RequestEnvelope(requests))
+      brokerProbe.expectMsg(OutRequestEnvelope(requests))
     }
     "route requests to downstream" in {
       val requests = List(ListRequest(1, "/downstream"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      downstreamProbe.expectMsg(RequestEnvelope(requests))
+      downstreamProbe.expectMsg(OutRequestEnvelope(requests))
     }
     "route requests to links" in {
       val requests = List(ListRequest(1, "/downstream/abc def"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      abcProbe.expectMsg(RequestEnvelope(requests))
+      abcProbe.expectMsg(OutRequestEnvelope(requests))
     }
     "forward responses to WS" in {
       val envelope = ResponseEnvelope(List(DSAResponse(1)))

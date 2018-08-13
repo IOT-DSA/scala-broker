@@ -5,7 +5,7 @@ import scala.concurrent.duration.DurationInt
 import akka.actor.Props
 import akka.routing.NoRoutee
 import akka.testkit.TestProbe
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{ OutRequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages }
 import models.rpc._
 import models.rpc.DSAValue.{ StringValue, longToNumericValue, obj }
@@ -30,15 +30,15 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   "PooledResponderBehavior" should {
     "handle List requests" in {
-      responder.tell(RequestEnvelope(List(ListRequest(101, "/downstream/R 1/blah"))), requesters(1).ref)
-      ws.expectMsg(RequestEnvelope(List(ListRequest(1, "/blah"))))
+      responder.tell(OutRequestEnvelope(List(ListRequest(101, "/downstream/R 1/blah"))), requesters(1).ref)
+      ws.expectMsg(OutRequestEnvelope(List(ListRequest(1, "/blah"))))
 
       val rsp1 = DSAResponse(rid = 1, updates = Some(List(obj("a" -> "b"))))
       ws.reply(ResponseMessage(1, None, List(rsp1)))
       requesters(1).expectMsg(ResponseEnvelope(List(rsp1.copy(rid = 101))))
 
-      responder.tell(RequestEnvelope(List(ListRequest(201, "/downstream/R 1/blah"))), requesters(2).ref)
-      responder.tell(RequestEnvelope(List(ListRequest(301, "/downstream/R 1/blah"))), requesters(3).ref)
+      responder.tell(OutRequestEnvelope(List(ListRequest(201, "/downstream/R 1/blah"))), requesters(2).ref)
+      responder.tell(OutRequestEnvelope(List(ListRequest(301, "/downstream/R 1/blah"))), requesters(3).ref)
       requesters(2).expectMsg(ResponseEnvelope(List(rsp1.copy(rid = 201))))
       requesters(3).expectMsg(ResponseEnvelope(List(rsp1.copy(rid = 301))))
 
@@ -49,26 +49,26 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(2).expectMsg(ResponseEnvelope(List(rsp2.copy(rid = 201))))
       requesters(3).expectMsg(ResponseEnvelope(List(rsp2.copy(rid = 301))))
 
-      responder.tell(RequestEnvelope(List(CloseRequest(201))), requesters(2).ref)
-      responder.tell(RequestEnvelope(List(CloseRequest(101))), requesters(1).ref)
+      responder.tell(OutRequestEnvelope(List(CloseRequest(201))), requesters(2).ref)
+      responder.tell(OutRequestEnvelope(List(CloseRequest(101))), requesters(1).ref)
       ws.expectNoMessage(1 second)
 
-      responder.tell(RequestEnvelope(List(CloseRequest(301))), requesters(3).ref)
-      ws.expectMsg(RequestEnvelope(List(CloseRequest(1))))
+      responder.tell(OutRequestEnvelope(List(CloseRequest(301))), requesters(3).ref)
+      ws.expectMsg(OutRequestEnvelope(List(CloseRequest(1))))
 
-      responder.tell(RequestEnvelope(List(ListRequest(401, "/downstream/R 1/blah"))), requesters(4).ref)
-      ws.expectMsg(RequestEnvelope(List(ListRequest(2, "/blah"))))
+      responder.tell(OutRequestEnvelope(List(ListRequest(401, "/downstream/R 1/blah"))), requesters(4).ref)
+      ws.expectMsg(OutRequestEnvelope(List(ListRequest(2, "/blah"))))
 
-      responder.tell(RequestEnvelope(List(CloseRequest(401))), requesters(4).ref)
-      ws.expectMsg(RequestEnvelope(List(CloseRequest(2))))
+      responder.tell(OutRequestEnvelope(List(CloseRequest(401))), requesters(4).ref)
+      ws.expectMsg(OutRequestEnvelope(List(CloseRequest(2))))
     }
     "handle Set requests" in {
-      responder.tell(RequestEnvelope(List(SetRequest(111, "/downstream/R 1/blah", 5))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(SetRequest(211, "/downstream/R 1/blah blah", 3))), requesters(2).ref)
+      responder.tell(OutRequestEnvelope(List(SetRequest(111, "/downstream/R 1/blah", 5))), requesters(1).ref)
+      responder.tell(OutRequestEnvelope(List(SetRequest(211, "/downstream/R 1/blah blah", 3))), requesters(2).ref)
 
       ws.receiveN(2).toSet mustBe Set(
-        RequestEnvelope(List(SetRequest(3, "/blah", 5))),
-        RequestEnvelope(List(SetRequest(4, "/blah blah", 3))))
+        OutRequestEnvelope(List(SetRequest(3, "/blah", 5))),
+        OutRequestEnvelope(List(SetRequest(4, "/blah blah", 3))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(3, Some(Closed)), DSAResponse(4, Some(Closed)))))
 
@@ -76,12 +76,12 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 211, stream = Some(Closed)))))
     }
     "handle Remove requests" in {
-      responder.tell(RequestEnvelope(List(RemoveRequest(121, "/downstream/R 1/blah"))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(RemoveRequest(321, "/downstream/R 1/blah"))), requesters(3).ref)
+      responder.tell(OutRequestEnvelope(List(RemoveRequest(121, "/downstream/R 1/blah"))), requesters(1).ref)
+      responder.tell(OutRequestEnvelope(List(RemoveRequest(321, "/downstream/R 1/blah"))), requesters(3).ref)
 
       ws.receiveN(2).toSet mustBe Set(
-        RequestEnvelope(List(RemoveRequest(5, "/blah"))),
-        RequestEnvelope(List(RemoveRequest(6, "/blah"))))
+        OutRequestEnvelope(List(RemoveRequest(5, "/blah"))),
+        OutRequestEnvelope(List(RemoveRequest(6, "/blah"))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(5, Some(Closed)), DSAResponse(6, Some(Closed)))))
 
@@ -89,12 +89,12 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(3).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 321, stream = Some(Closed)))))
     }
     "handle non-streaming Invoke requests" in {
-      responder.tell(RequestEnvelope(List(InvokeRequest(131, "/downstream/R 1/blah"))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(InvokeRequest(231, "/downstream/R 1/blah"))), requesters(2).ref)
+      responder.tell(OutRequestEnvelope(List(InvokeRequest(131, "/downstream/R 1/blah"))), requesters(1).ref)
+      responder.tell(OutRequestEnvelope(List(InvokeRequest(231, "/downstream/R 1/blah"))), requesters(2).ref)
 
       ws.receiveN(2).toSet mustBe Set(
-        RequestEnvelope(List(InvokeRequest(7, "/blah"))),
-        RequestEnvelope(List(InvokeRequest(8, "/blah"))))
+        OutRequestEnvelope(List(InvokeRequest(7, "/blah"))),
+        OutRequestEnvelope(List(InvokeRequest(8, "/blah"))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(7, Some(Closed)), DSAResponse(8, Some(Closed)))))
 
@@ -102,12 +102,12 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 231, stream = Some(Closed)))))
     }
     "handle streaming Invoke requests" in {
-      responder.tell(RequestEnvelope(List(InvokeRequest(141, "/downstream/R 1/blah"))), requesters(1).ref)
-      responder.tell(RequestEnvelope(List(InvokeRequest(241, "/downstream/R 1/blah"))), requesters(2).ref)
+      responder.tell(OutRequestEnvelope(List(InvokeRequest(141, "/downstream/R 1/blah"))), requesters(1).ref)
+      responder.tell(OutRequestEnvelope(List(InvokeRequest(241, "/downstream/R 1/blah"))), requesters(2).ref)
 
       ws.receiveN(2).toSet mustBe Set(
-        RequestEnvelope(List(InvokeRequest(9, "/blah"))),
-        RequestEnvelope(List(InvokeRequest(10, "/blah"))))
+        OutRequestEnvelope(List(InvokeRequest(9, "/blah"))),
+        OutRequestEnvelope(List(InvokeRequest(10, "/blah"))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(9), DSAResponse(10))))
 
@@ -127,16 +127,16 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
       requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 141, stream = Some(Closed)))))
     }
     "handle Subscribe requests" in {
-      responder.tell(RequestEnvelope(List(SubscribeRequest(151, List(
+      responder.tell(OutRequestEnvelope(List(SubscribeRequest(151, List(
         SubscriptionPath("/downstream/R 1/blahA", 1001))))), requesters(1).ref)
 
-      ws.expectMsg(RequestEnvelope(List(SubscribeRequest(11, List(
+      ws.expectMsg(OutRequestEnvelope(List(SubscribeRequest(11, List(
         SubscriptionPath("/blahA", 1))))))
 
-      responder.tell(RequestEnvelope(List(SubscribeRequest(251, List(
+      responder.tell(OutRequestEnvelope(List(SubscribeRequest(251, List(
         SubscriptionPath("/downstream/R 1/blahB", 2001))))), requesters(2).ref)
 
-      ws.expectMsg(RequestEnvelope(List(SubscribeRequest(12, List(
+      ws.expectMsg(OutRequestEnvelope(List(SubscribeRequest(12, List(
         SubscriptionPath("/blahB", 2))))))
 
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 11, stream = Some(Closed)))))
@@ -157,7 +157,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
         rid = 0,
         updates = Some(List(obj("sid" -> 2001, "data" -> 222)))))))
 
-      responder.tell(RequestEnvelope(List(SubscribeRequest(351, List(
+      responder.tell(OutRequestEnvelope(List(SubscribeRequest(351, List(
         SubscriptionPath("/downstream/R 1/blahA", 3001))))), requesters(3).ref)
 
       requesters(3).receiveN(2).toSet mustBe Set(
@@ -171,17 +171,17 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
         rid = 0,
         updates = Some(List(obj("sid" -> 2001, "data" -> 2222)))))))
 
-      responder.tell(RequestEnvelope(List(UnsubscribeRequest(152, List(1001)))), requesters(1).ref)
+      responder.tell(OutRequestEnvelope(List(UnsubscribeRequest(152, List(1001)))), requesters(1).ref)
       ws.expectNoMessage(1 second)
       requesters(1).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 152, stream = Some(Closed)))))
 
-      responder.tell(RequestEnvelope(List(UnsubscribeRequest(352, List(3001)))), requesters(3).ref)
-      ws.expectMsg(RequestEnvelope(List(UnsubscribeRequest(rid = 13, List(1)))))
+      responder.tell(OutRequestEnvelope(List(UnsubscribeRequest(352, List(3001)))), requesters(3).ref)
+      ws.expectMsg(OutRequestEnvelope(List(UnsubscribeRequest(rid = 13, List(1)))))
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 13, stream = Some(Closed)))))
       requesters(3).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 352, stream = Some(Closed)))))
 
-      responder.tell(RequestEnvelope(List(UnsubscribeRequest(252, List(2001)))), requesters(2).ref)
-      ws.expectMsg(RequestEnvelope(List(UnsubscribeRequest(rid = 14, List(2)))))
+      responder.tell(OutRequestEnvelope(List(UnsubscribeRequest(252, List(2001)))), requesters(2).ref)
+      ws.expectMsg(OutRequestEnvelope(List(UnsubscribeRequest(rid = 14, List(2)))))
       ws.reply(ResponseMessage(1, None, List(DSAResponse(rid = 14, stream = Some(Closed)))))
       requesters(2).expectMsg(ResponseEnvelope(List(DSAResponse(rid = 252, stream = Some(Closed)))))
     }

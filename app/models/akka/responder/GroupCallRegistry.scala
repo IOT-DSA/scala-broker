@@ -1,7 +1,7 @@
 package models.akka.responder
 
 import akka.event.LoggingAdapter
-import models.{ Origin, ResponseEnvelope }
+import models.{Origin, OutResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
 
@@ -107,7 +107,7 @@ class ListCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegi
    */
   protected def onAddOrigin(targetId: Int, origin: Origin, record: GroupCallRecord) = {
     record.lastResponse foreach { response =>
-      origin.source ! ResponseEnvelope(List(response.copy(rid = origin.sourceId)))
+      origin.source ! OutResponseEnvelope(List(response.copy(rid = origin.sourceId)))
     }
   }
 
@@ -117,7 +117,7 @@ class ListCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCallRegi
   def deliverResponse(rsp: DSAResponse) = {
     getOrInsert(rsp.rid).setLastResponse(rsp).origins foreach { origin =>
       val response = rsp.copy(rid = origin.sourceId)
-      origin.source ! ResponseEnvelope(List(response))
+      origin.source ! OutResponseEnvelope(List(response))
     }
     if (rsp.stream == Some(StreamState.Closed)) // shouldn't normally happen w/o CLOSE
       remove(rsp.rid)
@@ -137,7 +137,7 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
     record.lastResponse foreach { rsp =>
       val sourceRow = replaceSid(rsp.updates.get.head, origin.sourceId)
       val response = DSAResponse(0, rsp.stream, Some(List(sourceRow)), rsp.columns, rsp.error)
-      origin.source ! ResponseEnvelope(List(response))
+      origin.source ! OutResponseEnvelope(List(response))
     }
   }
 
@@ -151,7 +151,7 @@ class SubscribeCallRegistry(log: LoggingAdapter, ownId: String) extends GroupCal
     } else {
       val results = list flatMap handleSubscribeResponseRow(rsp.stream, rsp.columns, rsp.error)
       results groupBy (_._1) mapValues (_.map(_._2)) foreach {
-        case (to, rsps) => to ! ResponseEnvelope(rsps)
+        case (to, rsps) => to ! OutResponseEnvelope(rsps)
       }
     }
   }

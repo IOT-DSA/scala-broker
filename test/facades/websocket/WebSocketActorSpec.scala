@@ -2,7 +2,7 @@ package facades.websocket
 
 import akka.routing.ActorRefRoutee
 import akka.testkit.TestProbe
-import models.{ RequestEnvelope, ResponseEnvelope }
+import models.{ OutRequestEnvelope, ResponseEnvelope }
 import models.akka.{ AbstractActorSpec, ConnectionInfo }
 import models.rpc._
 
@@ -43,7 +43,7 @@ class WebSocketActorSpec extends AbstractActorSpec {
     }
     "send enveloped requests to socket" in {
       val req = ListRequest(111, "/path")
-      wsActor ! RequestEnvelope(List(req))
+      wsActor ! OutRequestEnvelope(List(req))
       expectMsg(RequestMessage(1, None, List(req)))
     }
     "send enveloped responses to socket" in {

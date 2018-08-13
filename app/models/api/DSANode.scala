@@ -6,7 +6,7 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import DSAValueType.DSAValueType
 import akka.actor.{ActorRef, TypedProps}
-import models.ResponseEnvelope
+import models.{OutResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.{DSAMap, DSAVal, StringValue, array, obj}
 import models.util.LoggingAdapterInside
@@ -86,7 +86,7 @@ trait DSANodeSubscriptions { self:DSANode with LoggingAdapterInside =>
     _sids foreach {
       case (sid, ref) =>
         val update = obj("sid" -> sid, "value" -> value, "ts" -> ts)
-        val response = ResponseEnvelope(DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil)
+        val response = OutResponseEnvelope(DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil)
         ref ! response
         log.debug("notify subscription updates:\\{} \\to: \\{} -> {}", value, sid, ref)
     }
@@ -97,7 +97,7 @@ trait DSANodeSubscriptions { self:DSANode with LoggingAdapterInside =>
     */
   def notifyListActors(updates: DSAVal*) = _rids foreach {
     case (rid, ref) =>
-      ref ! ResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
+      ref ! OutResponseEnvelope(DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil)
       log.debug("notify list updates:\\{} \\to: \\{} -> {}", updates, rid, ref)
   }
 

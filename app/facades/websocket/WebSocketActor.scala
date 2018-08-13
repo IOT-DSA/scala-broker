@@ -9,7 +9,7 @@ import akka.routing.Routee
 import akka.stream.{Materializer, OverflowStrategy, SinkRef}
 import akka.stream.scaladsl.{Keep, Source}
 import kamon.Kamon
-import models.{RequestEnvelope, ResponseEnvelope, formatMessage}
+import models.{InResponseEnvelope, MessagePack, OutRequestEnvelope, OutResponseEnvelope, formatMessage}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
 import models.metrics.Meter
@@ -79,12 +79,47 @@ class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSo
       sendAck(msg)
       routee ! m
       countTags(messageTags("response.in", ci):_*)
-    case e @ RequestEnvelope(requests) =>
+    case e @ OutRequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
-    case e @ ResponseEnvelope(responses) =>
+    case e @ OutResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       sendResponses(responses: _*)
+    case pack @ MessagePack(messages) =>
+      log.debug("{}: received messages in pack {}", ownId, messages)
+      messages.foreach{
+        case m @ PingMessage(msg, ack) =>
+          log.debug("{}: received ping from WebSocket with msg={}, acking...", ownId, msg)
+          sendAck(msg)
+        case m @ RequestMessage(msg, _, _) =>
+          Kamon.currentSpan().tag("type", "request")
+          log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
+          sendAck(msg)
+          routee ! m
+          countTags(messageTags("request.in", ci):_*)
+        case m @ ResponseMessage(msg, _, _) =>
+          Kamon.currentSpan().tag("type", "response")
+          log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
+          sendAck(msg)
+          countTags(messageTags("response.in", ci):_*)
+        case EmptyMessage =>
+          log.debug("{}: received empty message from WebSocket, ignoring...", ownId)
+        case e @ OutRequestEnvelope(requests) =>
+          log.debug("{}: received {}", ownId, e)
+          sendRequests(requests: _*)
+        case e @ OutResponseEnvelope(responses) =>
+          log.debug("{}: received {}", ownId, e)
+          sendResponses(responses: _*)
+        case anyOther =>
+          log.debug("{}: received anyOther {}", ownId, anyOther)
+      }
+
+      val m = pack.messages.filter{_.isInstanceOf[ResponseMessage]}.map(_.asInstanceOf[ResponseMessage])
+
+      if(!m.isEmpty){
+        routee ! InResponseEnvelope(m)
+      }
+
   }
 
   /**
