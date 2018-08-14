@@ -82,7 +82,7 @@ object StandardActions {
       , commonActions(REMOVE_TOKEN)
       , commonActions(TOKEN_REMOVE_CLIENTS)
       , commonActions(REGENERATE_TOKEN)
-      , commonActions(UPDATE_TOKEN)
+//      , commonActions(UPDATE_TOKEN)
     )
 
   /**
@@ -308,11 +308,13 @@ object StandardActions {
   val RegenerateToken: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
 
-    val fToken = node.config("token")
+    val fToken = node.child("token")
     for (oToken <- fToken) {
       oToken foreach { token =>
-        val newToken = models.util.Tokens.regenerate(token.toString)
-        node.addConfigs("token" -> newToken)
+        token.value foreach { value123 =>
+          val newToken = models.util.Tokens.regenerate(value123.toString)
+          token.value = newToken
+        }
       }
     }
   }
@@ -377,7 +379,7 @@ object StandardActions {
   val AddRoleNode: DSAAction = DSAAction((ctx: ActionContext) =>
     ctx.node.parent foreach { parent =>
       val roleName = ctx.args("Name").value.toString
-      parent.addChild(roleName, RootNodeActor.DEFAULT_ROLE_CONFIG.toList: _*) map { child =>
+      parent.addChild(roleName, RootNodeActor.DEFAULT_ROLE_CONFIG.toList: _*) foreach { child =>
         child.profile = "static"
         bindRoleNodeActions(child)
         RootNodeActor.createFallbackRole(child)
@@ -409,18 +411,19 @@ object StandardActions {
       val path = ctx.args("Path").value.toString
       val perm = ctx.args("Permission")
 
-      parent.addChild(URLEncoder.encode(path, "UTF-8"), "$permission"->perm) map { ruleNode =>
+      parent.addChild(URLEncoder.encode(path, "UTF-8"), RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*) foreach {
+        ruleNode =>
         ruleNode.value = perm.toString
         ruleNode.profile = "static"
-        ruleNode.addConfigs(RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*)
         bindActions(ruleNode, commonActions(REMOVE_RULE))
-      } recover {
-        case e: RuntimeException => println("Error while adding new rule: " + e.getMessage)
       }
+//      recover {
+//        case e: RuntimeException => println("Error while adding new rule: " + e.getMessage)
+//      }
     }
     , Map[String, DSAVal]("name"->"Path", "type"-> DSAString)
     , Map[String, DSAVal]("name"->"Permission", "type"-> DSADynamic
-      , "editor"->"enum[none,list,read,write,config]")
+    , "editor"->"enum[none,list,read,write,config]")
   )
 
   val commonActions:Map[String, ActionDescription] = Map(
@@ -434,7 +437,7 @@ object StandardActions {
     REMOVE_TOKEN -> ActionDescription(REMOVE_TOKEN, "Remove token", DeleteNode, Option("config")),
     TOKEN_REMOVE_CLIENTS -> ActionDescription(TOKEN_REMOVE_CLIENTS, "Remove clients", RemoveTokenClients, Option("config")),
     REGENERATE_TOKEN -> ActionDescription(REGENERATE_TOKEN, "Regenerate", RegenerateToken, Option("config")),
-    UPDATE_TOKEN -> ActionDescription(UPDATE_TOKEN, "Update token", UpdateToken, Option("config")),
+//    UPDATE_TOKEN -> ActionDescription(UPDATE_TOKEN, "Update token", UpdateToken, Option("config")),
     ADD_ROLE -> ActionDescription(ADD_ROLE, "Add permission group", AddRoleNode, Option("config")),
     ADD_RULE -> ActionDescription(ADD_RULE, "Add rule", AddRuleNode, Option("config")),
     REMOVE_ROLE -> ActionDescription(REMOVE_ROLE, "Remove group", DeleteNode, Option("config")),
