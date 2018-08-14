@@ -11,7 +11,6 @@ import akka.cluster.ddata.DistributedData
 import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
 import akka.pattern.ask
-import models.rpc.DSAValue.DSAVal
 
 import scala.concurrent.Future
 
