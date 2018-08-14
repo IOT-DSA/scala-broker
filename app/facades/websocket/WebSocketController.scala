@@ -335,7 +335,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
               } yield checkCount && checkDate
 
             Await.result(check, Duration.Inf)
-          case _ => false
+//          case _ => false
         }
       }
 

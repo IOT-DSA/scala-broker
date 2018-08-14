@@ -3,6 +3,7 @@ package models.api
 import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.event.Logging
 import models.akka.Messages.{AppendDsId2Token, GetConfigVal, GetTokens}
+import models.akka.RootNodeActor
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
@@ -99,7 +100,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
     addChild(name, child)
   }
 
-  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = {
+  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
     val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
     child.addConfigs(paramsAndConfigs.filter(_._1.startsWith("$")):_*)
@@ -187,7 +188,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
   }
 
   def initPermission() = {
-
+//    RootNodeActor.
 
   }
 
