@@ -379,7 +379,7 @@ object StandardActions {
   val AddRoleNode: DSAAction = DSAAction((ctx: ActionContext) =>
     ctx.node.parent foreach { parent =>
       val roleName = ctx.args("Name").value.toString
-      parent.addChild(roleName, RootNodeActor.DEFAULT_ROLE_CONFIG.toList: _*) map { child =>
+      parent.addChild(roleName, RootNodeActor.DEFAULT_ROLE_CONFIG.toList: _*) foreach { child =>
         child.profile = "static"
         bindRoleNodeActions(child)
         RootNodeActor.createFallbackRole(child)
@@ -415,7 +415,6 @@ object StandardActions {
         ruleNode =>
         ruleNode.value = perm.toString
         ruleNode.profile = "static"
-//        ruleNode.addConfigs(RootNodeActor.DEFAULT_RULE_CONFIG.toList:_*)
         bindActions(ruleNode, commonActions(REMOVE_RULE))
       }
 //      recover {
@@ -424,7 +423,7 @@ object StandardActions {
     }
     , Map[String, DSAVal]("name"->"Path", "type"-> DSAString)
     , Map[String, DSAVal]("name"->"Permission", "type"-> DSADynamic
-      , "editor"->"enum[none,list,read,write,config]")
+    , "editor"->"enum[none,list,read,write,config]")
   )
 
   val commonActions:Map[String, ActionDescription] = Map(
