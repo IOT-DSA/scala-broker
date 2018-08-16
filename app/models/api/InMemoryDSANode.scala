@@ -99,7 +99,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
     addChild(name, child)
   }
 
-  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = {
+  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
     val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
     child.addConfigs(paramsAndConfigs.filter(_._1.startsWith("$")):_*)

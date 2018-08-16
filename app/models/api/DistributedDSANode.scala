@@ -171,7 +171,7 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   override def child(name: String): Future[Option[DSANode]] = Future.successful(_children.get(name))
 
-  override def addChild(name: String, profile: Option[String] = None, valueType: Option[DSAValueType] = None): Future[DSANode] = {
+  override def addChild(name: String, profile: Option[String] = None, valueType: Option[DSAValueType] = None): Future[DSANode] = synchronized {
     _children.get(name).map(Future.successful).getOrElse {
       val description = DSANodeDescription.init(s"$path/$name", profile, valueType)
       (registry ? AddNode(description)).mapTo[DSANode] flatMap { actor =>
@@ -191,7 +191,7 @@ class DistributedDSANode(_parent: Option[DSANode],
     Future.successful(node)
   }
 
-  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = {
+  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = synchronized {
     _children.get(name).map(Future.successful).getOrElse {
       val map: Map[String, DSAVal] = paramsAndConfigs.toMap
       val description = DSANodeDescription(s"$path/$name", map)
