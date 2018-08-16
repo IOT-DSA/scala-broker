@@ -233,7 +233,7 @@ object RootNodeActor {
       child.profile = "static"
       child.displayName = "fallback"
       StandardActions.bindRoleNodeActions(child)
-      createFallbackRules(child)
+//      createFallbackRules(child)
     }
   }
 
