@@ -2,6 +2,7 @@
   "annotations": {
     "list": []
   },
+  "editMode": false,
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
@@ -256,25 +257,8 @@
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_0_dropped.select metric, 'qos0 replacement count')"
-            },
-            {
-              "hide": false,
-              "refId": "D",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_1_dropped.count, 'qos1 replacement count')",
-              "textEditor": true
-            },
-            {
-              "hide": false,
-              "refId": "E",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_2_dropped.count, 'qos2 replacement count')",
-              "textEditor": true
-            },
-            {
-              "hide": false,
-              "refId": "F",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_3_dropped.count, 'qos3 replacement count')",
-              "textEditor": true
+              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_level_0_dropped.count, 1), 'node qos0 replacement count')",
+              "textEditor": false
             },
             {
               "hide": false,
@@ -290,6 +274,12 @@
               "hide": false,
               "refId": "H",
               "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_notification_out.count, 1)), 'subscriptions sent from cluster to requester')"
+            },
+            {
+              "hide": false,
+              "refId": "I",
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_level_0_dropped.count, 1)), 'cluster qos0 replacement count')",
+              "textEditor": false
             }
           ],
           "thresholds": [],
@@ -553,7 +543,7 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {
@@ -583,5 +573,5 @@
   },
   "timezone": "",
   "title": "DSA Dashboard",
-  "version": 3
+  "version": 1
 }

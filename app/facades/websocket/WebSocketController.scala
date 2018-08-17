@@ -310,14 +310,13 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
         val wsProps = WebSocketActor.props(sink, routee,
           WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
+
+
         val fromSocket = actorSystem.actorOf(Props(new Actor {
-          val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+          val wsActor = context.watch( context.actorOf(wsProps, "wsActor"))
 
           def receive = {
-            case Success(_) | Failure(_) => wsActor ! PoisonPill
-            case Terminated(_)           => context.stop(self)
-            case other                   =>
-              wsActor ! other
+            case _ => sender() ! wsActor
           }
 
           override def supervisorStrategy = OneForOneStrategy() {
@@ -325,10 +324,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           }
         }))
 
+      val wsActor = Await.result((fromSocket ? Some).mapTo[ActorRef], 5 second)
+
 
         val messageSink = Flow[Any].conflateWithSeed(first => MessagePack(List(first))){
           (pack, next) => pack.copy(messages = pack.messages :+ next)
-        }.to(Sink.actorRef(fromSocket, Success(())))
+        }.async.to(Sink.actorRef(wsActor, Success(())))
 
         val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
 
