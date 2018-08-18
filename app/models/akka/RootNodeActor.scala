@@ -232,17 +232,17 @@ object RootNodeActor {
     node.addChild(FALLBACK_ROLE, DEFAULT_ROLE_CONFIG.toList:_*) foreach { child =>
       child.profile = "static"
       child.displayName = "fallback"
-      StandardActions.bindRoleNodeActions(child)
+//      StandardActions.bindRoleNodeActions(child)
 //      createFallbackRules(child)
     }
   }
 
   private def createFallbackRules(node: DSANode) : Unit = {
-    val path = URLEncoder.encode("empty", "UTF-8")
+    val path = URLEncoder.encode("empty rule", "UTF-8")
     node.addChild(path, DEFAULT_RULE_CONFIG.toList:_*) foreach { child =>
       val perm = "none"
       child.profile = "static"
-      child.displayName = "empty"
+      child.displayName = "empty rule"
       child.value = perm
 //      child.addConfigs("$permission"->perm) // Ths line was commented by description in screenshots, we don't need it in v.2
       StandardActions.bindRuleNodeActions(child)
