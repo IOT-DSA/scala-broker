@@ -197,28 +197,53 @@ class InMemoryDSANode(val parent: Option[DSANode])
 
     case GetRules(path) =>
       log.info(s"$ownId: GetRules($path) received")
+      var permissionStorage = Map.empty[String, String]
 
+      children foreach {
+        roles=>
+        roles foreach { case (roleName, roleNode) =>
+          roleNode.children foreach {
+            rules =>
+              val filteredRules = rules.filterKeys(rulePath=> path.startsWith(rulePath))
+              val selectedRule = filteredRules.reduce((a1, a2) =>
+                if (a1._1.length > a2._1.length)
+                  a1
+                else
+                  a2
+              )
+              permissionStorage += (roleName -> selectedRule._2.value)
+          }
 
+        }
+
+      }
+      sender ! permissionStorage
     case msg @ _ =>
       log.error("Unknown message: " + msg)
   }
 
+  // This is a map for containing [GroupName, PermissionOfClosestParent].
+  // The 'PermissionOfClosestParent' is relative to current node path
   var permissionMap: Map[String, String] = Map.empty
 
   // Initialization permission map
+  // The method should be executed once node has been created.
   def initPermission() = {
     val rolesNodeActor = RootNodeActor.childProxy(Settings.Paths.Roles)
 
     // Get list of Rules for corresponding path and it's parents
-    val rules = rolesNodeActor ? GetRules(path)
+//    val rules = rolesNodeActor ? GetRules(path)
 
-    var permissionStorage = Map.empty
+//    var permissionStorage = Map.empty
 
-    children foreach  { childrenMap =>
-      childrenMap foreach { case (role, node) =>
+//    children foreach  { childrenMap =>
+//      childrenMap foreach {
+//        case (role, node) =>
+//
+//      }
+//    }
 
-      }
-    }
+    rolesNodeActor.ch
 
 
     rules foreach  { rule =>
@@ -255,6 +280,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
     val groupName = getGroupName(token)
 
     groupName.fold(false) { name =>
+//      permissionMap.getOrElse(name, permissionMap("default"))  match {
       permissionMap.get(name) match {
         case Some(value) =>
           action.equals(value) || value.equals("config") // TODO: Change "Config" to enum
