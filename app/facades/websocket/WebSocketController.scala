@@ -4,7 +4,7 @@ import java.net.URL
 
 import play.api.http.HttpEntity
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 import org.velvia.msgpack.PlayJsonCodecs.JsValueCodec
 import akka.{Done, NotUsed}
@@ -15,7 +15,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
 import akka.stream.{Materializer, OverflowStrategy}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
 import akka.util.ByteString
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
@@ -288,35 +288,35 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
                            overflow:    OverflowStrategy) = {
     import akka.actor.Status._
 
-    val (toSocket, publisher) = Source.actorRef[DSAMessage](bufferSize, overflow)
+    val (futureSink, publisher) =  StreamRefs.sinkRef[DSAMessage]()
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()(materializer)
 
-    val sink = Sink.actorRef(toSocket, Success(()))
+    val sink = Await.result(futureSink, 10 second)
 
     val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
     fRoutee map   { routee =>
 
-      val (subscriptionsPusher, subscriptionsPublisher) = Source.actorRef[ResponseMessage](bufferSize, overflow)
+      val (subscriptionsPusher, subscriptionsPublisher) = StreamRefs.sinkRef[ResponseMessage]()
         .toMat(Sink.asPublisher(false))(Keep.both)
         .run()(materializer)
 
-      routee ! SubscriptionSourceMessage(subscriptionsPusher)
+      val subscriptionSink = Await.result(subscriptionsPusher, 10 second)
+      routee ! SubscriptionSourceMessage(subscriptionSink)
 
       val subscriptionSrcRef = Source.fromPublisher(subscriptionsPublisher)
 
-        val wsProps = WebSocketActor.props(toSocket, routee,
+        val wsProps = WebSocketActor.props(sink, routee,
           WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
+
+
         val fromSocket = actorSystem.actorOf(Props(new Actor {
-          val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
+          val wsActor = context.watch( context.actorOf(wsProps, "wsActor"))
 
           def receive = {
-            case Success(_) | Failure(_) => wsActor ! PoisonPill
-            case Terminated(_)           => context.stop(self)
-            case other                   =>
-              wsActor ! other
+            case _ => sender() ! wsActor
           }
 
           override def supervisorStrategy = OneForOneStrategy() {
@@ -324,10 +324,12 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           }
         }))
 
-        subscriptionSrcRef.runWith(sink)
+      val wsActor = Await.result((fromSocket ? Some).mapTo[ActorRef], 5 second)
 
-        val messageSink = Sink.actorRef(fromSocket, Success(()))
-        val src = Source.fromPublisher(publisher)
+
+        val messageSink = Flow[Any].async.to(Sink.actorRef(wsActor, Success(())))
+
+        val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
 
         Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
     }

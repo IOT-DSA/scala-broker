@@ -1,7 +1,9 @@
 package models.akka
 
 import akka.actor.ActorRef
+import akka.stream.SinkRef
 import models.akka.Messages._
+import models.rpc.ResponseMessage
 
 
 
@@ -10,7 +12,7 @@ object QoSState {
   /**
     * Sent from StateKeeper with subscription actor ref
     */
-  case class SubscriptionSourceMessage(actor: ActorRef)
+  case class SubscriptionSourceMessage(actor: SinkRef[ResponseMessage])
 
   /**
     * Sent to StateKeeper to add subscription message

@@ -3,7 +3,7 @@ package models.akka
 import akka.actor.ActorRef
 import akka.actor.Status.Success
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.{ActorMaterializer, OverflowStrategy, SinkRef}
 import models.akka.Messages._
 import models.metrics.Meter
 import scala.util.control.NonFatal
@@ -15,9 +15,10 @@ import org.reactivestreams.Publisher
 import models.akka.QoSState._
 
 /**
- * Handles communication with a remote DSLink in Requester mode.
- */
-trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
+  * Handles communication with a remote DSLink in Requester mode.
+  */
+trait RequesterBehavior {
+  me: AbstractDSLinkActor with Meter =>
 
   implicit val materializer = ActorMaterializer()
 
@@ -87,16 +88,18 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource(actor:ActorRef) = {
+  private def getSubscriptionSource(sinkRef: SinkRef[ResponseMessage]) = {
 
-    log.info("new subscription source connected: {}", actor)
+    log.info("new subscription source connected: {}", sinkRef)
 
-    val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
+    val toSocketVal = Source.queue[SubscriptionNotificationMessage](100, OverflowStrategy.backpressure)
+      .conflateWithSeed(List(_)){(list, next) => list :+ next}
+      .async
       .via(Flow.fromGraph(channel))
-      .groupedWithin(Settings.Subscriptions.maxBatchSize,
-        Settings.Subscriptions.aggregationPeriod milliseconds)
-      .map{ in => new ResponseMessage(-1, None, in.toList )}
-      .toMat(Sink.actorRef(actor, Success(())))(Keep.both)
+      .conflateWithSeed(resp => new ResponseMessage(-1, None, List(resp))) {
+        (message, next) => message.copy(responses = message.responses :+ next)
+      }
+      .toMat(sinkRef.sink())(Keep.left)
       .run()
 
     toSocket = toSocketVal
