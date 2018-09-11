@@ -14,12 +14,12 @@ import scala.collection.mutable
 
 
 class SubscriptionChannel(log: LoggingAdapter)
-  extends GraphStage[FlowShape[SubscriptionNotificationMessage, DSAResponse]] with Meter {
+  extends GraphStage[FlowShape[Seq[SubscriptionNotificationMessage], DSAResponse]] with Meter {
 
   type Sid = Int
   val subscriptionsQueue = mutable.HashMap[Int, Queue[SubscriptionNotificationMessage]]()
 
-  val in = Inlet[SubscriptionNotificationMessage]("Subscriptions.in")
+  val in = Inlet[Seq[SubscriptionNotificationMessage]]("Subscriptions.in")
   val out = Outlet[DSAResponse]("Subscriptions.out")
 
   val timeout = Settings.QueryTimeout
@@ -28,7 +28,7 @@ class SubscriptionChannel(log: LoggingAdapter)
   val maxQosCapacity = Settings.Subscriptions.queueCapacity
   implicit val implTimeout = Timeout(timeout)
 
-  override def shape: FlowShape[SubscriptionNotificationMessage, DSAResponse] = FlowShape.of(in, out)
+  override def shape: FlowShape[Seq[SubscriptionNotificationMessage], DSAResponse] = FlowShape.of(in, out)
 
   def putMessage(message: SubscriptionNotificationMessage) = {
     countTags("qos.notification.in.counter")
@@ -91,8 +91,8 @@ class SubscriptionChannel(log: LoggingAdapter)
     setHandler(in, new InHandler {
       override def onPush(): Unit = {
         log.debug("on push: {}", in)
-        val message = grab(in)
-        putMessage(message)
+        val messages = grab(in)
+        messages.foreach(putMessage(_))
         if (isAvailable(out)) {
           pushNext
         }
