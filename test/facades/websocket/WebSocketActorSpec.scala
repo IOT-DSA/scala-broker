@@ -1,10 +1,17 @@
 package facades.websocket
 
+import akka.actor.Status.Success
 import akka.routing.ActorRefRoutee
+import akka.stream.ActorMaterializer
+
+import scala.concurrent.duration._
+import akka.stream.scaladsl.{Keep, Sink, StreamRefs}
 import akka.testkit.TestProbe
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.akka.{ AbstractActorSpec, ConnectionInfo }
+import models.{RequestEnvelope, ResponseEnvelope}
+import models.akka.{AbstractActorSpec, ConnectionInfo}
 import models.rpc._
+
+import scala.concurrent.Await
 
 /**
  * WebSocketActor test suite.
@@ -12,11 +19,19 @@ import models.rpc._
 class WebSocketActorSpec extends AbstractActorSpec {
   import models.akka.Messages._
 
+  implicit val mat = ActorMaterializer()
+
   val salt = 1234
   val ci = ConnectionInfo("", "ws", true, false)
   val config = WebSocketActorConfig(ci, "session", salt)
   val link = TestProbe()
-  val wsActor = system.actorOf(WebSocketActor.props(testActor, new ActorRefRoutee(link.ref), config))
+
+  val futureSink = StreamRefs.sinkRef[DSAMessage]()
+    .toMat(Sink.actorRef(testActor, Success(())))(Keep.left).run()
+
+  val sink = Await.result(futureSink, 1 second)
+
+  val wsActor = system.actorOf(WebSocketActor.props(sink, new ActorRefRoutee(link.ref), config))
 
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {

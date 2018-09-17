@@ -106,30 +106,19 @@ trait ClusterKit { self: GivenWhenThen =>
 
   def system(port: String) = {
     When(s"ActorSystem on port $port started")
-    val config = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port).
-      withFallback(ConfigFactory.load(
-        ConfigFactory.parseString("""
-            akka.loglevel = "DEBUG"
-            akka.actor.provider = "akka.cluster.ClusterActorRefProvider"
-            akka.remote {
-              netty.tcp {
-                hostname = "127.0.0.1"
-                port = 0
-              }
-            }
-            akka.cluster {
-              distributed-data {
-                gossip-interval = 150 ms
-                notify-subscribers-interval = 150 ms
-              }
-              seed-nodes = [
-                "akka.tcp://DDTestClusterSystem@127.0.0.1:2555"]
-              auto-down-unreachable-after = 10s
-            }
-            """)))
+    val config = ConfigFactory.parseString(
+      s"""
+         |akka.remote.artery.canonical.port=$port
+         |akka.cluster.distributed-data.gossip-interval = 150 ms
+         |akka.cluster.distributed-data.notify-subscribers-interval = 150 ms
+         |akka.cluster.seed-nodes =  [
+         |                "akka://DSASystem@127.0.0.1:2555"]
+         |              auto-down-unreachable-after = 10s
+       """.stripMargin)
+      .withFallback(ConfigFactory.load("backend.conf"))
 
     // Create an Akka system
-    ActorSystem("DDTestClusterSystem", config)
+    ActorSystem("DSASystem", config)
   }
 
 }

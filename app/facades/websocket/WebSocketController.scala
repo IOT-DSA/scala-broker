@@ -249,7 +249,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
       val res =
-        if (/*validateAuth(sessionInfo, clientAuth)*/ true)
+        if (validateAuth(sessionInfo, clientAuth))
           f(sessionInfo)
         else {
           val errorString = s"Authentication failed in request with dsId: '$dsId', auth value '$clientAuth' is not correct."

@@ -89,15 +89,15 @@ class SubscriptionChannelSpec extends WordSpecLike
       }
 
       def withFlow(iterations: Int, sids:Int, qosLevel:QoS.Level)(assertion: (
-        Source[SubscriptionNotificationMessage, NotUsed],
-        Flow[SubscriptionNotificationMessage, DSAResponse, NotUsed],
+        Source[Seq[SubscriptionNotificationMessage], NotUsed],
+        Flow[Seq[SubscriptionNotificationMessage], DSAResponse, NotUsed],
         Sink[DSAResponse, Future[Set[Int]]]
       ) => Unit) = {
 
         val ch = new SubscriptionChannel(DefaultNoLogging)
         val flow = Flow.fromGraph(ch)
         val list = 0 until iterations map { i => SubscriptionNotificationMessage(DSAResponse(i, None, None, None, None), i % sids, qosLevel)}
-        val source = Source(list)
+        val source = Source(list).map(Seq(_))
 
         val sink = Sink.fold[Set[Int], DSAResponse](Set[Int]())({
           case (set, DSAResponse(rid, _, _, _, _)) =>
