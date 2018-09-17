@@ -4,15 +4,24 @@ import models.api.DSANode
 
 import scala.concurrent.Future
 import scala.util.Random
-
 import scala.concurrent.ExecutionContext.Implicits.global
-
 import org.bouncycastle.jcajce.provider.digest.SHA256
+import play.api.Logger
 
 object Tokens {
+  protected val log = Logger(getClass)
+
+  def getTokenId(token: String) = {
+    if (token.length < 16) {
+      log.error("Token length is less then 16, tokenId has been set empty")
+      ""
+    } else
+      token.substring(0, 16)
+  }
+
   def makeToken(dsaNode: DSANode, curToken: Option[String] = None) : Future[String] = {
     val token = createToken()
-    val tokenId = token.substring(0, 16);
+    val tokenId = getTokenId(token)
 
     val r = dsaNode.child(tokenId).flatMap {
         case None => Future(token)
@@ -25,7 +34,7 @@ object Tokens {
   def regenerate(curToken: String) : String = {
     val newToken = createToken()
 
-    val token = curToken.substring(0, 16) + newToken.substring(16)
+    val token = getTokenId(curToken) + newToken.substring(16)
 
     token
   }

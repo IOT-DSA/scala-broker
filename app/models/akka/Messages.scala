@@ -154,4 +154,8 @@ object Messages {
     * @param value
     */
   case class AppendDsId2Token(name: String, value: String)
+
+  case class GetToken(name: String)
+
+  case class GetRules(path: String)
 }

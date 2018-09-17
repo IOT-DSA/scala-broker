@@ -30,7 +30,7 @@ class RootNodeActor extends Actor with ActorLogging {
   override def postStop() = log.info("[RootNode] actor stopped")
 
   def receive = {
-    case env @ RequestEnvelope(reqs) =>
+    case env @ RequestEnvelope(reqs, header) =>
       log.info(s"Received: $env")
       val responses = reqs map processDSARequest
       sender ! ResponseEnvelope(responses)
@@ -244,7 +244,7 @@ object RootNodeActor {
       child.profile = "static"
       child.displayName = "empty rule"
       child.value = perm
-      child.addConfigs("$permission"->perm)
+//      child.addConfigs("$permission"->perm) // Ths line was commented by description in screenshots, we don't need it in v.2
       StandardActions.bindRuleNodeActions(child)
     }
   }

@@ -72,7 +72,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
       sendAck(msg)
       routee ! m
       meterTags(messageTags("response.in", ci):_*)
-    case e @ RequestEnvelope(requests) =>
+    case e @ RequestEnvelope(requests, header) =>
       log.debug("{}: received RequestEnvelope {}", ownId, e)
       sendRequests(requests: _*)
     case e @ ResponseEnvelope(responses) =>

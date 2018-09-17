@@ -132,8 +132,8 @@ object StandardActions {
         "$columns" -> ArrayValue(columns),
         "$is" -> ""
       )
-      ad.is foreach { v => configs += ("$is"->v) }
-      ad.invokable foreach { v => configs += ("$invokable"->v) }
+      ad.is foreach { v => configs += ("$is"-> StringValue(v)) }
+      ad.invokable foreach { v => configs += ("$invokable"->StringValue(v)) }
 
       node.addChild(ad.name, configs.toSeq:_*).foreach { child =>
         child.action = ad.action
@@ -250,8 +250,7 @@ object StandardActions {
       (token.substring(0, 16), token)
     }
     , Map[String, DSAVal]("name"->"Group", "type"->DSAString)
-    , Map[String, DSAVal]("name"->"TimeRange", "type"->DSAString, "editor"->"daterange"
-      , "writable"->"config")
+    , Map[String, DSAVal]("name"->"TimeRange", "type"->DSAString, "editor"->"daterange", "writable"->"config")
     , Map[String, DSAVal]("name"->"Count", "type"->DSANumber)
     , Map[String, DSAVal]("name"->"MaxSession", "type"->DSANumber)
     , Map[String, DSAVal]("name"->"Managed", "type"->DSABoolean)
@@ -357,6 +356,7 @@ object StandardActions {
             dsId.toString.substring(0, dsId.toString.size - 44)
             else dsId.toString
 
+          // TODO: Add exception handling here
           val dstActorRef = system.actorSelection("/user" + Paths.Downstream)
 
           val fRoutee = (dstActorRef ? GetOrCreateDSLink(dstName)).mapTo[Routee]
@@ -385,6 +385,7 @@ object StandardActions {
         RootNodeActor.createFallbackRole(child)
       }
     }
+    // TODO: Add exception handling here!
 //        .onComplete(
 //        {
 //          case Success(_) => {
@@ -417,6 +418,7 @@ object StandardActions {
         ruleNode.profile = "static"
         bindActions(ruleNode, commonActions(REMOVE_RULE))
       }
+      // TODO: Add exception handling here!
 //      recover {
 //        case e: RuntimeException => println("Error while adding new rule: " + e.getMessage)
 //      }

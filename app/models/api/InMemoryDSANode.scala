@@ -2,8 +2,9 @@ package models.api
 
 import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.event.Logging
-import models.akka.Messages.{AppendDsId2Token, GetConfigVal, GetTokens}
-import models.{RequestEnvelope, ResponseEnvelope}
+import models.akka.Messages.{AppendDsId2Token, GetConfigVal, GetToken, GetTokens, GetRules}
+import models.akka.RootNodeActor
+import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
 import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
 import models.util.LoggingAdapterInside
@@ -11,7 +12,9 @@ import models.util.LoggingAdapterInside
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 import models.util.DsaToAkkaCoder._
+import models.util.Tokens
 
+import akka.pattern.ask
 
 /**
   * DSA Node actor-based in memory implementation.
@@ -145,10 +148,12 @@ class InMemoryDSANode(val parent: Option[DSANode])
     */
   def onReceive(message: Any, sender: ActorRef) = message match {
 
-    case e @ RequestEnvelope(requests) =>
+    case e @ RequestEnvelope(requests, header) =>
       log.info(s"$ownId: received $e")
       val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
+
+    // This case has been executed when this node is TOKEN
     case AppendDsId2Token(name, value) =>
       log.info(s"$ownId: received AppendDsId2Token ($name, $value)")
       if(name.startsWith("$")) {
@@ -168,6 +173,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
       } else
         log.warning("UpdateToken's parameter does not contains @ " + name)
 
+    // This case has been executed when this node is TOKEN's root node
     case GetTokens =>
       log.info(s"$ownId: GetTokens received")
 
@@ -177,21 +183,118 @@ class InMemoryDSANode(val parent: Option[DSANode])
 
       val response = Await.result(fResponse, Duration.Inf)
       sender ! response
+
+    case GetToken(name) =>
+      log.info(s"$ownId: GetToken($name) received")
+      val response = Await.result(child(name), Duration.Inf)
+      sender ! response
+
     case GetConfigVal(name) =>
       log.info(s"$ownId: GetDSLinksIds received")
       val fResp = config(name)
       val response = Await.result(fResp, Duration.Inf)
       sender ! response
+
+    case GetRules(path) =>
+      log.info(s"$ownId: GetRules($path) received")
+      var permissionStorage = Map.empty[String, String]
+
+      children foreach {
+        roles=>
+        roles foreach { case (roleName, roleNode) =>
+          roleNode.children foreach {
+            rules =>
+              val filteredRules = rules.filterKeys(rulePath=> path.startsWith(rulePath))
+              val selectedRule = filteredRules.reduce((a1, a2) =>
+                if (a1._1.length > a2._1.length)
+                  a1
+                else
+                  a2
+              )
+              permissionStorage += (roleName -> selectedRule._2.value)
+          }
+
+        }
+
+      }
+      sender ! permissionStorage
     case msg @ _ =>
       log.error("Unknown message: " + msg)
   }
 
+  // This is a map for containing [GroupName, PermissionOfClosestParent].
+  // The 'PermissionOfClosestParent' is relative to current node path
+  var permissionMap: Map[String, String] = Map.empty
+
+  // Initialization permission map
+  // The method should be executed once node has been created.
+  def initPermission() = {
+    val rolesNodeActor = RootNodeActor.childProxy(Settings.Paths.Roles)
+
+    // Get list of Rules for corresponding path and it's parents
+//    val rules = rolesNodeActor ? GetRules(path)
+
+//    var permissionStorage = Map.empty
+
+//    children foreach  { childrenMap =>
+//      childrenMap foreach {
+//        case (role, node) =>
+//
+//      }
+//    }
+
+    rolesNodeActor.ch
+
+
+    rules foreach  { rule =>
+//      TODO:  Initializing Map of Rules for permission
+      permissionMap += ("a" -> rule)
+    }
+  }
+
+  def getGroupName(token: String) : Option[String] = {
+    val tokenId = Tokens.getTokenId(token)
+    val tokenNodeActor = RootNodeActor.childProxy(Settings.Paths.Tokens)
+    val fTokensNode: Future[Option[DSANode]] = (tokenNodeActor ? GetToken(tokenId)).mapTo
+
+    val fRes = fTokensNode flatMap {
+      case Some(node) =>
+        node.child("role")
+      case None =>
+        log.error("There is no node: " + Settings.Paths.Tokens + "/" + tokenId)
+        Future.successful(None)
+    }
+
+    val fRes2 = fRes flatMap {
+      case Some(node: DSANode) =>
+        node.value map { item => Some(item.toString) }
+      case None =>
+        log.error("There is no value node of token's node: " + Settings.Paths.Tokens + "/" + tokenId)
+        Future.successful(None)
+    }
+
+    Await.result(fRes2, Duration.Inf)
+  }
+
+  def checkPermission(token: String, action: String) = {
+    val groupName = getGroupName(token)
+
+    groupName.fold(false) { name =>
+//      permissionMap.getOrElse(name, permissionMap("default"))  match {
+      permissionMap.get(name) match {
+        case Some(value) =>
+          action.equals(value) || value.equals("config") // TODO: Change "Config" to enum
+        case None => false
+      }
+    }
+  }
 
   // event handlers
 
   def preStart() = log.info(s"DSANode[$path] initialized")
 
   def postStop() = log.info(s"DSANode[$path] stopped")
+
 }
 
 

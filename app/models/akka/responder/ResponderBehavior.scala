@@ -42,12 +42,12 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    * Processes incoming requests and responses.
    */
   val responderBehavior: Receive = {
-    case env @ RequestEnvelope(requests) =>
+    case env @ RequestEnvelope(requests, header) =>
       log.info("{}: received {} from {}", ownId, env, sender)
       persist(RequestsProcessed(requests)) { event =>
         val result = processRequests(event.requests)
         if (!result.requests.isEmpty)
-          sendToEndpoint(RequestEnvelope(result.requests))
+          sendToEndpoint(RequestEnvelope(result.requests)) // TODO: Add header with dsId: Some(Map("dsId"->DSAValue.StringValue(me.connInfo.dsId)))
         if (!result.responses.isEmpty)
           sender ! ResponseEnvelope(result.responses)
       }

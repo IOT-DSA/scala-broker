@@ -121,6 +121,8 @@ trait DSANodeRequestHandler { self:DSANode =>
     */
   def handleRequest(sender: ActorRef): PartialFunction[DSARequest, Iterable[DSAResponse]] = {
 
+    //    Idealy, checkPermission has to be here !!!
+
     /* set */
 
     case SetRequest(rid, p, newValue, _) =>
@@ -175,7 +177,7 @@ trait DSANodeRequestHandler { self:DSANode =>
 
       val futureTail = value.map{ v =>
         if (v != null) {
-          val update = obj("sid" -> paths.head.sid, "value" -> v, "ts" -> DateTime.now.toString(ISODateTimeFormat.dateTime)
+          val update = obj("sid" -> DSAValue.NumericValue(paths.head.sid), "value" -> v, "ts" -> DateTime.now.toString(ISODateTimeFormat.dateTime)
           )
           DSAResponse(0, Some(StreamState.Open), Some(List(update))) :: Nil
         } else Nil
