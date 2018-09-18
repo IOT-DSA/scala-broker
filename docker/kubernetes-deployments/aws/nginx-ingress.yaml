@@ -177,7 +177,7 @@ data:
   ssl-redirect: "false"
   upstream-keepalive-connections: "50"
   use-proxy-protocol: "true"
-  enable-underscores-in-headers": "true"
+  enable-underscores-in-headers: "true"
   load-balance: "hash $http_ds_id"
 ---
 kind: ConfigMap
