@@ -94,8 +94,6 @@ class SubscriptionChannel(log: LoggingAdapter)
 
 
     def pushNext = {
-
-      countTagsNTimes("qos.notification.out")(subscriptionsQueue.size)
       emitMultiple(out, subscriptionsQueue.valuesIterator.flatten.map(_.response))
       subscriptionsQueue.clear()
       if (!hasBeenPulled(in)) {

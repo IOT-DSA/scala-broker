@@ -98,6 +98,10 @@ trait RequesterBehavior {
       .conflateWithSeed(List(_)){(list, next) => list :+ next}
       .async
       .via(Flow.fromGraph(channel))
+      .map{ item =>
+          countTags("qos.notification.out")
+        item
+      }
       .conflateWithSeed(resp => new ResponseMessage(-1, None, List(resp))) {
         (message, next) => message.copy(responses = message.responses :+ next)
       }
