@@ -30,7 +30,7 @@ docker push 582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performanc
 ``` 
 6. delete the pods (they will be recreated with latest image pulled)  
 ```
-kubectl delete pods cloud-broker-metrics-0 cloud-broker-metrics-1 cloud-broker-metrics-2  
+kubectl delete pods cloud-broker-cluster-0 cloud-broker-cluster-1 cloud-broker-cluster-2  
 ```
 
 
