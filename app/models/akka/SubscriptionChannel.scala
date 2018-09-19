@@ -23,7 +23,6 @@ class SubscriptionChannel(log: LoggingAdapter)
   val out = Outlet[DSAResponse]("Subscriptions.out")
 
   val timeout = Settings.QueryTimeout
-  var iter = subscriptionsQueue.iterator
   val maxBatch = Settings.Subscriptions.maxBatchSize
   val maxQosCapacity = Settings.Subscriptions.queueCapacity
   implicit val implTimeout = Timeout(timeout)
@@ -65,26 +64,6 @@ class SubscriptionChannel(log: LoggingAdapter)
     result
   }
 
-  def next: Option[(Int, Queue[SubscriptionNotificationMessage])] = {
-    if (iter.hasNext) {
-      Some(iter.next())
-    } else {
-      iter = subscriptionsQueue.iterator
-      if (iter.hasNext) Some(iter.next())
-      else None
-
-    }
-  }
-
-
-  def getAndRemoveNext(): Option[SubscriptionNotificationMessage] = next.flatMap { case (key, queue) =>
-    val item = if (queue.isEmpty) None
-    else Some(queue.dequeue())
-
-    if (queue.isEmpty) subscriptionsQueue.remove(key)
-    item
-  }
-
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
 
@@ -116,11 +95,9 @@ class SubscriptionChannel(log: LoggingAdapter)
 
     def pushNext = {
 
-      getAndRemoveNext().foreach { message =>
-        val resp = message.response
-        countTags("qos.notification.out")
-        push(out, resp)
-      }
+      countTagsNTimes("qos.notification.out")(subscriptionsQueue.size)
+      emitMultiple(out, subscriptionsQueue.valuesIterator.flatten.map(_.response))
+      subscriptionsQueue.clear()
       if (!hasBeenPulled(in)) {
         pull(in)
       }

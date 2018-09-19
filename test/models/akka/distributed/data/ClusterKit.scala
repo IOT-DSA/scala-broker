@@ -111,6 +111,7 @@ trait ClusterKit { self: GivenWhenThen =>
          |akka.remote.artery.canonical.port=$port
          |akka.cluster.distributed-data.gossip-interval = 150 ms
          |akka.cluster.distributed-data.notify-subscribers-interval = 150 ms
+         |akka.remote.artery.advanced.aeron-dir=/tmp/aeron-$port-${Math.random()}
          |akka.cluster.seed-nodes =  [
          |                "akka://DSASystem@127.0.0.1:2555"]
          |              auto-down-unreachable-after = 10s
