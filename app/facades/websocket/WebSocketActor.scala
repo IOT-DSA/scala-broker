@@ -2,8 +2,9 @@ package facades.websocket
 
 import java.util.UUID
 
+import akka.actor.Status.{Failure, Success}
 import org.joda.time.DateTime
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, PoisonPill, Props, Terminated}
 import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
 import akka.stream.{Materializer, OverflowStrategy, SinkRef}
@@ -85,6 +86,8 @@ class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSo
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       sendResponses(responses: _*)
+    case Success(_) | Failure(_) => self ! PoisonPill
+    case Terminated(_)           => context.stop(self)
   }
 
   /**
