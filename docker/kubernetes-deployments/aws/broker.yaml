@@ -40,6 +40,7 @@ spec:
         - containerPort: 9005
         - containerPort: 2551
         - containerPort: 2552
+          protocol: UDP
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
