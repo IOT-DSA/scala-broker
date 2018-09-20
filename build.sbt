@@ -69,7 +69,7 @@ dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
 dockerExposedPorts := Seq(9000, 9443, 2551)
-dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs", "/opt/docker/journal", "/opt/docker/snapshots")
+dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
