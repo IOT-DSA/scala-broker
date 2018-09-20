@@ -24,14 +24,14 @@ class SubscriptionChannelSpec extends WordSpecLike
 
       "deliver at least 1 message for every subscription for QoS == 0 if consumer is slow" in {
 
-        withFlow(200, 5, QoS.Default){
+        withFlow(200, 1, QoS.Default){
           (source, flow, sink) =>
 
             When("consumer is slow")
             And("qos == 0")
             val runnableGraph =
               source
-                .buffer(300, OverflowStrategy.backpressure)
+                .buffer(20, OverflowStrategy.backpressure)
                 .via(flow)
                 .throttle(1, 20.millisecond, 1, ThrottleMode.shaping)
                 .toMat(sink)(Keep.right)
