@@ -68,7 +68,8 @@ enablePlugins(DockerPlugin, JavaAppPackaging)
 dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
-dockerExposedPorts := Seq(9000, 9443, 2551, 2552)
+dockerExposedPorts := Seq(9000, 9443, 2551)
+dockerExposedUdpPorts := Seq(2552)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
