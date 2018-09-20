@@ -82,7 +82,7 @@ dockerEntrypoint ++= Seq(
   """-Dakka.remote.artery.canonical.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
   """-Dakka.remote.artery.canonical.port="$AKKA_REMOTING_BIND_PORT_UDP"""",
   """-Dakka.remote.artery.bind.hostname="0.0.0.0"""",
-  """-Dakka.remote.artery.bind.port="$AKKA_REMOTING_BIND_PORT_UDP"""",
+  """-Dakka.remote.artery.bind.port=2552""",
   """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
   """-Dkamon.statsd.hostname="$STATSD_HOST"""",
   """-Dkamon.statsd.port=$STATSD_PORT""",
