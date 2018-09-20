@@ -96,8 +96,7 @@ dockerCommands :=
   }
 
 dockerCommands ++= Seq(
-  Cmd("USER", "root"),
-  ExecCmd("RUN","apt-get install -y nmap netstat")
+  Cmd("USER", "root")
 )
 
 mappings in Universal ++= Seq(
