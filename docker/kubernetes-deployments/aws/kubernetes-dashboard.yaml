@@ -164,7 +164,7 @@ spec:
     - port: 443
       targetPort: 8443
   selector:
+    k8s-app: kubernetes-dashboard
   type: LoadBalancer
   loadBalancerSourceRanges:
     - 0.0.0.0/0
-k8s-app: kubernetes-dashboard
