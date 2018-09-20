@@ -1,5 +1,6 @@
 import Testing.itTest
-import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
+//import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
+import com.typesafe.sbt.packager.docker._
 
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
@@ -68,6 +69,10 @@ enablePlugins(DockerPlugin, JavaAppPackaging)
 dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
+import com.typesafe.sbt.packager.docker._
+
+// use += to add an item to a Sequence
+dockerCommands += Cmd("USER", (daemonUser in Docker).value)
 dockerExposedPorts := Seq(9000, 9443, 2551)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
@@ -88,6 +93,11 @@ dockerCommands :=
     case ExecCmd("ENTRYPOINT", args @ _*) => Seq(Cmd("ENTRYPOINT", args.mkString(" ")))
     case v => Seq(v)
   }
+
+dockerCommands ++= Seq(
+  Cmd("USER", "root"),
+  ExecCmd("RUN","apt-get install -y nmap netstat")
+)
 
 mappings in Universal ++= Seq(
   file("scripts/start-broker") -> "bin/start-broker",
