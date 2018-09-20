@@ -16,15 +16,11 @@ spec:
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
-      dnsConfig:
-        searches:
-        - cloud-broker-internal.default.svc.cluster.local
       initContainers:
       - name: init-resolv
         image: "busybox"
         command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
-      dnsPolicy: ClusterFirst
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
         imagePullPolicy: Always
