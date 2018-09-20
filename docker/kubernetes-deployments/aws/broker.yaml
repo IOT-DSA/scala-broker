@@ -160,9 +160,11 @@ metadata:
 spec:
   ports:
   - port: 2551
+    name: tcp-2551
     targetPort: 2551
     protocol: TCP
   - port: 2552
+    name: udp-2552
     targetPort: 2552
     protocol: UDP
   selector:
