@@ -19,7 +19,7 @@ spec:
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-metrics.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -39,6 +39,7 @@ spec:
         - containerPort: 9000
         - containerPort: 9005
         - containerPort: 2551
+        - containerPort: 2552
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
@@ -57,8 +58,10 @@ spec:
               fieldPath: metadata.name
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
+        - name: AKKA_REMOTING_BIND_PORT_UDP
+          value: "2552"
         - name: AKKA_SEED_NODES
-          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
+          value: "cloud-broker-cluster-0:2552,cloud-broker-cluster-1:2552,cloud-broker-cluster-2:2552"
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
@@ -80,7 +83,7 @@ spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster
-  replicas: 0
+  replicas: 1
   serviceName: cloud-broker-internal
   template:
     metadata:
@@ -115,6 +118,7 @@ spec:
         - containerPort: 9000
         - containerPort: 9005
         - containerPort: 2551
+        - containerPort: 2552
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
@@ -158,6 +162,9 @@ spec:
   - port: 2551
     targetPort: 2551
     protocol: TCP
+  - port: 2552
+    targetPort: 2552
+    protocol: UDP
   selector:
     app: cloud-broker-cluster
   clusterIP: None
