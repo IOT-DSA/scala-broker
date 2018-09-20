@@ -68,13 +68,13 @@ enablePlugins(DockerPlugin, JavaAppPackaging)
 dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
-dockerExposedPorts := Seq(9000, 9443, 2551)
+dockerExposedPorts := Seq(9000, 9443, 2551, 2552)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
   """-Dakka.remote.artery.canonical.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
-  """-Dakka.remote.artery.canonical.port="$AKKA_REMOTING_BIND_PORT"""",
+  """-Dakka.remote.artery.canonical.port="$AKKA_REMOTING_BIND_PORT_UDP"""",
   """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
   """-Dkamon.statsd.hostname="$STATSD_HOST"""",
   """-Dkamon.statsd.port=$STATSD_PORT""",
