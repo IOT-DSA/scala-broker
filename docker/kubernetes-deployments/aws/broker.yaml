@@ -69,11 +69,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "3500Mi"
+            cpu: "1700m"
           limits:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "3500Mi"
+            cpu: "1700m"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -139,6 +139,8 @@ spec:
               fieldPath: metadata.name
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
+        - name: AKKA_REMOTING_BIND_PORT_UDP
+          value: "2552"
         - name: AKKA_SEED_NODES
           value: "cloud-broker-cluster-0:2552,cloud-broker-cluster-1:2552,cloud-broker-cluster-2:2552"
         - name: AKKA_ACTOR_SYSTEM_NAME
@@ -147,11 +149,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "3500Mi"
+            cpu: "1700m"
           limits:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "3500Mi"
+            cpu: "1700m"
 ---
 apiVersion: v1
 kind: Service
