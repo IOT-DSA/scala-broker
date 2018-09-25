@@ -7,7 +7,7 @@ spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster
-  replicas: 3
+  replicas: 2
   serviceName: cloud-broker-internal
   template:
     metadata:
@@ -22,7 +22,7 @@ spec:
         command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-metrics.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
-        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
+        image: "localhost:5000/broker-scala:latest"
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -39,8 +39,7 @@ spec:
         - containerPort: 9000
         - containerPort: 9005
         - containerPort: 2551
-        - containerPort: 2552
-          protocol: UDP
+        - containerPort: 8558
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
@@ -59,21 +58,19 @@ spec:
               fieldPath: metadata.name
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
-        - name: AKKA_REMOTING_BIND_PORT_UDP
-          value: "2552"
         - name: AKKA_SEED_NODES
-          value: "cloud-broker-cluster-0:2552,cloud-broker-cluster-1:2552,cloud-broker-cluster-2:2552"
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "100Mi"
+            cpu: "10m"
           limits:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "1000Mi"
+            cpu: "1000m"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -102,7 +99,7 @@ spec:
         command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
-        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
+        image: "localhost:5000/broker-scala:latest"
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -119,8 +116,7 @@ spec:
         - containerPort: 9000
         - containerPort: 9005
         - containerPort: 2551
-        - containerPort: 2552
-          protocol: UDP
+        - containerPort: 8558
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
@@ -139,21 +135,19 @@ spec:
               fieldPath: metadata.name
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
-        - name: AKKA_REMOTING_BIND_PORT_UDP
-          value: "2552"
         - name: AKKA_SEED_NODES
-          value: "cloud-broker-cluster-0:2552,cloud-broker-cluster-1:2552,cloud-broker-cluster-2:2552"
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "100Mi"
+            cpu: "10m"
           limits:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "1000Mi"
+            cpu: "1000m"
 ---
 apiVersion: v1
 kind: Service
@@ -163,14 +157,9 @@ metadata:
     app: cloud-broker-cluster
 spec:
   ports:
-  - port: 2551
-    name: tcp-2551
+  - name: tcp-2551
+    port: 2551
     targetPort: 2551
-    protocol: TCP
-  - port: 2552
-    name: udp-2552
-    targetPort: 2552
-    protocol: UDP
   selector:
     app: cloud-broker-cluster
   clusterIP: None
@@ -184,6 +173,10 @@ metadata:
 spec:
   clusterIP: 10.100.0.3
   ports:
+  - name: akka-mgmt-http
+    port: 8558
+    targetPort: 8558
+    nodePort: 30003
   - name: dsabroker-webinterface
     port: 9000
     targetPort: 9000
