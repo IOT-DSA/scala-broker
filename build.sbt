@@ -73,12 +73,16 @@ import com.typesafe.sbt.packager.docker._
 
 // use += to add an item to a Sequence
 dockerCommands += Cmd("USER", (daemonUser in Docker).value)
-dockerExposedPorts := Seq(9000, 9443, 2551)
+dockerExposedPorts := Seq(9000, 9443, 2551, 8558)
 dockerExposedUdpPorts := Seq(2552)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
+  """-Dakka.remote.artery.canonical.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
+  """-Dakka.remote.artery.canonical.port="$AKKA_REMOTING_BIND_PORT"""",
+  """-Dakka.remote.artery.bind.hostname="0.0.0.0"""",
+  """-Dakka.remote.artery.bind.port="$AKKA_REMOTING_BIND_PORT"""",
   """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
   """-Dkamon.statsd.hostname="$STATSD_HOST"""",
   """-Dkamon.statsd.port=$STATSD_PORT""",
