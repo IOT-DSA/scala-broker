@@ -7,7 +7,7 @@ spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster
-  replicas: 2
+  replicas: 3
   serviceName: cloud-broker-internal
   template:
     metadata:
@@ -22,7 +22,7 @@ spec:
         command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-metrics.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
-        image: "localhost:5000/broker-scala:latest"
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -66,11 +66,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "100Mi"
-            cpu: "10m"
+            memory: "3500Mi"
+            cpu: "1700m"
           limits:
-            memory: "1000Mi"
-            cpu: "1000m"
+            memory: "3500Mi"
+            cpu: "1700m"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -99,7 +99,7 @@ spec:
         command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
-        image: "localhost:5000/broker-scala:latest"
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -143,11 +143,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "100Mi"
-            cpu: "10m"
+            memory: "3500Mi"
+            cpu: "1700m"
           limits:
-            memory: "1000Mi"
-            cpu: "1000m"
+            memory: "3500Mi"
+            cpu: "1700m"
 ---
 apiVersion: v1
 kind: Service
