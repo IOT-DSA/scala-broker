@@ -69,8 +69,8 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "6500Mi"
+            cpu: "3700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"
@@ -99,7 +99,7 @@ spec:
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-metrics.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -146,8 +146,8 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "6500Mi"
+            cpu: "3700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"
@@ -207,4 +207,4 @@ spec:
   - type: Resource
     resource:
       name: cpu
-      targetAverageUtilization: 80
+      targetAverageUtilization: 50
