@@ -22,7 +22,7 @@ object Settings {
   /**
    * Broker name.
    */
-  val BrokerName = rootConfig.getBoolean("broker.name")
+  val BrokerName = rootConfig.getString("broker.name")
 
   /**
    * DSA Server Configuration.
