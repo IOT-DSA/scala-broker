@@ -10,12 +10,12 @@ spec:
   replicas: 3
   serviceName: cloud-broker-internal
   template:
+    metadata:
+      labels:
+        app: cloud-broker-cluster
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
-      dnsConfig:
-        searches:
-        - cloud-broker-internal.default.svc.cluster.local
       initContainers:
       - name: init-resolv
         image: "busybox"
