@@ -16,6 +16,9 @@ spec:
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
+      dnsConfig:
+        searches:
+        - cloud-broker-internal.default.svc.cluster.local
       initContainers:
       - name: init-resolv
         image: "busybox"
@@ -59,7 +62,7 @@ spec:
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
         - name: AKKA_SEED_NODES
-          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551"
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
@@ -69,8 +72,8 @@ spec:
             memory: "3500Mi"
             cpu: "1700m"
           limits:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "6500Mi"
+            cpu: "3700m"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -136,7 +139,7 @@ spec:
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
         - name: AKKA_SEED_NODES
-          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551"
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
@@ -146,8 +149,8 @@ spec:
             memory: "3500Mi"
             cpu: "1700m"
           limits:
-            memory: "3500Mi"
-            cpu: "1700m"
+            memory: "6500Mi"
+            cpu: "3700m"
 ---
 apiVersion: v1
 kind: Service
@@ -160,6 +163,7 @@ spec:
   - name: tcp-2551
     port: 2551
     targetPort: 2551
+    protocol: TCP
   selector:
     app: cloud-broker-cluster
   clusterIP: None
@@ -173,10 +177,6 @@ metadata:
 spec:
   clusterIP: 10.100.0.3
   ports:
-  - name: akka-mgmt-http
-    port: 8558
-    targetPort: 8558
-    nodePort: 30003
   - name: dsabroker-webinterface
     port: 9000
     targetPort: 9000
