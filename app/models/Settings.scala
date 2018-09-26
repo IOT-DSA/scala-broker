@@ -17,10 +17,12 @@ object Settings {
 
   val rootConfig = ConfigFactory.load
 
+  val SkipAuth = rootConfig.getBoolean("broker.skipAuth")
+
   /**
    * Broker name.
    */
-  val BrokerName = rootConfig.getString("broker.name")
+  val BrokerName = rootConfig.getBoolean("broker.name")
 
   /**
    * DSA Server Configuration.
