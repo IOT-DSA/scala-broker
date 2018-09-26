@@ -66,8 +66,8 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "3500Mi"
+            cpu: "1700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"
@@ -143,8 +143,8 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "6500Mi"
-            cpu: "3700m"
+            memory: "3500Mi"
+            cpu: "1700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"
