@@ -28,5 +28,8 @@ PUT      /bench/start           controllers.BenchmarkController.start(config: co
 PUT      /bench/stop            controllers.BenchmarkController.stop
 PUT      /bench/reset           controllers.BenchmarkController.reset
 
+# healthcheck
+GET     /health                 controllers.MainController.health
+
 # Map static resources from the /public folder to the /assets URL path
 GET      /assets/*file          controllers.Assets.versioned(path="/public", file: Asset)

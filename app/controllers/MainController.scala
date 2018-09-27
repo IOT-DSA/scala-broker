@@ -12,6 +12,7 @@ import models.Settings
 import models.akka.{BrokerActors, DSLinkManager, RichRoutee}
 import play.api.mvc.ControllerComponents
 import akka.actor.Address
+import kamon.Kamon
 
 import scala.util.control.NonFatal
 
@@ -52,6 +53,15 @@ class MainController @Inject() (actorSystem: ActorSystem,
       down <- dslinkStats.recover{case NonFatal(e) => DSLinkStats(Map.empty)}
       up <- uplinkStats.recover{case NonFatal(e) => DSLinkStats(Map.empty)}
     } yield Ok(views.html.cluster(mode, startedAt, nodes.map(ni => (ni.address -> ni)).toMap, down, up))
+  }
+
+  /**
+    * healthcheck
+    */
+  def health = Action.async{
+    Future.successful{
+      Ok("i'm alive")
+    }
   }
 
   /**
