@@ -26,7 +26,7 @@ spec:
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
-            path: /cluster
+            path: /health
             port: 9000
             scheme: HTTP
           initialDelaySeconds: 30
@@ -103,7 +103,7 @@ spec:
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
-            path: /cluster
+            path: /health
             port: 9000
             scheme: HTTP
           initialDelaySeconds: 30
