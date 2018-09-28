@@ -132,6 +132,10 @@ spec:
           value: cloud-metrics-internal
         - name: ZIPKIN_PORT
           value: "9411"
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: AKKA_REMOTING_BIND_HOST
           valueFrom:
             fieldRef:
