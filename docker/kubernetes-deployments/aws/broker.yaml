@@ -76,12 +76,12 @@ apiVersion: apps/v1
 kind: Deployment
 namespace: default
 metadata:
-  name: cloud-broker-cluster-squad
+  name: cloud-broker-cluster
 spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster
-  replicas: 1
+  replicas: 3
   serviceName: cloud-broker-internal
   template:
     metadata:
@@ -90,9 +90,6 @@ spec:
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
-      dnsConfig:
-        searches:
-        - cloud-broker-internal.default.svc.cluster.local
       initContainers:
       - name: init-resolv
         image: "busybox"
