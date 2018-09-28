@@ -16,10 +16,13 @@ spec:
     spec:
       subdomain: "cloud-broker-internal"
       podManagementPolicy: Parallel
+      dnsConfig:
+        searches:
+        - cloud-broker-internal.default.svc.cluster.local
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-metrics.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -89,11 +92,14 @@ spec:
         app: cloud-broker-cluster
     spec:
       subdomain: "cloud-broker-internal"
+      dnsConfig:
+        searches:
+        - cloud-broker-internal.default.svc.cluster.local
       podManagementPolicy: Parallel
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-metrics.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -154,8 +160,7 @@ metadata:
     app: cloud-broker-cluster
 spec:
   ports:
-  - name: tcp-2551
-    port: 2551
+  - port: 2551
     targetPort: 2551
     protocol: TCP
   selector:
