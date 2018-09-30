@@ -114,7 +114,7 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           failureThreshold: 3
-        serviceName: "cloud-broker-internal-squad"
+        serviceName: "cloud-broker-internal"
         ports:
         - containerPort: 9000
         - containerPort: 9005
@@ -174,26 +174,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: cloud-broker-internal-squad
-  labels:
-    app: cloud-broker-cluster-squad
-spec:
-  ports:
-  - port: 2551
-    targetPort: 2551
-    protocol: TCP
-  selector:
-    app: cloud-broker-cluster-squad
-  clusterIP: None
----
-apiVersion: v1
-kind: Service
-metadata:
   name: cloud-broker-external
   labels:
     app: cloud-broker-cluster
 spec:
-  clusterIP: 10.100.0.3
   ports:
   - name: dsabroker-webinterface
     port: 9000
