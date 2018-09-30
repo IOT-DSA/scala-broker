@@ -139,7 +139,7 @@ spec:
         - name: AKKA_REMOTING_BIND_HOST
           valueFrom:
             fieldRef:
-              fieldPath: metadata.name
+              fieldPath: status.podIP
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
         - name: AKKA_SEED_NODES
