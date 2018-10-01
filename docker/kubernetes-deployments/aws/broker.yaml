@@ -203,8 +203,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: cloud-broker-cluster-squad
-  minReplicas: 0
-  maxReplicas: 0
+  minReplicas: 1
+  maxReplicas: 1
   metrics:
   - type: Resource
     resource:
