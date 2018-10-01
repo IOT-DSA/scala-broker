@@ -46,7 +46,7 @@ spec:
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
-          value: "-Xmx5120m"
+          value: "-Xmx6500m"
         - name: STATSD_HOST
           value: cloud-metrics-internal.default.svc.cluster.local
         - name: STATSD_PORT
@@ -123,7 +123,7 @@ spec:
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
-          value: "-Xmx5120m"
+          value: "-Xmx6500m"
         - name: STATSD_HOST
           value: cloud-metrics-internal.default.svc.cluster.local
         - name: STATSD_PORT
