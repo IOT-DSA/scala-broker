@@ -85,11 +85,12 @@ spec:
     matchLabels:
       app: cloud-broker-cluster-squad
   replicas: 1
-  serviceName: cloud-broker-internal-squad
+  serviceName: cloud-broker-internal, depl_type: squad
   template:
     metadata:
       labels:
-        app: cloud-broker-cluster-squad
+        app: cloud-broker-cluster
+        depl_type: squad
     spec:
       subdomain: "cloud-broker-internal-squad"
       dnsConfig:
@@ -161,7 +162,7 @@ kind: Service
 metadata:
   name: cloud-broker-internal
   labels:
-    app: cloud-broker-cluster,cloud-broker-cluster-squad
+    app: cloud-broker-cluster
 spec:
   ports:
   - port: 2551
@@ -176,7 +177,7 @@ kind: Service
 metadata:
   name: cloud-broker-external
   labels:
-    app: cloud-broker-cluster,cloud-broker-cluster-squad
+    app: cloud-broker-cluster
 spec:
   ports:
   - name: dsabroker-webinterface
