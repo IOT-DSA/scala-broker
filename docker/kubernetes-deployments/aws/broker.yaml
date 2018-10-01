@@ -83,9 +83,9 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: cloud-broker-cluster-squad
+      app: cloud-broker-cluster-squad, depl_type: squad
   replicas: 1
-  serviceName: cloud-broker-internal, depl_type: squad
+  serviceName: cloud-broker-internal
   template:
     metadata:
       labels:
