@@ -189,7 +189,7 @@ spec:
     nodePort: 30002
   selector:
     matchExpressions:
-      - {key: app, operator: In, values: [cloud-broker-cluster, cloud-broker-cluster-squad]}
+      - {key: app, operator: In, values: [cloud-broker-cluster,cloud-broker-cluster-squad]}
   status: loadBalancer
   type: NodePort
   externalTrafficPolicy: Cluster
