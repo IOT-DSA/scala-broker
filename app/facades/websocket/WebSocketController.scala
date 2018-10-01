@@ -320,7 +320,7 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
           }
 
           override def supervisorStrategy = OneForOneStrategy() {
-            case _ => SupervisorStrategy.Stop
+            case _ => SupervisorStrategy.restart
           }
         }))
 
