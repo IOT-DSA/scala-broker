@@ -84,7 +84,7 @@ spec:
   selector:
     matchLabels:
       app: cloud-broker-cluster-squad
-  replicas: 3
+  replicas: 1
   serviceName: cloud-broker-internal-squad
   template:
     metadata:
