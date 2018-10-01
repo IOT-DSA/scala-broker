@@ -161,7 +161,7 @@ kind: Service
 metadata:
   name: cloud-broker-internal
   labels:
-    app: cloud-broker-cluster
+    app: cloud-broker-cluster,cloud-broker-cluster-squad
 spec:
   ports:
   - port: 2551
@@ -176,7 +176,7 @@ kind: Service
 metadata:
   name: cloud-broker-external
   labels:
-    app: cloud-broker-cluster
+    app: cloud-broker-cluster,cloud-broker-cluster-squad
 spec:
   ports:
   - name: dsabroker-webinterface
@@ -189,7 +189,7 @@ spec:
     nodePort: 30002
   selector:
     matchExpressions:
-      - {key: app, operator: In, values: [cloud-broker-cluster,cloud-broker-cluster-squad]}
+    app: cloud-broker-cluster,
   status: loadBalancer
   type: NodePort
   externalTrafficPolicy: Cluster
