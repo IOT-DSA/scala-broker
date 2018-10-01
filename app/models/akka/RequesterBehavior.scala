@@ -94,7 +94,7 @@ trait RequesterBehavior {
 
     log.info("new subscription source connected: {}", sinkRef)
 
-    val toSocketVal = Source.queue[SubscriptionNotificationMessage](1000, OnOverflow)
+    val toSocketVal = Source.queue[SubscriptionNotificationMessage](100, OnOverflow)
       .conflateWithSeed(List(_)){(list, next) => list :+ next}
       .async
       .via(Flow.fromGraph(channel))
