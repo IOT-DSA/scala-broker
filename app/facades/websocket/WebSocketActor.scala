@@ -10,6 +10,7 @@ import akka.routing.Routee
 import akka.stream.{Materializer, OverflowStrategy, SinkRef}
 import akka.stream.scaladsl.{Keep, Source}
 import kamon.Kamon
+import models.Settings.WebSocket.OnOverflow
 import models.{RequestEnvelope, ResponseEnvelope, formatMessage}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
@@ -30,7 +31,7 @@ class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSo
 
   protected val ci = config.connInfo
 
-  protected val out = Source.queue(100, OverflowStrategy.backpressure)
+  protected val out = Source.queue(1000, OnOverflow)
     .toMat(sinkRef.sink())(Keep.left)
     .run()
 
