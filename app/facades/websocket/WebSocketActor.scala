@@ -31,7 +31,7 @@ class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSo
 
   protected val ci = config.connInfo
 
-  protected val out = Source.queue(1000, OnOverflow)
+  protected val out = Source.queue(100, OnOverflow)
     .toMat(sinkRef.sink())(Keep.left)
     .run()
 
