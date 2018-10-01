@@ -190,7 +190,7 @@ spec:
     nodePort: 30002
   selector:
     matchExpressions:
-    app: cloud-broker-cluster,
+    app: cloud-broker-cluster
   status: loadBalancer
   type: NodePort
   externalTrafficPolicy: Cluster
