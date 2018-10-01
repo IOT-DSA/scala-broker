@@ -4,8 +4,10 @@ import akka.actor.ActorRef
 import akka.actor.Status.Success
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{ActorMaterializer, OverflowStrategy, SinkRef}
+import models.Settings.WebSocket.OnOverflow
 import models.akka.Messages._
 import models.metrics.Meter
+
 import scala.util.control.NonFatal
 import scala.concurrent.duration._
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
@@ -94,7 +96,7 @@ trait RequesterBehavior {
 
     log.info("new subscription source connected: {}", sinkRef)
 
-    val toSocketVal = Source.queue[SubscriptionNotificationMessage](100, OverflowStrategy.backpressure)
+    val toSocketVal = Source.queue[SubscriptionNotificationMessage](1000, OnOverflow)
       .conflateWithSeed(List(_)){(list, next) => list :+ next}
       .async
       .via(Flow.fromGraph(channel))

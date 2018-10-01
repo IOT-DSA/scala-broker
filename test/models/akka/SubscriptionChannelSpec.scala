@@ -5,6 +5,7 @@ import akka.actor.ActorSystem
 import akka.http.impl.util.DefaultNoLogging
 import akka.stream.{ActorMaterializer, OverflowStrategy, ThrottleMode}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import models.Settings.WebSocket.OnOverflow
 import models.akka.Messages.SubscriptionNotificationMessage
 import models.rpc.{DSAResponse, ResponseMessage}
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
@@ -31,7 +32,7 @@ class SubscriptionChannelSpec extends WordSpecLike
             And("qos == 0")
             val runnableGraph =
               source
-                .buffer(20, OverflowStrategy.backpressure)
+                .buffer(20, OnOverflow)
                 .via(flow)
                 .throttle(1, 20.millisecond, 1, ThrottleMode.shaping)
                 .toMat(sink)(Keep.right)
