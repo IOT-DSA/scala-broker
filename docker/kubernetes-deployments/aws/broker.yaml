@@ -48,11 +48,11 @@ spec:
         - name: JAVA_OPTS
           value: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
         - name: STATSD_HOST
-          value: cloud-metrics-internal
+          value: cloud-metrics-internal.default.svc.cluster.local
         - name: STATSD_PORT
           value: "8125"
         - name: ZIPKIN_HOST
-          value: cloud-metrics-internal
+          value: cloud-metrics-internal.default.svc.cluster.local
         - name: ZIPKIN_PORT
           value: "9411"
         - name: AKKA_REMOTING_BIND_HOST
@@ -125,11 +125,11 @@ spec:
         - name: JAVA_OPTS
           value: "-agentlib:jdwp=transport=dt_socket,address=9005,server=y,suspend=n"
         - name: STATSD_HOST
-          value: cloud-metrics-internal
+          value: cloud-metrics-internal.default.svc.cluster.local
         - name: STATSD_PORT
           value: "8125"
         - name: ZIPKIN_HOST
-          value: cloud-metrics-internal
+          value: cloud-metrics-internal.default.svc.cluster.local
         - name: ZIPKIN_PORT
           value: "9411"
         - name: HOSTNAME
