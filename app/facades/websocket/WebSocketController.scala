@@ -14,7 +14,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.routing.Routee
-import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.{InvalidSequenceNumberException, Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
 import akka.util.ByteString
 import controllers.BasicController
@@ -331,7 +331,11 @@ class WebSocketController @Inject() (actorSystem:  ActorSystem,
 
         val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
 
-        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
+        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src).recover{
+          case e: InvalidSequenceNumberException =>
+            log.error(s"messages been lost: ${e.msg}", e)
+            EmptyMessage
+        }
     }
   }
 
