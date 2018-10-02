@@ -1,12 +1,11 @@
 package models.akka.cluster
 
-import akka.actor.{ ActorRef, ActorSystem }
+import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.cluster.Cluster
-import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRegion }
+import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.routing.Routee
 import akka.util.Timeout
-import models.akka.{ DSLinkManager, RichRoutee, RootNodeActor }
-import akka.actor.Props
+import models.akka.{DSLinkManager, RichRoutee, RootNodeActor}
 import akka.cluster.ddata.DistributedData
 import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
@@ -88,10 +87,26 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
    */
   private def createRegion(typeName: String, linkProps: Props) = {
     val sharding = ClusterSharding(system)
-    if (proxyMode)
+    if (proxyMode){
       sharding.startProxy(typeName, Some("backend"), extractEntityId, extractShardId)
-    else
-      sharding.start(typeName, linkProps, ClusterShardingSettings(system), extractEntityId, extractShardId)
+    }
+    else {
+      val settings = ClusterShardingSettings(system)
+      val threshold = settings.tuningParameters.leastShardAllocationRebalanceThreshold
+      val maxSimultaneousRebalance = settings.tuningParameters.leastShardAllocationMaxSimultaneousRebalance
+
+      sharding.start(
+        typeName,
+        linkProps,
+        settings,
+        extractEntityId,
+        extractShardId,
+        new CustomAllocationStrategy(threshold, maxSimultaneousRebalance),
+        PoisonPill
+      )
+    }
+
+
   }
 
   private def routeToDistributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Unit =
