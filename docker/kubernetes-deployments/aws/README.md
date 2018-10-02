@@ -33,4 +33,3 @@ docker push 582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performanc
 kubectl delete pods cloud-broker-cluster-0 cloud-broker-cluster-1 cloud-broker-cluster-2  
 ```
 
-
