@@ -145,6 +145,7 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
     val config = ConfigFactory.parseString(
       s"""
          |akka.remote.artery.canonical.port=$port
+         |akka.cluster.distributed-data.gossip-interval = 150 ms
          |akka.remote.artery.advanced.aeron-dir=/tmp/aeron-$port-${Math.random()}
          |
        """.stripMargin)
