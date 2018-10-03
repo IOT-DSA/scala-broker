@@ -38,7 +38,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
   // processes request using the appropriate handler
-  private val requestHandler = handlePassthroughRequest orElse handleListRequest orElse
+  private val requestHandler = handlePasstroughRequest orElse handleListRequest orElse
     handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
   private val mainResponderBehaviorState = MainResponderBehaviorState(ridRegistry, sidRegistry, attributes)
@@ -131,7 +131,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
           HandlerResult(ListRequest(tgtId, translatePath(path)))
         case Some(rec) =>
           addListOrigin(rec.targetId, origin)
-          HandlerResult.Empty
+          HandlerResult(ListRequest(rec.targetId, translatePath(path)))
       }
   }
 
@@ -143,7 +143,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
   /**
    * Translates the original request before sending it to responder link.
    */
-  private def handlePassthroughRequest: RequestHandler = {
+  private def handlePasstroughRequest: RequestHandler = {
 
     def tgtId(srcId: Int, method: DSAMethod) = {
       val tgtId = ridRegistry.nextTgtId
@@ -190,6 +190,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
 
   /**
    * Handles Subscribe request.
+   * For each subscribe request we create new stream even previous stream is already exists
    */
   private def handleSubscribeRequest: RequestHandler = {
     case req @ SubscribeRequest(srcRid, _) =>
@@ -200,22 +201,16 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
       Kamon.currentSpan().tag("rid", srcRid)
       Kamon.currentSpan().tag("kind", "SubscribeRequest")
 
-      sidRegistry.lookupByPath(srcPath.path) match {
-        case None =>
-          val tgtRid = ridRegistry.nextTgtId
-          ridRegistry.saveSubscribeLookup(ridOrigin, tgtRid)
-          val tgtSid = sidRegistry.nextTgtId
-          sidRegistry.saveLookup(srcPath.path, tgtSid)
-          Kamon.currentSpan().tag("sid", tgtSid)
-          val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
-          addSubscribeOrigin(tgtSid, sidOrigin)
-          HandlerResult(SubscribeRequest(tgtRid, tgtPath))
-        case Some(tgtSid) =>
-          // Close and Subscribe response may come out of order, leaving until it's a problem
-          addSubscribeOrigin(tgtSid, sidOrigin)
-          Kamon.currentSpan().tag("sid", tgtSid)
-          HandlerResult(DSAResponse(srcRid, Some(StreamState.Closed)))
-      }
+      //TODO: check for memory leak. Right now we are making available to create new subscriptions for Requester-Responder pair which already have at least one subscription
+
+      val tgtRid = ridRegistry.nextTgtId
+      ridRegistry.saveSubscribeLookup(ridOrigin, tgtRid)
+      val tgtSid = sidRegistry.nextTgtId
+      sidRegistry.saveLookup(srcPath.path, tgtSid)
+      Kamon.currentSpan().tag("sid", tgtSid)
+      val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
+      addSubscribeOrigin(tgtSid, sidOrigin)
+      HandlerResult(SubscribeRequest(tgtRid, tgtPath))
   }
 
   /**

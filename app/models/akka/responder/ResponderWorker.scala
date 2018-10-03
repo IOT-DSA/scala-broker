@@ -7,7 +7,7 @@ import models.akka.PartOfPersistenceBehavior
 import models.rpc.DSAResponse
 
 /**
- * A worker handling either List or Subscribe calls. Storer call records for multiple target Ids
+ * A worker handling either List or Subscribe calls. Stores call records for multiple target Ids
  * (RIDs or SIDs).
  */
 abstract class ResponderWorker(poolId: String) extends Actor with ActorLogging {
