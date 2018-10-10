@@ -131,7 +131,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
           HandlerResult(ListRequest(tgtId, translatePath(path)))
         case Some(rec) =>
           addListOrigin(rec.targetId, origin)
-          HandlerResult(ListRequest(rec.targetId, translatePath(path)))
+          HandlerResult(ListRequest(rid, translatePath(path)))
       }
   }
 
