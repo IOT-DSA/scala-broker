@@ -59,7 +59,7 @@ class ResponderListWorker(linkName: String) extends ResponderWorker(linkName + "
 
   override def receive = super.receive orElse {
     case rsp @ DSAResponse(rid, stream, _, _, _) if rid != 0 =>
-      log.info(s"$ownId: received $rsp")
+      log.debug(s"$ownId: received $rsp")
       registry.deliverResponse(rsp)
   }
 }
@@ -83,7 +83,7 @@ class ResponderSubscribeWorker(linkName: String) extends ResponderWorker(linkNam
 
   override def receive = super.receive orElse {
     case rsp @ DSAResponse(0, stream, updates, columns, error) =>
-      log.info(s"$ownId: received $rsp")
+      log.debug(s"$ownId: received $rsp")
       registry.deliverResponse(rsp)
   }
 }

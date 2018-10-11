@@ -141,25 +141,25 @@ class LocalDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
     }
   }
 
-  "PoisonPill" should {
-    "kill downstream and then try to recover it" in {
-      downstream ! PoisonPill
-      Thread.sleep(500)
-      downstreamRecovered = system.actorOf(LocalDSLinkFolderActor.props(
-        Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
-      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
-        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 2, 0, 1, 0, 0))
-      }
-    }
-  }
+//  "PoisonPill" should {
+//    "kill downstream and then try to recover it" in {
+//      downstream ! PoisonPill
+//      Thread.sleep(500)
+//      downstreamRecovered = system.actorOf(LocalDSLinkFolderActor.props(
+//        Paths.Downstream, dslinkMgr.dnlinkProps, "downstream" -> true), Nodes.Downstream)
+//      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+//        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 2, 0, 1, 0, 0))
+//      }
+//    }
+//  }
 
-  "RemoveDisconnectedDSLinks" should {
-    "remove all disconnected dslinks after the state recovering" in {
-      downstreamRecovered ! RemoveDisconnectedDSLinks
-      Thread.sleep(500)
-      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
-        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 0, 0, 0, 0, 0))
-      }
-    }
-  }
+//  "RemoveDisconnectedDSLinks" should {
+//    "remove all disconnected dslinks after the state recovering" in {
+//      downstreamRecovered ! RemoveDisconnectedDSLinks
+//      Thread.sleep(500)
+//      whenReady((downstreamRecovered ? GetDSLinkStats).mapTo[DSLinkStats]) {
+//        _.nodeStats.values.toList mustBe List(DSLinkNodeStats(downstreamRecovered.path.address, 0, 0, 0, 0, 0, 0))
+//      }
+//    }
+//  }
 }

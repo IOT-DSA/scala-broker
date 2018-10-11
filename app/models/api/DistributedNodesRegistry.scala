@@ -148,6 +148,7 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
     case (Some(parent), name) => {
       val parentNode: DSANode = registry.get(parent)
         .getOrElse(getOrCreateNode(parent))
+
       val child = registry.get(nodeDescription.path).getOrElse {
         val newOne: DSANode = TypedActor(context)
           .typedActorOf(DistributedDSANode.props(Some(parentNode), new StringValue(""), nodeDescription, self, replicator))

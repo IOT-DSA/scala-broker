@@ -365,7 +365,7 @@ class DistributedDSANode(_parent: Option[DSANode],
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
       case e@RequestEnvelope(requests) =>
-        log.info("{}: received {}", ownId, e)
+        log.debug("{}: received {}", ownId, e)
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
       case u: UpdateResponse[_] ⇒ // ignore

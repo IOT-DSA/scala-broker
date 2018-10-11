@@ -3,11 +3,13 @@ package models.akka
 import akka.actor.ActorRef
 import akka.actor.Status.Success
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.{ActorMaterializer, OverflowStrategy, SinkRef}
+import models.Settings.WebSocket.OnOverflow
 import models.akka.Messages._
 import models.metrics.Meter
+
 import scala.util.control.NonFatal
-import scala.collection.mutable.Set
+import scala.concurrent.duration._
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
@@ -15,19 +17,14 @@ import org.reactivestreams.Publisher
 import models.akka.QoSState._
 
 /**
- * Handles communication with a remote DSLink in Requester mode.
- */
-trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
+  * Handles communication with a remote DSLink in Requester mode.
+  */
+trait RequesterBehavior {
+  me: AbstractDSLinkActor with Meter =>
 
   implicit val materializer = ActorMaterializer()
 
   protected def dslinkMgr: DSLinkManager
-
-  //state actore to store different dslink state with persistance etc
-  val qosState = context.actorOf(QoSState.props(
-    reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
-    maxCapacity = Settings.Subscriptions.queueCapacity
-  ), "stateKeeper")
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private val targetsByRid = collection.mutable.Map.empty[Int, String]
@@ -35,7 +32,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
 
   private var lastRid: Int = 0
 
-  val channel = Flow.fromGraph(new SubscriptionChannel(qosState))
+  val channel = new SubscriptionChannel(log)
 
   var toSocket: SourceQueueWithComplete[SubscriptionNotificationMessage] = _
   var subscriptionsPublisher: Publisher[DSAMessage] = _
@@ -47,7 +44,8 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     case m @ RequestMessage(msg, ack, requests) =>
       log.debug("{}: received {}", ownId, m)
       processRequests(requests)
-      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
+//      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
+      requests.lastOption foreach ( req => lastRid = req.rid )
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       cleanupStoredTargets(responses)
@@ -91,23 +89,26 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       }
   }
 
-  override protected def afterConnection(): Unit = {
-    qosState ! Connected
-  }
-
-  override protected def afterDisconnection(): Unit = {
-    qosState ! Disconnected
-  }
-
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource(actor:ActorRef) = {
+  private def getSubscriptionSource(sinkRef: SinkRef[ResponseMessage]) = {
 
-    log.info("new subscription source connected: {}", actor)
+    log.info("new subscription source connected: {}", sinkRef)
 
-    val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
-      .via(channel).toMat(Sink.actorRef(actor, Success(())))(Keep.both).run()
+    val toSocketVal = Source.queue[SubscriptionNotificationMessage](100, OnOverflow)
+      .conflateWithSeed(List(_)){(list, next) => list :+ next}
+      .async
+      .via(Flow.fromGraph(channel))
+      .map{ item =>
+          countTags("qos.notification.out")
+        item
+      }
+      .conflateWithSeed(resp => new ResponseMessage(-1, None, List(resp))) {
+        (message, next) => message.copy(responses = message.responses :+ next)
+      }
+      .toMat(sinkRef.sink())(Keep.left)
+      .run()
 
     toSocket = toSocketVal
   }
@@ -147,14 +148,13 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     r => withQosAndSid(r) foreach {
       message =>
       log.debug("sending subscription message: {}", message)
-      val toSend = SubscriptionNotificationMessage(-1, None, List(message.response), message.sid, message.qos)
+      val toSend = SubscriptionNotificationMessage(message.response, message.sid, message.qos)
 
       if(connected){
         // in connected state pushing to stream with backpressure logic
         toSocket offer toSend
       } else if(message.qos >= QoS.Durable){
-        //in disconnected - just send to state actor
-        qosState ! PutNotification(toSend)
+        channel.putMessage(toSend)
       }
     }
   }
@@ -201,6 +201,17 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
    */
   private def cleanupStoredTargets(responses: Seq[DSAResponse]) = {
 
+    def cleanupSids(rows: Seq[DSAVal]) = try {
+      rows collect extractSid foreach targetsBySid.remove
+    } catch {
+      case NonFatal(e) => log.error("Subscribe response does not have a valid SID")
+    }
+
+    responses filter (_.stream == Some(StreamState.Closed)) foreach {
+      case DSAResponse(0, _, Some(updates), _, _)   => cleanupSids(updates)
+      case DSAResponse(rid, _, _, _, _) if rid != 0 => targetsByRid.remove(rid)
+    }
+    /*
     def cleanupSids(rows: Seq[DSAVal]) = {
       val sids = Set[Int]()
       rows collect extractSid foreach sids.add
@@ -219,7 +230,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
           targetsByRid.remove(event.rid)
         }
     }
-
+    */
     log.debug("{}: RID targets: {}, SID targets: {}", ownId, targetsByRid.size, targetsBySid.size)
   }
 
@@ -264,15 +275,15 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
    */
   private def cacheRequestTarget(request: DSARequest, target: String) = request match {
     case r @ (_: ListRequest | _: InvokeRequest) =>
-      persist(RidTargetsRequesterState(r.rid, target)) { event =>
-        log.debug("{}: RID targets persisted {}", ownId, event)
-        targetsByRid.put(event.rid, event.target)
-      }
+//      persist(RidTargetsRequesterState(r.rid, target)) { event =>
+//        log.debug("{}: RID targets persisted {}", ownId, event)
+      targetsByRid.put(r.rid, target)
+//      }
     case r: SubscribeRequest =>
-      persist(SidTargetsRequesterState(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))) { event =>
-        log.debug("{}: SID targets persisted {}", ownId, event)
-        targetsBySid.put(event.sid, event.pathAndQos)
-      }
+//      persist(SidTargetsRequesterState(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))) { event =>
+//        log.debug("{}: SID targets persisted {}", ownId, event)
+      targetsBySid.put(r.path.sid, PathAndQos(target, r.path.qos.map(QoS(_)).getOrElse(QoS.Default)))
+//      }
     case _ => // do nothing
   }
 
@@ -299,23 +310,23 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   private def resolveTarget(request: DSARequest) = {
 
     val resolveUnsubscribeTarget: PartialFunction[DSARequest, String] = {
-      case UnsubscribeRequest(_, sids) =>
-        val target = targetsBySid.get(sids.head).get.path
-        persist(RemoveTargetBySid(sids.head)) { event =>
-          log.debug("{}: removing by SID persisted {}", ownId, event)
-          removeTargetBy(event.sids: _*)
-        }
-        target
+      case UnsubscribeRequest(_, sids) => targetsBySid.remove(sids.head).get.path
+//        val target = targetsBySid.get(sids.head).get.path
+//        persist(RemoveTargetBySid(sids.head)) { event =>
+//          log.debug("{}: removing by SID persisted {}", ownId, event)
+//          removeTargetBy(event.sids: _*)
+//        }
+//        target
     }
 
     val resolveCloseTarget: PartialFunction[DSARequest, String] = {
-      case CloseRequest(rid) =>
-        val target = targetsByRid.get(rid).get
-        persist(RemoveTargetByRid(rid)) { event =>
-          log.debug("{}: removing by RID persisted {}", ownId, event)
-          targetsByRid.remove(event.rid)
-        }
-        target
+      case CloseRequest(rid) => targetsByRid.remove(rid).get
+//        val target = targetsByRid.get(rid).get
+//        persist(RemoveTargetByRid(rid)) { event =>
+//          log.debug("{}: removing by RID persisted {}", ownId, event)
+//          targetsByRid.remove(event.rid)
+//        }
+//        target
     }
 
     (resolveTargetByPath orElse resolveUnsubscribeTarget orElse resolveCloseTarget)(request)

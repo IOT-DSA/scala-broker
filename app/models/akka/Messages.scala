@@ -129,13 +129,12 @@ object Messages {
    */
   case object RemoveDisconnectedDSLinks
 
-  case class SubscriptionNotificationMessage(msg: Int, ack: Option[Int] = None, responses: List[DSAResponse] = Nil, sid: Int, qos: QoS.Level = QoS.Default) {
+  case class SubscriptionNotificationMessage(response:DSAResponse, sid: Int, qos: QoS.Level = QoS.Default) {
     /**
       * Outputs only the first response for compact logging.
       */
-    override def toString = if (responses.size < 2)
-      s"ResponseMessage($msg,$ack,$responses,$sid,$qos)"
-    else
-      s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more...,$sid,$qos))"
+    override def toString =
+      s"ResponseMessage($response,$sid,$qos)"
+
   }
 }

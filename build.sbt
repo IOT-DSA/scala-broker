@@ -1,10 +1,12 @@
 import Testing.itTest
-import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
+//import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
+import com.typesafe.sbt.packager.docker._
+import sbtsonar.SonarPlugin.autoImport.sonarProperties
 
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
 val SCALA_VERSION = "2.12.4"
-val AKKA_VERSION = "2.5.13"
+val AKKA_VERSION = "2.5.16"
 val JSON_VERSION = "2.6.9"
 
 
@@ -68,14 +70,21 @@ enablePlugins(DockerPlugin, JavaAppPackaging)
 dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
-dockerExposedPorts := Seq(9000, 9443, 2551)
+import com.typesafe.sbt.packager.docker._
+
+// use += to add an item to a Sequence
+dockerCommands += Cmd("USER", (daemonUser in Docker).value)
+dockerExposedPorts := Seq(9000, 9443, 2551, 8558)
+dockerExposedUdpPorts := Seq(2552)
 dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
 dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
-  """-Dakka.remote.netty.tcp.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
-  """-Dakka.remote.netty.tcp.port="$AKKA_REMOTING_BIND_PORT"""",
-  """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka.tcp://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
+  """-Dakka.remote.artery.canonical.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
+  """-Dakka.remote.artery.canonical.port="$AKKA_REMOTING_BIND_PORT"""",
+  """-Dakka.remote.artery.bind.hostname="0.0.0.0"""",
+  """-Dakka.remote.artery.bind.port="$AKKA_REMOTING_BIND_PORT"""",
+  """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
   """-Dkamon.statsd.hostname="$STATSD_HOST"""",
   """-Dkamon.statsd.port=$STATSD_PORT""",
   """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
@@ -89,6 +98,9 @@ dockerCommands :=
     case v => Seq(v)
   }
 
+dockerCommands ++= Seq(
+  Cmd("USER", "root")
+)
 
 mappings in Universal ++= Seq(
   file("scripts/start-broker") -> "bin/start-broker",
@@ -116,6 +128,8 @@ lazy val commonDependencies = Seq(
   "com.typesafe.akka"           %% "akka-cluster-sharding"       % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-slf4j"                  % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-persistence"            % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-remote"                 % AKKA_VERSION,
+  "com.typesafe.akka"            % "akka-cluster-metrics_2.12"   % AKKA_VERSION,
   "org.fusesource.leveldbjni"    % "leveldbjni-all"              % "1.8",
   "com.paulgoldbaum"            %% "scala-influxdb-client"       % "0.5.2",
   "org.bouncycastle"             % "bcprov-jdk15on"              % "1.51",
@@ -128,12 +142,13 @@ lazy val commonDependencies = Seq(
   "io.netty"                     % "netty-handler"               % "4.0.41.Final" force(),
   "org.msgpack"                 %% "msgpack-scala"               % "0.8.13",
   "org.json4s"                  %% "json4s-native"               % "3.5.0",
-  "io.kamon"                    %% "kamon-akka-remote-2.5"       % "1.0.0",
-  "io.kamon"                    %% "kamon-akka-2.5"              % "1.0.0",
+  "io.kamon"                     % "sigar-loader"                % "1.6.6-rev002",
+//  "io.kamon"                    %% "kamon-akka-remote-2.5"       % "1.0.0",
+//  "io.kamon"                    %% "kamon-akka-2.5"              % "1.0.0",
   "io.kamon"                    %% "kamon-statsd"                % "1.0.0",
   "io.kamon"                    %% "kamon-system-metrics"        % "1.0.0",
   "io.kamon"                    %% "kamon-core"                  % "1.0.0",
-  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
+//  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
   "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12"
 )
 
@@ -171,5 +186,15 @@ lazy val msgpackDependencies = Seq(
   "com.typesafe.play" %% "play-json" % JSON_VERSION
 )
 
+
+sonarProperties := Map(
+  "sonar.projectName" -> "iot-dsa",
+  "sonar.projectKey" -> "iot-dsa",
+  "sonar.sources" -> "app",
+  "sonar.sourceEncoding" -> "UTF-8",
+  "sonar.scoverage.reportPath" -> "target/scala-2.12/scoverage-report/scoverage.xml",
+  "sonar.scala.scapegoat.reportPath" -> "target/scala-2.12/scapegoat-report/scapegoat.xml"
+)
+coverageFailOnMinimum := false
 
 
