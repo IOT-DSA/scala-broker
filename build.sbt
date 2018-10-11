@@ -185,5 +185,16 @@ lazy val msgpackDependencies = Seq(
   "com.typesafe.play" %% "play-json" % JSON_VERSION
 )
 
+import sbtsonar.SonarPlugin.autoImport.sonarProperties
+scapegoatVersion:="1.3.4"
+sonarProperties := Map(
+  "sonar.projectName" -> "iot-dsa",
+  "sonar.projectKey" -> "iot-dsa",
+  "sonar.sources" -> "app",
+  "sonar.sourceEncoding" -> "UTF-8",
+  "sonar.scoverage.reportPath" -> "target/scala-2.12/scoverage-report/scoverage.xml",
+  "sonar.scala.scapegoat.reportPath" -> "target/scala-2.12/scapegoat-report/scapegoat.xml"
+)
+coverageFailOnMinimum := false
 
 
