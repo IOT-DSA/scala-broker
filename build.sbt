@@ -1,6 +1,7 @@
 import Testing.itTest
 //import com.typesafe.sbt.packager.docker.{Cmd, ExecCmd}
 import com.typesafe.sbt.packager.docker._
+import sbtsonar.SonarPlugin.autoImport.sonarProperties
 
 // properties
 val APP_VERSION = "0.4.0-SNAPSHOT"
@@ -185,7 +186,7 @@ lazy val msgpackDependencies = Seq(
   "com.typesafe.play" %% "play-json" % JSON_VERSION
 )
 
-import sbtsonar.SonarPlugin.autoImport.sonarProperties
+
 sonarProperties := Map(
   "sonar.projectName" -> "iot-dsa",
   "sonar.projectKey" -> "iot-dsa",
