@@ -186,7 +186,6 @@ lazy val msgpackDependencies = Seq(
 )
 
 import sbtsonar.SonarPlugin.autoImport.sonarProperties
-scapegoatVersion:="1.3.4"
 sonarProperties := Map(
   "sonar.projectName" -> "iot-dsa",
   "sonar.projectKey" -> "iot-dsa",
