@@ -47,8 +47,8 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
       StandardActions.bindTokenGroupNodeActions(node)
   }
 
-  (distrubutedNodeRegistry ? AddNode(DSANodeDescription(Paths.Tokens + "/" + RootNodeActor.DEFAULT_TOKEN
-    , RootNodeActor.DEFAULT_TOKEN_CONFIG))).mapTo[DSANode] foreach {
+  (distrubutedNodeRegistry ? AddNode(DSANodeDescription(Paths.Tokens + "/" + RootNodeActor.DEFAULT_TOKEN,
+    Map("$is" -> "broker/token")))).mapTo[DSANode] foreach {
     node =>
       node.displayName = RootNodeActor.DEFAULT_TOKEN
       StandardActions.initTokenNode(node, RootNodeActor.DEFAULT_TOKEN, "config")

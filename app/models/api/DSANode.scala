@@ -17,47 +17,67 @@ import models.util.DsaToAkkaCoder._
   */
 trait DSANode {
   def parent: Option[DSANode]
+
   def name: String
+
   def path: String
 
   def value: Future[DSAVal]
+
   def value_=(v: DSAVal): Unit
 
   def valueType: Future[DSAValueType]
+
   def valueType_=(vt: DSAValueType): Unit
 
   def displayName: Future[String]
+
   def displayName_=(name: String): Unit
 
   def profile: String
+
   def profile_=(p: String): Unit
 
   def configs: Future[Map[String, DSAVal]]
+
   def config(name: String): Future[Option[DSAVal]]
+
   def addConfigs(cfg: (String, DSAVal)*): Unit
+
   def removeConfig(name: String): Unit
 
   def attributes: Future[Map[String, DSAVal]]
+
   def attribute(name: String): Future[Option[DSAVal]]
+
   def addAttributes(cfg: (String, DSAVal)*): Unit
+
   def removeAttribute(name: String): Unit
 
   def children: Future[Map[String, DSANode]]
+
   def child(name: String): Future[Option[DSANode]]
-  def addChild(name: String, profile:Option[String] = None, valueType:Option[DSAValueType] = None): Future[DSANode]
-  def addChild(name: String, paramsAndConfigs:(String, DSAVal)*): Future[DSANode]
+
+  def addChild(name: String, profile: Option[String] = None, valueType: Option[DSAValueType] = None): Future[DSANode]
+
+  def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode]
+
   def addChild(name: String, node: DSANode): Future[DSANode]
+
   def removeChild(name: String): Unit
 
   def action: Option[DSAAction]
+
   def action_=(a: DSAAction): Unit
 
-  def invoke(params: DSAMap): Unit
+  def invoke(params: DSAMap): Any
 
   def subscribe(sid: Int, ref: ActorRef): Unit
+
   def unsubscribe(sid: Int): Unit
 
   def list(rid: Int, ref: ActorRef): Unit
+
   def unlist(rid: Int): Unit
 }
 
@@ -72,10 +92,11 @@ object DSANode {
 }
 
 
-trait DSANodeSubscriptions { self:DSANode with LoggingAdapterInside =>
+trait DSANodeSubscriptions {
+  self: DSANode with LoggingAdapterInside =>
 
-  protected var _sids:Map[Int, ActorRef]
-  protected var _rids:Map[Int, ActorRef]
+  protected var _sids: Map[Int, ActorRef]
+  protected var _rids: Map[Int, ActorRef]
 
 
   /**
@@ -108,12 +129,16 @@ trait DSANodeSubscriptions { self:DSANode with LoggingAdapterInside =>
 
 }
 
-trait DSANodeRequestHandler { self:DSANode =>
+trait DSANodeRequestHandler {
+  self: DSANode =>
 
-  protected def _configs:Map[String, DSAVal]
-  protected def _attributes:Map[String, DSAVal]
-  protected def _children:Map[String, DSANode]
-  implicit val executionContext:ExecutionContext
+  protected def _configs: Map[String, DSAVal]
+
+  protected def _attributes: Map[String, DSAVal]
+
+  protected def _children: Map[String, DSANode]
+
+  implicit val executionContext: ExecutionContext
 
 
   /**
@@ -126,9 +151,9 @@ trait DSANodeRequestHandler { self:DSANode =>
     case SetRequest(rid, p, newValue, _) =>
       val name = p.split("/").last
 
-      if(name.startsWith("$")){
+      if (name.startsWith("$")) {
         self.addConfigs(name -> newValue)
-      } else if(name.startsWith("@")) {
+      } else if (name.startsWith("@")) {
         addAttributes(name -> newValue)
       } else {
         self.value = newValue
@@ -141,9 +166,9 @@ trait DSANodeRequestHandler { self:DSANode =>
     case RemoveRequest(rid, p) =>
       val name = p.split("/").last
 
-      if(name.startsWith("$")){
+      if (name.startsWith("$")) {
         self.removeConfig(name)
-      } else if(name.startsWith("@")) {
+      } else if (name.startsWith("@")) {
         removeAttribute(name)
       }
 
@@ -152,8 +177,19 @@ trait DSANodeRequestHandler { self:DSANode =>
     /* invoke */
 
     case InvokeRequest(rid, _, params, _) =>
-      invoke(params)
-      DSAResponse(rid, Some(StreamState.Closed)) :: Nil
+      val invokeRes = invoke(params)
+
+      invokeRes match {
+        case Some((tokenName, token)) =>
+          val strTokenName = tokenName.asInstanceOf[String]
+          val strToken = token.asInstanceOf[String]
+          DSAResponse(rid, Some(StreamState.Closed), Some(List(array(strTokenName, strToken))),
+            Some(List(ColumnInfo("TokenName", "String"), ColumnInfo("Token", "String")))) :: Nil
+        case None                     =>
+          DSAResponse(rid, Some(StreamState.Open)) :: Nil
+        case _                        =>
+          DSAResponse(rid, Some(StreamState.Open)) :: Nil
+      }
 
     /* subscribe */
 
@@ -162,7 +198,7 @@ trait DSANodeRequestHandler { self:DSANode =>
       subscribe(paths.head.sid, sender)
       val head = DSAResponse(rid, Some(StreamState.Closed))
 
-      val futureTail = value.map{ v =>
+      val futureTail = value.map { v =>
         if (v != null) {
           val update = obj("sid" -> paths.head.sid, "value" -> v, "ts" -> DateTime.now.toString(ISODateTimeFormat.dateTime)
           )
@@ -185,7 +221,7 @@ trait DSANodeRequestHandler { self:DSANode =>
     // TODO this needs to be rewritten to remove blocking
     case ListRequest(rid, _) =>
       list(rid, sender)
-      val cfgUpdates = array("$is", _configs("$is")) +: toUpdateRows(_configs - "$is")
+      val cfgUpdates = array("$is", _configs.getOrElse("$is", StringValue(""))) +: toUpdateRows(_configs - "$is")
       val attrUpdates = toUpdateRows(_attributes)
       val childUpdates = Await.result(Future.sequence(_children map {
         case (name, node) => node.configs map (cfgs => name -> cfgs)
@@ -193,7 +229,7 @@ trait DSANodeRequestHandler { self:DSANode =>
         case (name, cfgs) => array(name, cfgs)
       }
       val updates = cfgUpdates ++ attrUpdates ++ childUpdates
-      DSAResponse(rid, Some(StreamState.Open), Some(updates.toList)) :: Nil
+      DSAResponse(rid, Some(StreamState.Closed), Some(updates.toList)) :: Nil
 
     /* close */
 
@@ -206,6 +242,4 @@ trait DSANodeRequestHandler { self:DSANode =>
     * Converts data to a collection of DSAResponse-compatible update rows.
     */
   def toUpdateRows(data: collection.Map[String, DSAVal]) = data map (cfg => array(cfg._1, cfg._2)) toSeq
-
-
 }

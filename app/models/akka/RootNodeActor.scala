@@ -1,17 +1,21 @@
 package models.akka
 
+import java.net.URLEncoder
+
 import akka.actor._
 import akka.cluster.singleton._
-import models.{ RequestEnvelope, ResponseEnvelope }
-import models.api.DSANode
-import models.rpc.{ DSAError, DSARequest, DSAResponse, ListRequest }
-import models.rpc.DSAValue.{ StringValue, array, obj }
+import models.akka.StandardActions.initTokenNode
+import models.api.{DSANode, DSAValueType}
+import models.rpc.DSAValue.{DSAVal, StringValue, array, obj}
+import models.rpc.{DSAError, DSARequest, DSAResponse, ListRequest}
 import models.util.DsaToAkkaCoder._
+import models.{RequestEnvelope, ResponseEnvelope}
 
 /**
- * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
- */
+  * The top broker node, handles requests to `/` path and creates children for `/defs`, `/sys` etc.
+  */
 class RootNodeActor extends Actor with ActorLogging {
+
   import context.dispatcher
   import models.Settings.Nodes._
   import models.rpc.StreamState._
@@ -45,8 +49,8 @@ class RootNodeActor extends Actor with ActorLogging {
   }
 
   /**
-   * Creates the root nodes.
-   */
+    * Creates the root nodes.
+    */
   private val rootNodes = {
     val config = rows(is("dsa/broker"), "$downstream" -> Downstream)
     val children = List(defsNode, dataNode, usersNode, sysNode) map { node =>
@@ -58,20 +62,20 @@ class RootNodeActor extends Actor with ActorLogging {
   }
 
   /**
-   * Creates a /data node.
-   */
+    * Creates a /data node.
+    */
   private def createDataNode = {
-    val dataNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
+    val dataNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Data)
     dataNode.profile = "broker/dataRoot"
     StandardActions.bindDataRootActions(dataNode)
     dataNode
   }
 
   /**
-   * Creates a /defs node hierarchy.
-   */
+    * Creates a /defs node hierarchy.
+    */
   private def createDefsNode = {
-    val defsNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
+    val defsNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Defs)
     defsNode.profile = "node"
     defsNode.addChild("profile").foreach { node =>
       node.profile = "static"
@@ -84,6 +88,7 @@ class RootNodeActor extends Actor with ActorLogging {
       node.addChild("broker").foreach { node =>
         node.addChild("userNode")
         node.addChild("userRoot")
+        node.addChild("sysRoot")
         node.addChild("dataNode") foreach { node =>
           node.profile = "static"
           StandardActions.bindDataNodeActions(node)
@@ -92,44 +97,76 @@ class RootNodeActor extends Actor with ActorLogging {
           node.profile = "static"
           StandardActions.bindDataRootActions(node)
         }
+        node.addChild("rolesRoot") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindRolesNodeActions(node)
+        }
+        node.addChild("tokensRoot") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindTokenGroupNodeActions(node)
+        }
+        node.addChild("token") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindTokenNodeActions(node)
+        }
+        node.addChild("tokenNode") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindTokenNodeActions(node)
+        }
+        node.addChild("permissionRole") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindRoleNodeActions(node)
+        }
+        node.addChild("permissionRule") foreach { node =>
+          node.profile = "static"
+          StandardActions.bindRuleNodeActions(node)
+        }
       }
     }
     defsNode
   }
 
   /**
-   * Creates a /users node.
-   */
+    * Creates a /users node.
+    */
   private def createUsersNode = {
-    val usersNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
+    val usersNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Users)
     usersNode.profile = "node"
     usersNode
   }
 
   /**
-   * Creates a /sys node.
-   */
+    * Creates a /sys node.
+    */
   private def createSysNode = {
-    val sysNode:DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
-    sysNode.profile = "node"
+    val sysNode: DSANode = TypedActor(context).typedActorOf(DSANode.props(None), Sys)
+    sysNode.profile = "broker/sysRoot"
+
+    // TODO: These two methods need to be reviewed for the cluster mode
+    RootNodeActor.createTokensNode(sysNode)
+    RootNodeActor.createRolesNode(sysNode)
+
     sysNode
   }
 }
 
 /**
- * Factory for [[RootNodeActor]] instances.
- */
+  * Factory for [[RootNodeActor]] instances.
+  */
 object RootNodeActor {
+
   import models.Settings.Nodes._
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   /**
-   * Creates a new instance of [[RootNodeActor]] props.
-   */
+    * Creates a new instance of [[RootNodeActor]] props.
+    */
   def props() = Props(new RootNodeActor())
 
   /**
-   * Starts a Singleton Manager and returns the cluster-wide unique instance of [[RootNodeActor]].
-   */
+    * Starts a Singleton Manager and returns the cluster-wide unique instance of [[RootNodeActor]].
+    */
   def singletonStart(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonManager.props(
       singletonProps = props(),
@@ -138,8 +175,8 @@ object RootNodeActor {
     name = Root)
 
   /**
-   * Returns a [[RootNodeActor]] proxy on the current cluster node.
-   */
+    * Returns a [[RootNodeActor]] proxy on the current cluster node.
+    */
   def singletonProxy(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonProxy.props(
       singletonManagerPath = "/user/" + Root,
@@ -147,9 +184,88 @@ object RootNodeActor {
     name = Root)
 
   /**
-   * Returns a proxy for a child node of the singleton [[RootNodeActor]].
-   */
+    * Returns a proxy for a child node of the singleton [[RootNodeActor]].
+    */
   def childProxy(dsaPath: String)(implicit system: ActorSystem): ActorRef = system.actorOf(
     ClusterSingletonProxy.props("/user/" + Root,
       settings = ClusterSingletonProxySettings(system).withSingletonName("singleton" + dsaPath.forAkka)))
+
+  val DEFAULT_ROLE = "default"
+  val DEFAULT_ROLE_CONFIG = Map[String, DSAVal](
+    "$is" -> "broker/permissionRole",
+    "$type" -> DSAValueType.DSAString,
+    "$writable" -> "config"
+  )
+
+  val FALLBACK_ROLE = "fallback"
+
+  val DEFAULT_RULE_CONFIG = Map[String, DSAVal](
+    "$is" -> "broker/permissionRule",
+    "$type" -> DSAValueType.DSAString,
+    "$writable" -> "config"
+  )
+
+  /**
+    * Create Roles nodes in the parent node (usualy in /sys)
+    * The roles are related to tokens and permission
+    * TODO: Remove it to Token's class
+    *
+    * @param parentNode
+    */
+  private def createRolesNode(parentNode: DSANode) = {
+    parentNode.addChild("roles").foreach { node =>
+      node.profile = "static"
+      node.displayName = "roles"
+      StandardActions.bindRolesNodeActions(node)
+
+      // Add default role
+      node.addChild(DEFAULT_ROLE, DEFAULT_ROLE_CONFIG.toList: _*) foreach { child =>
+        child.profile = "static"
+        child.displayName = "default"
+        StandardActions.bindRoleNodeActions(child)
+        createFallbackRules(child)
+      }
+    }
+  }
+
+  def createFallbackRole(node: DSANode): Unit = {
+    node.addChild(FALLBACK_ROLE, DEFAULT_ROLE_CONFIG.toList: _*) foreach { child =>
+      child.profile = "static"
+      child.displayName = "fallback"
+      //      StandardActions.bindRoleNodeActions(child)
+      //      createFallbackRules(child)
+    }
+  }
+
+  private def createFallbackRules(node: DSANode): Unit = {
+    val path = URLEncoder.encode("empty rule", "UTF-8")
+    node.addChild(path, DEFAULT_RULE_CONFIG.toList: _*) foreach { child =>
+      val perm = "none"
+      child.profile = "static"
+      child.displayName = "empty rule"
+      child.value = perm
+      child.addConfigs("$permission" -> perm)
+      StandardActions.bindRuleNodeActions(child)
+    }
+  }
+
+  /**
+    * Add root node (aka tokens/GroupToken node) for all tokens
+    * In Dart impl GroupToken node is used for grouping tokens by a user
+    * I.e. GroupToken is just "username". Since users are skipped, we are not creating user's groupToken
+    **/
+  val DEFAULT_TOKEN = "1234567891234567"
+
+  private def createTokensNode(parentNode: DSANode) = {
+    parentNode.addChild("tokens").foreach { node =>
+      node.displayName = "tokens"
+      StandardActions.bindTokenGroupNodeActions(node)
+
+      // Add default token
+      val tokenId = DEFAULT_TOKEN.take(16)
+      node.addChild(tokenId) foreach { child =>
+        initTokenNode(child, DEFAULT_TOKEN, "config")
+      }
+    }
+  }
 }
