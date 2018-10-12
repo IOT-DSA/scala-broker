@@ -104,7 +104,8 @@ coverageFailOnMinimum := true
 
 coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"
 
-sonarProperties := Map(
+sonarProperties ++= Map(
+  "sonar.modules" -> "root",
   "sonar.projectName" -> "iot-dsa",
   "sonar.projectKey" -> "iot-dsa",
   "sonar.sources" -> "app",
