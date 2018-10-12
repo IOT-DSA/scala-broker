@@ -1,9 +1,11 @@
 package models.akka
 
-import akka.actor.{ ActorRef, ActorSystem }
-import akka.routing.{ ActorSelectionRoutee, Routee }
-import models.Settings.{ Paths, Responder }
+import akka.actor.{ActorRef, ActorSystem}
+import akka.routing.{ActorSelectionRoutee, Routee}
+import models.Settings.{Paths, Responder}
 import play.api.Logger
+
+import scala.concurrent.Future
 
 /**
  * Manages DSA communications and dslink operations.
@@ -41,6 +43,16 @@ trait DSLinkManager {
    * Sends a message to its DSA destination using actor selection.
    */
   def dsaSend(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit
+
+  /**
+    * Ask message from its DSA destination using actor selection
+    *
+    * @param dsaPath
+    * @param message
+    * @param sender
+    * @return
+    */
+  def dsaAsk(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender) : Future[Any]
 
   /**
    * An instance of downlink actor props, according to the
