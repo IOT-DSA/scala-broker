@@ -99,7 +99,20 @@ mappings in Universal ++= Seq(
   file("scripts/stop-frontend") -> "bin/stop-frontend")
 
 // scoverage options
-coverageMinimum := 60
+coverageMinimum := 70
+coverageFailOnMinimum := true
+
+coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"
+
+sonarProperties := Map(
+  "sonar.projectName" -> "iot-dsa",
+  "sonar.projectKey" -> "iot-dsa",
+  "sonar.sources" -> "app",
+  "sonar.sourceEncoding" -> "UTF-8",
+  "sonar.scoverage.reportPath" -> "target/scala-2.12/scoverage-report/scoverage.xml",
+  "sonar.scala.scapegoat.reportPath" -> "target/scala-2.12/scapegoat-report/scapegoat.xml"
+)
+
 coverageFailOnMinimum := true
 
 // dependencies for scala-broker application

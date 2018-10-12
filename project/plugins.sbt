@@ -19,3 +19,5 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-multi-jvm" % "0.4.0")
 resolvers += Resolver.bintrayIvyRepo("kamon-io", "sbt-plugins")
 
 addSbtPlugin("io.kamon" % "sbt-aspectj-runner-play-2.6" % "1.1.0")
+
+addSbtPlugin("com.github.mwz" % "sbt-sonar" % "1.5.0")
