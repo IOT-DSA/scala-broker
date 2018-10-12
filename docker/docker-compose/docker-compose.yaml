@@ -66,10 +66,10 @@ services:
     environment:
       BROKER_HOST: broker1
       BROKER_PORT: 9000
-    depends_on:
-      - broker1
-    links:
-      - broker1
+#    depends_on:
+#      - broker1
+#    links:
+#      - broker1
     networks:
       - dsnet
 

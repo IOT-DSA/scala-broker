@@ -25,6 +25,11 @@ object Settings {
   val BrokerName = rootConfig.getString("broker.name")
 
   /**
+    * Broker private key filename
+    */
+  val BrokerKeyFilename = rootConfig.getString("broker.server-config.keyFilename")
+
+  /**
    * DSA Server Configuration.
    */
   val ServerConfiguration = {
@@ -68,14 +73,24 @@ object Settings {
     val Defs = "/defs"
     val Sys = "/sys"
     val Users = "/users"
+    val Tokens = Sys + "/tokens"
+    val Roles = Sys + "/roles"
     val Downstream = Root + Nodes.Downstream
     val Upstream = Root + Nodes.Upstream
   }
 
   /**
-   * Used in Allowed messages sent on handshake.
+   * Used in Allowed messages sent on handshake.  Not used any more
    */
+  @deprecated
   val Salt = rootConfig.getInt("broker.salt")
+
+  /**
+    * Used to disable token checking and permission validation. Set 'true' for disabling
+    */
+  val AllowAllLinks = if (rootConfig.hasPath("broker.allowAllLinks"))
+    rootConfig.getBoolean("broker.allowAllLinks")
+  else true
 
   /**
     * The number means how many events we store before snapshot making.

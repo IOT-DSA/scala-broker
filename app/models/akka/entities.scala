@@ -3,16 +3,16 @@ package models.akka
 import javax.annotation.concurrent.NotThreadSafe
 
 /**
- * Encapsulates DSLink information for WebSocket connection.
- */
+  * Encapsulates DSLink information for WebSocket connection.
+  */
 case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, isResponder: Boolean,
                           linkData: Option[String] = None, version: String = "",
-                          formats: List[String] = Nil, compression: Boolean = false,
-                          linkAddress: String = "", brokerAddress: String = ""
-                          , resultFormat: String = models.rpc.DSAMessageSerrializationFormat.MSGJSON
-                          , tempKey: String = "", sharedSecret: Array[Byte] = Array.emptyByteArray, salt: String = ""
-                         )
-{
+                          clientFormats: List[String] = Nil, compression: Boolean = false,
+                          linkAddress: String = "", brokerAddress: String = "",
+                          format: String = models.rpc.DSAMessageSerrializationFormat.MSGJSON,
+                          tempKey: String = "", sharedSecret: Array[Byte] = Array.emptyByteArray, salt: String = "",
+                          tokenHash: Option[String] = None
+                         ) {
   val mode = (isRequester, isResponder) match {
     case (true, true)  => DSLinkMode.Dual
     case (true, false) => DSLinkMode.Requester
@@ -44,16 +44,15 @@ class IntCounter(private val init: Int = 0) {
       start until value
     } else {
       // Avoiding overflow
-      val tmpLong: Long = init.toLong + start + count - Int.MaxValue - 1
-      value = tmpLong.toInt
+      value = count - 1 - (Int.MaxValue - start) + init
       (start to Int.MaxValue) ++ (init until value)
     }
   }
 }
 
 /**
- * DSA Link mode.
- */
+  * DSA Link mode.
+  */
 object DSLinkMode extends Enumeration {
   type DSLinkMode = Value
   val Responder, Requester, Dual = Value
