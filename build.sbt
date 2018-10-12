@@ -121,8 +121,7 @@ sonarProperties ++= Map(
   "msgpack.sonar.sources" -> "tools/msgpack4s/src/main/scala",
   "msgpack.sonar.tests" -> "tools/msgpack4s/src/test/scala",
   "msgpack.sonar.scoverage.reportPath" -> "tools/msgpack4s/target/scala-2.12/scoverage-report/scoverage.xml",
-  "msgpack.sonar.scapegoat.reportPath" -> "tools/msgpack4s/target/scala-2.12/scapegoat-report/scapegoat.xml",
-
+  "msgpack.sonar.scapegoat.reportPath" -> "tools/msgpack4s/target/scala-2.12/scapegoat-report/scapegoat.xml"
 )
 
 coverageFailOnMinimum := true
