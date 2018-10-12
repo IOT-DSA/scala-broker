@@ -105,12 +105,10 @@ coverageFailOnMinimum := true
 coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"
 
 sonarProperties ++= Map(
-  "msgpack.sources" -> "tools/msgpack4s/src/main/scala",
-  "sonar.modules" -> "msgpack",
   "sonar.tests" -> "test",
   "sonar.projectName" -> "iot-dsa",
   "sonar.projectKey" -> "iot-dsa",
-  "sonar.sources" -> "app",
+  "sonar.sources" -> "app,tools/msgpack4s/src/main/scala",
   "sonar.sourceEncoding" -> "UTF-8",
   "sonar.scoverage.reportPath" -> "target/scala-2.12/scoverage-report/scoverage.xml",
   "sonar.scala.scapegoat.reportPath" -> "target/scala-2.12/scapegoat-report/scapegoat.xml"
