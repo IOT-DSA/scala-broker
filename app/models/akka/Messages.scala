@@ -138,4 +138,23 @@ object Messages {
     else
       s"ResponseMessage($msg,$ack,List(${responses.head},...${responses.size - 1} more...,$sid,$qos))"
   }
+
+  /**
+    * Sent to the Tokens node to retrieve a list of child tokens.
+    */
+  case class GetTokens()
+
+  /**
+    * Sent to a node to retrieve the specified config value.
+    */
+  case class GetConfigVal(name: String)
+
+  /**
+    * Sent to a node. The node updates the node configs or attributes or node's value by the passed value.
+    * Configs and attributes are treated as Array.
+    *
+    * @param name
+    * @param value
+    */
+  case class AppendDsId2Token(name: String, value: String)
 }

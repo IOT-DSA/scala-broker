@@ -1,5 +1,6 @@
 package facades.websocket
 
+import models.Settings
 import models.handshake.{LocalKeys, RemoteKey}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
@@ -111,8 +112,12 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
       val conn2 = controller.dslinkWSConnect(requestWs)
       val result = Await.result(conn2, 3 seconds)
 
-      result.isLeft mustBe true
-      result.left.get.header.status mustBe UNAUTHORIZED
+      if (Settings.AllowAllLinks) {
+        result.isRight mustBe true
+      } else {
+        result.isLeft mustBe true
+        result.left.get.header.status mustBe UNAUTHORIZED
+      }
 
       // ws with auth = ""
       val authStr = ""
@@ -120,11 +125,16 @@ class WebSocketControllerSpec extends PlaySpec with GuiceOneAppPerTest {
 
       val conn3 = controller.dslinkWSConnect(requestWs)
       val result2 = Await.result(conn2, 3 seconds)
-      result2.isLeft mustBe true
-      result2.left.get.header.status mustBe UNAUTHORIZED
+
+      if (Settings.AllowAllLinks) {
+        result.isRight mustBe true
+      } else {
+        result2.isLeft mustBe true
+        result2.left.get.header.status mustBe UNAUTHORIZED
+      }
     }
 
   }
 
-  // TODO: Add additional tests when publicKey is absent and for wrong auth
+  // TODO: Add additional tests when publicKey is absent and for wrong auth and allowAllLinks is false
 }
