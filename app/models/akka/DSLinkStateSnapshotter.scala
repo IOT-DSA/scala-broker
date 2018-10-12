@@ -1,7 +1,8 @@
 package models.akka
 
-import akka.actor.ActorLogging
+import akka.actor.{ActorLogging, ActorSystem, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider}
 import akka.persistence._
+import com.typesafe.config.Config
 import models.Settings
 import models.util.DsaToAkkaCoder._
 
@@ -13,6 +14,7 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
   private var baseState: DSLinkBaseState = _
   private var folderState: DSLinkFolderState = _
   private var responderState: ResponderBehaviorState = _
+  private val settings = DSLinkSnapshotterSettings(context.system)
 
   val recoverDSLinkSnapshot: Receive = {
     case SnapshotOffer(_, offeredSnapshot: DSLinkState) =>
@@ -31,14 +33,14 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
       }
 
     case RecoveryCompleted =>
-      log.debug("{}: recovery completed with persistenceId: '{}'", ownId, persistenceId)
+      log.info("{}: recovery completed with persistenceId: '{}'", ownId, persistenceId)
   }
 
   val snapshotReceiver: Receive = {
     case SaveSnapshotSuccess(metadata) =>
       log.debug("{}: snapshot saved successfully, metadata: {}", ownId, metadata)
       deleteMessages(metadata.sequenceNr)
-      deleteSnapshots(SnapshotSelectionCriteria(metadata.sequenceNr - (DSLinkStateSnapshotter.SNAPSHOTS_NUMBER_TO_KEEP * Settings.AkkaPersistenceSnapShotInterval), metadata.timestamp))
+      deleteSnapshots(SnapshotSelectionCriteria(metadata.sequenceNr - (settings.snapshotNumberToKeep * Settings.AkkaPersistenceSnapShotInterval), metadata.timestamp))
     case SaveSnapshotFailure(metadata, reason) =>
       log.error("{}: failed to save snapshot, metadata: {}, caused by: {}", ownId, metadata, reason)
     case DeleteMessagesSuccess(toSequenceNr) =>
@@ -81,9 +83,18 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
   }
 }
 
-object DSLinkStateSnapshotter {
+class DSLinkSnapshotterSettingsImpl(config: Config) extends Extension {
+
+  val snapshotNumberToKeep: Int = config.getInt("broker.dslink.stateSnapshotter.snapshotNumbersToKeep")
+}
+
+object DSLinkSnapshotterSettings extends ExtensionId[DSLinkSnapshotterSettingsImpl] with ExtensionIdProvider {
+  override def lookup = DSLinkSnapshotterSettings
+
+  override def createExtension(system: ExtendedActorSystem) = new DSLinkSnapshotterSettingsImpl(system.settings.config)
+
   /**
-    * How many snapshots we want to keep after old ones removing.
+    * Java API: retrieve the Settings extension for the given system.
     */
-  val SNAPSHOTS_NUMBER_TO_KEEP = 3
+  override def get(system: ActorSystem) = super.get(system)
 }
