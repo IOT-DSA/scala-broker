@@ -99,7 +99,7 @@ mappings in Universal ++= Seq(
   file("scripts/stop-frontend") -> "bin/stop-frontend")
 
 // scoverage options
-coverageMinimum := 80
+coverageMinimum := 62
 coverageFailOnMinimum := true
 
 // dependencies for scala-broker application
