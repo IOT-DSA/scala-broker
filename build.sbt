@@ -109,6 +109,8 @@ sonarProperties := Map(
   "sonar.tests" -> "test",
   "sonar.projectName" -> "iot-dsa",
   "sonar.projectKey" -> "iot-dsa",
+  "sonar.language" -> "scala",
+  "sonar.modules" -> "root",
   "sonar.projectVersion" -> APP_VERSION,
   "sonar.sources" -> "app",
   "sonar.sourceEncoding" -> "UTF-8",
