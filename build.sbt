@@ -105,24 +105,15 @@ coverageFailOnMinimum := true
 coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"
 aggregate in sonarScan := false
 
-sonarProperties ++= Map(
+sonarProperties := Map(
+  "sonar.tests" -> "test",
   "sonar.projectName" -> "iot-dsa",
   "sonar.projectKey" -> "iot-dsa",
   "sonar.projectVersion" -> APP_VERSION,
+  "sonar.sources" -> "app",
   "sonar.sourceEncoding" -> "UTF-8",
-  "sonar.modules" -> "root, msgpack",
-
-  "root.sonar.binaries" -> "target/scala-2.12/classes",
-  "root.sonar.sources" -> "app",
-  "root.sonar.tests" -> "test",
-  "root.sonar.scoverage.reportPath" -> "target/scala-2.12/scoverage-report/scoverage.xml",
-  "root.sonar.scapegoat.reportPath" -> "target/scala-2.12/scapegoat-report/scapegoat.xml",
-
-  "msgpack.sonar.binaries" -> "tools/msgpack4s/target/scala-2.12/classes",
-  "msgpack.sonar.sources" -> "tools/msgpack4s/src/main/scala",
-  "msgpack.sonar.tests" -> "tools/msgpack4s/src/test/scala",
-  "msgpack.sonar.scoverage.reportPath" -> "tools/msgpack4s/target/scala-2.12/scoverage-report/scoverage.xml",
-  "msgpack.sonar.scapegoat.reportPath" -> "tools/msgpack4s/target/scala-2.12/scapegoat-report/scapegoat.xml"
+  "sonar.scoverage.reportPath" -> "target/scala-2.12/scoverage-report/scoverage.xml",
+  "sonar.scala.scapegoat.reportPath" -> "target/scala-2.12/scapegoat-report/scapegoat.xml"
 )
 
 coverageFailOnMinimum := true
