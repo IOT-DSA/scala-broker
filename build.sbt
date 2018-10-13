@@ -103,6 +103,7 @@ coverageMinimum := 70
 coverageFailOnMinimum := true
 
 coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"
+aggregate in sonarScan := false
 
 sonarProperties ++= Map(
   "sonar.projectName" -> "iot-dsa",
