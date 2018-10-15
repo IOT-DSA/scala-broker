@@ -76,6 +76,11 @@ object Settings {
   val Salt = rootConfig.getInt("broker.salt")
 
   /**
+    * The number means how many events we store before snapshot making.
+    */
+  val AkkaPersistenceSnapShotInterval = rootConfig.getInt("broker.akka-persistence-snapshot-interval")
+
+  /**
    * Interval to wait for actors' responses.
    */
   val QueryTimeout = rootConfig.getDuration("broker.query.timeout").getSeconds.seconds

@@ -2,10 +2,9 @@ package models.akka.local
 
 import akka.actor.{PoisonPill, Props, actorRef2Scala}
 import akka.routing.{ActorRefRoutee, Routee}
-import models.akka.{DSLinkCreated, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered}
+import models.akka.{DSLinkCreated, DSLinkFolderActor, DSLinkFolderState, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered, IsNode, rows}
 import akka.stream.scaladsl.Source
 import models.akka.Messages._
-import models.akka.{DSLinkFolderActor, IsNode, rows}
 import models.rpc.DSAValue._
 import models.util.DsaToAkkaCoder._
 
@@ -20,12 +19,12 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   /**
    * Handles incoming messages.
    */
-  override def receiveCommand = responderBehavior orElse mgmtHandler
+  override def receiveCommand = responderBehavior orElse mgmtHandler orElse snapshotReceiver
 
   /**
     * Handles persisted events.
     */
-  override def receiveRecover = dslinkFolderRecover orElse responderRecover
+  override def receiveRecover = dslinkFolderRecover orElse responderRecover orElse simpleResponderRecover orElse recoverDSLinkSnapshot
 
   /**
    * Handles control messages.
@@ -34,13 +33,16 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
 
     case GetOrCreateDSLink(name) =>
       persist(DSLinkCreated(name)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         log.debug("{}: requested DSLink '{}'", ownId, event.name)
         sender ! getOrCreateDSLink(event.name)
       }
 
     case RegisterDSLink(name, mode, connected) =>
       persist(DSLinkRegistered(name, mode, connected)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         links += (event.name -> LinkState(event.mode, event.connected))
+        saveSnapshot(DSLinkFolderState(links, listRid))
         log.info("{}: registered DSLink '{}'", ownId, event.name)
         notifyOnRegister(event.name)
       }
@@ -49,13 +51,16 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
 
     case RemoveDSLink(name) =>
       persist(DSLinkRemoved(name)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         removeDSLinks(event.names: _*)
         log.debug("{}: ordered to remove DSLink '{}'", ownId, event.names)
       }
 
     case UnregisterDSLink(name) =>
       persist(DSLinkUnregistered(name)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
         links -= event.name
+        saveSnapshot(DSLinkFolderState(links, listRid))
         log.info("{}: removed DSLink '{}'", ownId, event.name)
         notifyOnRemove(event.name)
       }

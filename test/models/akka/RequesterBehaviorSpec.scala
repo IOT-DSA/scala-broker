@@ -98,8 +98,8 @@ object RequesterBehaviorSpec {
   class Requester(val dslinkMgr: DSLinkManager, registry: Routee)
     extends AbstractDSLinkActor(registry) with RequesterBehavior {
     override def persistenceId = linkName
-    override def connected = super.connected orElse requesterBehavior
-    override def disconnected = super.disconnected orElse requesterDisconnected orElse toStash
-    override def receiveRecover = recoverBaseState orElse requesterRecover
+    override def connected = super.connected orElse requesterBehavior orElse snapshotReceiver
+    override def disconnected = super.disconnected orElse requesterDisconnected orElse toStash orElse snapshotReceiver
+    override def receiveRecover = recoverBaseState orElse requesterRecover orElse recoverDSLinkSnapshot
   }
 }

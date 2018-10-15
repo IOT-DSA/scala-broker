@@ -1,5 +1,7 @@
 package models.akka
 
+import javax.annotation.concurrent.NotThreadSafe
+
 /**
  * Encapsulates DSLink information for WebSocket connection.
  */
@@ -20,24 +22,32 @@ case class ConnectionInfo(dsId: String, linkName: String, isRequester: Boolean, 
 }
 
 /**
- * Similar to java AtomicInteger, but not thread safe,
- * optimized for single threaded execution by an actor.
- */
-class IntCounter(init: Int = 0) {
+  * Counter for rid/sid/msg. According to [[https://github.com/IOT-DSA/docs/wiki/Node-API]]
+  * the maximum value of counter equals to Int.MaxValue and must be reset to 1 in case of reaching the limit
+  */
+@NotThreadSafe
+class IntCounter(private val init: Int = 0) {
   private var value = init
 
   @inline def get = value
-  
+
   @inline def inc = {
     val result = value
-    value += 1
+    value = if (value == Int.MaxValue) init else value + 1
     result
   }
-  
-  @inline def inc(count: Int) = {
+
+  @inline def inc(count: Int): Seq[Int] = {
     val start = value
-    value += count
-    (start until value)
+    if (Int.MaxValue - count >= start) {
+      value += count
+      start until value
+    } else {
+      // Avoiding overflow
+      val tmpLong: Long = init.toLong + start + count - Int.MaxValue - 1
+      value = tmpLong.toInt
+      (start to Int.MaxValue) ++ (init until value)
+    }
   }
 }
 

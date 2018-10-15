@@ -69,7 +69,7 @@ dockerBaseImage := "java:latest"
 maintainer := "Vlad Orzhekhovskiy <vlad@uralian.com>"
 packageName in Docker := "iotdsa/broker-scala"
 dockerExposedPorts := Seq(9000, 9443, 2551)
-dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs")
+dockerExposedVolumes := Seq("/opt/docker/conf", "/opt/docker/logs", "/opt/docker/journal", "/opt/docker/snapshots")
 dockerUpdateLatest := true
 
 dockerEntrypoint ++= Seq(
@@ -89,7 +89,6 @@ dockerCommands :=
     case v => Seq(v)
   }
 
-
 mappings in Universal ++= Seq(
   file("scripts/start-broker") -> "bin/start-broker",
   file("scripts/stop-broker") -> "bin/stop-broker",
@@ -99,7 +98,7 @@ mappings in Universal ++= Seq(
   file("scripts/stop-frontend") -> "bin/stop-frontend")
 
 // scoverage options
-coverageMinimum := 70
+coverageMinimum := 65
 coverageFailOnMinimum := true
 
 coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"

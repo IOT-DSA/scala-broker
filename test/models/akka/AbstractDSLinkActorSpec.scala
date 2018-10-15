@@ -109,7 +109,7 @@ object AbstractDSLinkActorSpec {
    * Test actor.
    */
   class LinkActor(registry: Routee) extends AbstractDSLinkActor(registry) {
-    override def persistenceId = self.path.name
-    override def receiveRecover = recoverBaseState
+    override def persistenceId = linkName
+    override def receiveRecover = recoverBaseState orElse recoverDSLinkSnapshot
   }
 }

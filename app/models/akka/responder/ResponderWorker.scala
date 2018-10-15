@@ -1,11 +1,13 @@
 package models.akka.responder
 
-import akka.actor.{ Actor, ActorLogging, Props, actorRef2Scala }
+import akka.actor.{Actor, ActorLogging, Props, actorRef2Scala}
+import akka.event.LoggingAdapter
 import models.Origin
+import models.akka.PartOfPersistenceBehavior
 import models.rpc.DSAResponse
 
 /**
- * A worker handling either List or Subscribe calls. Storer call records for multiple target Ids
+ * A worker handling either List or Subscribe calls. Stores call records for multiple target Ids
  * (RIDs or SIDs).
  */
 abstract class ResponderWorker(poolId: String) extends Actor with ActorLogging {
@@ -18,12 +20,12 @@ abstract class ResponderWorker(poolId: String) extends Actor with ActorLogging {
   def receive = {
     case LookupTargetId(origin)      => sender ! registry.lookupTargetId(origin)
 
-    case AddOrigin(targetId, origin) => registry.addOrigin(targetId, origin)
+    case AddOrigin(targetId, origin) => registry.addOrigin(targetId, origin, RegistryType.DEFAULT)
 
-    case RemoveOrigin(origin)        => registry.removeOrigin(origin)
+    case RemoveOrigin(origin)        => registry.removeOrigin(origin, RegistryType.DEFAULT)
 
     case RemoveAllOrigins(targetId) =>
-      registry.remove(targetId)
+      registry.remove(targetId, RegistryType.DEFAULT)
       log.info(s"$ownId: removed all bindings for $targetId")
 
     case GetOrigins(targetId)                => sender ! registry.getOrigins(targetId)
@@ -55,7 +57,7 @@ object ResponderWorker {
  */
 class ResponderListWorker(linkName: String) extends ResponderWorker(linkName + "/LST") {
 
-  protected val registry = new ListCallRegistry(log, ownId)
+  protected val registry = new ListCallRegistry(new ResponderWorkerPersistenceBehaviorStub(ownId, log))
 
   override def receive = super.receive orElse {
     case rsp @ DSAResponse(rid, stream, _, _, _) if rid != 0 =>
@@ -79,7 +81,7 @@ object ResponderListWorker {
  */
 class ResponderSubscribeWorker(linkName: String) extends ResponderWorker(linkName + "/SUB") {
 
-  protected val registry = new SubscribeCallRegistry(log, ownId)
+  protected val registry = new SubscribeCallRegistry(new ResponderWorkerPersistenceBehaviorStub(ownId, log))
 
   override def receive = super.receive orElse {
     case rsp @ DSAResponse(0, stream, updates, columns, error) =>
@@ -96,4 +98,11 @@ object ResponderSubscribeWorker {
    * Creates a new [[ResponderSubscribeWorker]] props instance.
    */
   def props(linkName: String) = Props(new ResponderSubscribeWorker(linkName))
+}
+
+class ResponderWorkerPersistenceBehaviorStub(val _ownId: String, val _log: LoggingAdapter) extends PartOfPersistenceBehavior {
+  override val ownId: String = _ownId
+  override def persist[A](event: A)(handler: A => Unit): Unit = handler(event)
+  override def onPersist: Unit = {}
+  @transient override def log: LoggingAdapter = _log
 }

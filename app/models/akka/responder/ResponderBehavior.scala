@@ -2,41 +2,48 @@ package models.akka.responder
 
 import scala.util.control.NonFatal
 import akka.persistence.PersistentActor
-
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{ ResponsesProcessed, RequestsProcessed }
-
+import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState, PartOfPersistenceBehavior}
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
+import _root_.akka.routing.ActorSelectionRoutee
+import _root_.akka.routing.Routee
+import _root_.akka.event.LoggingAdapter
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior { me: PersistentActor with ActorLogging =>
+trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor with ActorLogging =>
   import RidRegistry._
+  import models.akka.RichRoutee
+
+  private def routee = ActorSelectionRoutee(context.actorSelection(sender.path))
 
   protected def linkPath: String
-
   protected def ownId: String
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
-  type ResponseHandler = PartialFunction[DSAResponse, List[(ActorRef, DSAResponse)]]
+  type ResponseHandler = PartialFunction[DSAResponse, List[(Routee, DSAResponse)]]
 
   // stores call records for forward and reverse RID lookup
-  private val ridRegistry = new RidRegistry
+  private var ridRegistry = new RidRegistry(new PartOfPersistentResponderBehavior(ownId, log))
 
   // stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
-  private val sidRegistry = new SidRegistry
+  private var sidRegistry = new SidRegistry(new PartOfPersistentResponderBehavior(ownId, log))
 
   // stores responder's nodes' attributes locally
-  private val attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
+  private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
   // processes request using the appropriate handler
-  private val requestHandler = handlePassthroughRequest orElse handleListRequest orElse
+  private val requestHandler = handlePasstroughRequest orElse handleListRequest orElse
     handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
+
+  private val mainResponderBehaviorState = MainResponderBehaviorState(ridRegistry, sidRegistry, attributes)
+
+  def onPersistRegistry: Unit = saveResponderBehaviorSnapshot(mainResponderBehaviorState)
 
   /**
    * Processes incoming requests and responses.
@@ -44,35 +51,37 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
   val responderBehavior: Receive = {
     case env @ RequestEnvelope(requests) =>
       log.info("{}: received {} from {}", ownId, env, sender)
-      persist(RequestsProcessed(requests)) { event =>
-        val result = processRequests(event.requests)
-        if (!result.requests.isEmpty)
-          sendToEndpoint(RequestEnvelope(result.requests))
-        if (!result.responses.isEmpty)
-          sender ! ResponseEnvelope(result.responses)
-      }
+      val result = processRequests(requests)
+      if (!result.requests.isEmpty)
+        sendToEndpoint(RequestEnvelope(result.requests))
+      if (!result.responses.isEmpty)
+        sender ! ResponseEnvelope(result.responses)
 
     case m @ ResponseMessage(_, _, responses) =>
       log.debug("{}: received {}", ownId, m)
-      persist(ResponsesProcessed(responses)) { event =>
-        processResponses(event.responses) foreach {
-          case (to, rsps) => to ! ResponseEnvelope(rsps)
-        }
+      processResponses(responses) foreach {
+        case (to, rsps) => to ! ResponseEnvelope(rsps)
       }
   }
 
   /**
-    * Recovers events of responder behavior from the journal.
+    * Recovers events and snapshots of responder behavior.
     */
   val responderRecover: Receive = {
-    case event: RequestsProcessed =>
-      log.debug("{}: trying to recover {}", ownId, event)
-      // TODO has to be improved to separate the functionality
-      processRequests(event.requests)
-    case event: ResponsesProcessed =>
-      log.debug("{}: trying to recover {}", ownId, event)
-      // TODO has to be improved to separate the functionality
-      processResponses(event.responses)
+    case event: LookupRidRestoreProcess =>
+      log.debug("{}: recovering with event {}", ownId, event)
+      ridRegistry.restoreRidRegistry(event)
+    case event: LookupSidRestoreProcess =>
+      log.debug("{}: recovering with event {}", ownId, event)
+      sidRegistry.restoreSidRegistry(event)
+    case event: AttributeSaved =>
+      log.debug("{}: recovering with event {}", ownId, event)
+      addAttribute(event.nodePath, event.name, event.value)
+    case offeredSnapshot: MainResponderBehaviorState =>
+      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
+      ridRegistry = offeredSnapshot.ridRegistry
+      sidRegistry = offeredSnapshot.sidRegistry
+      attributes = offeredSnapshot.attributes
   }
 
   /**
@@ -96,10 +105,11 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
   /**
    * Processes the responses and returns the translated ones groupped by their destinations.
    */
-  def processResponses(responses: Seq[DSAResponse]): Map[ActorRef, Seq[DSAResponse]] = {
+  def processResponses(responses: Seq[DSAResponse]): Map[Routee, Seq[DSAResponse]] = {
     val handler = handleSubscribeResponse orElse handleNonSubscribeResponse
 
     val results = responses flatMap handler
+    log.debug("{}: processResponses results: {}", ownId, results)
 
     log.debug("{}: RID after Rsp: {}", ownId, ridRegistry.info)
     log.debug("{}: SID after Rsp: {}", ownId, sidRegistry.info)
@@ -112,29 +122,42 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    */
   private def handleListRequest: RequestHandler = {
     case ListRequest(rid, path) =>
-      val origin = Origin(sender, rid)
+      val origin = Origin(routee, rid)
       ridRegistry.lookupByPath(path) match {
         case None =>
-          val tgtId = ridRegistry.saveListLookup(path)
+          val tgtId = ridRegistry.nextTgtId
+          ridRegistry.saveListLookup(path, tgtId)
           addListOrigin(tgtId, origin)
           HandlerResult(ListRequest(tgtId, translatePath(path)))
         case Some(rec) =>
           addListOrigin(rec.targetId, origin)
-          HandlerResult.Empty
+          HandlerResult(ListRequest(rec.targetId, translatePath(path)))
       }
+  }
+
+  private def addAttribute(nodePath: String, name: String, value: DSAVal) = {
+    val attrMap = attributes.getOrElse(nodePath, Map.empty)
+    attributes(nodePath) = attrMap + (name -> value)
   }
 
   /**
    * Translates the original request before sending it to responder link.
    */
-  private def handlePassthroughRequest: RequestHandler = {
+  private def handlePasstroughRequest: RequestHandler = {
 
-    def tgtId(srcId: Int, method: DSAMethod) = ridRegistry.savePassthroughLookup(method, Origin(sender, srcId))
+    def tgtId(srcId: Int, method: DSAMethod) = {
+      val tgtId = ridRegistry.nextTgtId
+      ridRegistry.savePassthroughLookup(method, Origin(routee, srcId), tgtId)
+      tgtId
+    }
 
     def saveAttribute(nodePath: String, name: String, value: DSAVal) = {
-      log.info(s"$ownId: saving attribute under $nodePath: $name = $value")
-      val attrMap = attributes.getOrElse(nodePath, Map.empty)
-      attributes(nodePath) = attrMap + (name -> value)
+      log.info("{}: saving attribute under {}: {} = {}", ownId, nodePath, name, value)
+      persist(AttributeSaved(nodePath, name, value)) { event =>
+        log.debug("{}: persisting {}", ownId, event)
+        addAttribute(event.nodePath, event.name, event.value)
+        saveResponderBehaviorSnapshot(mainResponderBehaviorState)
+      }
     }
 
     {
@@ -167,20 +190,23 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
 
   /**
    * Handles Subscribe request.
+   * For each subscribe request we create new stream even previous stream is already exists
    */
   private def handleSubscribeRequest: RequestHandler = {
     case req @ SubscribeRequest(srcRid, _) =>
       val srcPath = req.path // to ensure there's only one path (see requester actor)
-      val ridOrigin = Origin(sender, srcRid)
-      val sidOrigin = Origin(sender, srcPath.sid)
+      val ridOrigin = Origin(routee, srcRid)
+      val sidOrigin = Origin(routee, srcPath.sid)
 
       Kamon.currentSpan().tag("rid", srcRid)
       Kamon.currentSpan().tag("kind", "SubscribeRequest")
 
       sidRegistry.lookupByPath(srcPath.path) match {
         case None =>
-          val tgtRid = ridRegistry.saveSubscribeLookup(ridOrigin)
-          val tgtSid = sidRegistry.saveLookup(srcPath.path)
+          val tgtRid = ridRegistry.nextTgtId
+          ridRegistry.saveSubscribeLookup(ridOrigin, tgtRid)
+          val tgtSid = sidRegistry.nextTgtId
+          sidRegistry.saveLookup(srcPath.path, tgtSid)
           Kamon.currentSpan().tag("sid", tgtSid)
           val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
           addSubscribeOrigin(tgtSid, sidOrigin)
@@ -188,8 +214,10 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
         case Some(tgtSid) =>
           // Close and Subscribe response may come out of order, leaving until it's a problem
           addSubscribeOrigin(tgtSid, sidOrigin)
+          val tgtRid = ridRegistry.nextTgtId
           Kamon.currentSpan().tag("sid", tgtSid)
-          HandlerResult(DSAResponse(srcRid, Some(StreamState.Closed)))
+          val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
+          HandlerResult(SubscribeRequest(tgtRid, tgtPath))
       }
   }
 
@@ -198,11 +226,12 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    */
   private def handleUnsubscribeRequest: RequestHandler = {
     case req @ UnsubscribeRequest(rid, _) =>
-      val ridOrigin = Origin(sender, rid)
-      val sidOrigin = Origin(sender, req.sid)
+      val ridOrigin = Origin(routee, rid)
+      val sidOrigin = Origin(routee, req.sid)
       removeSubscribeOrigin(sidOrigin) map { targetSid =>
         sidRegistry.removeLookup(targetSid)
-        val tgtRid = ridRegistry.saveUnsubscribeLookup(ridOrigin)
+        val tgtRid = ridRegistry.nextTgtId
+        ridRegistry.saveUnsubscribeLookup(ridOrigin, tgtRid)
         HandlerResult(UnsubscribeRequest(tgtRid, List(targetSid)))
       } getOrElse HandlerResult(DSAResponse(rid, Some(StreamState.Closed)))
   }
@@ -212,7 +241,7 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    */
   private def handleCloseRequest: RequestHandler = {
     case CloseRequest(rid) =>
-      val origin = Origin(sender, rid)
+      val origin = Origin(routee, rid)
       ridRegistry.lookupByOrigin(origin) match {
         case Some(LookupRecord(_, tgtId, _, _)) => HandlerResult(CloseRequest(tgtId)) // passthrough call
         case _ => // LIST call
@@ -227,7 +256,10 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    * Forwards response to the recipients and returns nothing.
    */
   private def handleSubscribeResponse: ResponseHandler = {
-    case rsp @ DSAResponse(0, _, _, _, _) => deliverSubscribeResponse(rsp); Nil
+    case rsp @ DSAResponse(0, _, _, _, _) =>
+      log.debug("{}: handleSubscribeResponse: {}", ownId, rsp)
+      deliverSubscribeResponse(rsp)
+      Nil
   }
 
   /**
@@ -255,7 +287,7 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
           log.warning(s"$ownId: Cannot find original request for target RID: ${rsp.rid}")
           Nil
       }
-
+      log.debug("{}: handleNonSubscribeResponse result: {}", ownId, result)
       result
   }
   /**
@@ -274,6 +306,13 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
       array("$base", linkPath + v.value.tail.head.toString)
     case v: MapValue if v.value.contains("$base") =>
       MapValue(v.value + ("$base" -> (linkPath + v.value("$base").toString)))
+  }
+
+  protected class PartOfPersistentResponderBehavior(val _ownId: String, val _log: LoggingAdapter) extends PartOfPersistenceBehavior {
+    override val ownId = _ownId
+    override def persist[A](event: A)(handler: A => Unit): Unit = me.persist(event)(handler)
+    override def onPersist: Unit = onPersistRegistry
+    @transient override def log: LoggingAdapter = _log
   }
 
   /**
@@ -312,4 +351,9 @@ trait ResponderBehavior { me: PersistentActor with ActorLogging =>
    * Sends a message to the endpoint, if connected.
    */
   protected def sendToEndpoint(msg: Any): Unit
+
+  /**
+    * Tries to save this responder state as a snapshot.
+    */
+  protected def saveResponderBehaviorSnapshot(main: MainResponderBehaviorState): Unit
 }

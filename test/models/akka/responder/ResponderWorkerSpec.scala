@@ -1,16 +1,15 @@
 package models.akka.responder
 
 import scala.concurrent.duration.DurationInt
-
-import akka.actor.{ ActorRef, Props, actorRef2Scala }
+import akka.actor.{ActorRef, Props, actorRef2Scala}
 import akka.pattern.ask
-import akka.routing.{ Broadcast, ConsistentHashingPool }
+import akka.routing.{ActorSelectionRoutee, Broadcast, ConsistentHashingPool}
 import akka.testkit.TestProbe
 import akka.util.Timeout
-import models.{ Origin, ResponseEnvelope }
+import models.{Origin, ResponseEnvelope}
 import models.akka.AbstractActorSpec
 import models.rpc.DSAResponse
-import models.rpc.DSAValue.{ longToNumericValue, obj }
+import models.rpc.DSAValue.{longToNumericValue, obj}
 
 /**
  * ResponderWorker test suite.
@@ -29,32 +28,32 @@ class ResponderWorkerSpec extends AbstractActorSpec {
   "ResponderWorker" should {
     val router = system.actorOf(pool.props(Props(new ResponderListWorker("") {})))
     "add origins for targetId" in {
-      router ! AddOrigin(1, Origin(testActor, 101))
-      router ! AddOrigin(3, Origin(testActor, 301))
-      router ! AddOrigin(3, Origin(testActor, 302))
-      router ! AddOrigin(3, Origin(testActor, 303))
-      router ! AddOrigin(2, Origin(testActor, 201))
-      router ! AddOrigin(1, Origin(testActor, 102))
-      getOrigins(router, 1) mustBe Set(Origin(testActor, 101), Origin(testActor, 102))
-      getOrigins(router, 2) mustBe Set(Origin(testActor, 201))
-      getOrigins(router, 3) mustBe Set(Origin(testActor, 301), Origin(testActor, 302), Origin(testActor, 303))
+      router ! AddOrigin(1, Origin(getTestRoutee(testActor), 101))
+      router ! AddOrigin(3, Origin(getTestRoutee(testActor), 301))
+      router ! AddOrigin(3, Origin(getTestRoutee(testActor), 302))
+      router ! AddOrigin(3, Origin(getTestRoutee(testActor), 303))
+      router ! AddOrigin(2, Origin(getTestRoutee(testActor), 201))
+      router ! AddOrigin(1, Origin(getTestRoutee(testActor), 102))
+      getOrigins(router, 1) mustBe Set(Origin(getTestRoutee(testActor), 101), Origin(getTestRoutee(testActor), 102))
+      getOrigins(router, 2) mustBe Set(Origin(getTestRoutee(testActor), 201))
+      getOrigins(router, 3) mustBe Set(Origin(getTestRoutee(testActor), 301), Origin(getTestRoutee(testActor), 302), Origin(getTestRoutee(testActor), 303))
     }
     "lookup targetId by origin" in {
-      whenReady(router ? LookupTargetId(Origin(testActor, 303))) { _ mustBe Some(3) }
-      whenReady(router ? LookupTargetId(Origin(testActor, 201))) { _ mustBe Some(2) }
-      whenReady(router ? LookupTargetId(Origin(testActor, 102))) { _ mustBe Some(1) }
-      whenReady(router ? LookupTargetId(Origin(testActor, 404))) { _ mustBe None }
+      whenReady(router ? LookupTargetId(Origin(getTestRoutee(testActor), 303))) { _ mustBe Some(3) }
+      whenReady(router ? LookupTargetId(Origin(getTestRoutee(testActor), 201))) { _ mustBe Some(2) }
+      whenReady(router ? LookupTargetId(Origin(getTestRoutee(testActor), 102))) { _ mustBe Some(1) }
+      whenReady(router ? LookupTargetId(Origin(getTestRoutee(testActor), 404))) { _ mustBe None }
     }
     "remove origins for targetId" in {
-      router ! RemoveOrigin(Origin(testActor, 101))
-      getOrigins(router, 1) mustBe Set(Origin(testActor, 102))
-      router ! RemoveOrigin(Origin(testActor, 303))
-      getOrigins(router, 3) mustBe Set(Origin(testActor, 301), Origin(testActor, 302))
+      router ! RemoveOrigin(Origin(getTestRoutee(testActor), 101))
+      getOrigins(router, 1) mustBe Set(Origin(getTestRoutee(testActor), 102))
+      router ! RemoveOrigin(Origin(getTestRoutee(testActor), 303))
+      getOrigins(router, 3) mustBe Set(Origin(getTestRoutee(testActor), 301), Origin(getTestRoutee(testActor), 302))
     }
     "remove all origins for targetId" in {
       router ! Broadcast(RemoveAllOrigins(3))
-      getOrigins(router, 1) mustBe Set(Origin(testActor, 102))
-      getOrigins(router, 2) mustBe Set(Origin(testActor, 201))
+      getOrigins(router, 1) mustBe Set(Origin(getTestRoutee(testActor), 102))
+      getOrigins(router, 2) mustBe Set(Origin(getTestRoutee(testActor), 201))
       getOrigins(router, 3) mustBe empty
     }
     "get origin count" in {
@@ -79,10 +78,10 @@ class ResponderWorkerSpec extends AbstractActorSpec {
 
       val requesters = (1 to 5) map (_ -> TestProbe()) toMap
 
-      listRouter ! AddOrigin(1, Origin(requesters(4).ref, 401))
-      listRouter ! AddOrigin(1, Origin(requesters(2).ref, 201))
-      listRouter ! AddOrigin(2, Origin(requesters(1).ref, 101))
-      listRouter ! AddOrigin(2, Origin(requesters(3).ref, 301))
+      listRouter ! AddOrigin(1, Origin(getTestRoutee(requesters(4).ref), 401))
+      listRouter ! AddOrigin(1, Origin(getTestRoutee(requesters(2).ref), 201))
+      listRouter ! AddOrigin(2, Origin(getTestRoutee(requesters(1).ref), 101))
+      listRouter ! AddOrigin(2, Origin(getTestRoutee(requesters(3).ref), 301))
 
       listRouter ! Broadcast(DSAResponse(rid = 1, updates = upd1))
 
@@ -103,8 +102,8 @@ class ResponderWorkerSpec extends AbstractActorSpec {
 
       listRouter ! Broadcast(DSAResponse(rid = 1, updates = upd1))
 
-      listRouter ! AddOrigin(1, Origin(requesters(1).ref, 101))
-      listRouter ! AddOrigin(1, Origin(requesters(2).ref, 201))
+      listRouter ! AddOrigin(1, Origin(getTestRoutee(requesters(1).ref), 101))
+      listRouter ! AddOrigin(1, Origin(getTestRoutee(requesters(2).ref), 201))
 
       receiveResponses(requesters(1), 1) mustBe List(DSAResponse(rid = 101, updates = upd1))
       receiveResponses(requesters(2), 1) mustBe List(DSAResponse(rid = 201, updates = upd1))
@@ -126,17 +125,18 @@ class ResponderWorkerSpec extends AbstractActorSpec {
       val upd202 = Some(List(obj("sid" -> 202, "data" -> 222)))
 
       val requesters = (1 to 5) map (_ -> TestProbe()) toMap
+//      val requesters = (1 to 5) map (_ -> ActorSelectionRoutee(system.actorSelection(TestProbe().ref.path))) toMap
 
-      subsRouter ! AddOrigin(1, Origin(requesters(4).ref, 401))
-      subsRouter ! AddOrigin(1, Origin(requesters(2).ref, 201))
+      subsRouter ! AddOrigin(1, Origin(getTestRoutee(requesters(4).ref), 401))
+      subsRouter ! AddOrigin(1, Origin(getTestRoutee(requesters(2).ref), 201))
 
       subsRouter ! Broadcast(DSAResponse(rid = 0, updates = upd1))
 
       receiveResponses(requesters(4), 1) mustBe List(DSAResponse(rid = 0, updates = upd401))
       receiveResponses(requesters(2), 1) mustBe List(DSAResponse(rid = 0, updates = upd201))
 
-      subsRouter ! AddOrigin(2, Origin(requesters(4).ref, 402))
-      subsRouter ! AddOrigin(2, Origin(requesters(2).ref, 202))
+      subsRouter ! AddOrigin(2, Origin(getTestRoutee(requesters(4).ref), 402))
+      subsRouter ! AddOrigin(2, Origin(getTestRoutee(requesters(2).ref), 202))
 
       subsRouter ! Broadcast(DSAResponse(rid = 0, updates = upd12))
 
@@ -155,7 +155,7 @@ class ResponderWorkerSpec extends AbstractActorSpec {
 
       subsRouter ! Broadcast(DSAResponse(rid = 0, updates = upd1))
 
-      subsRouter ! AddOrigin(1, Origin(requesters(4).ref, 401))
+      subsRouter ! AddOrigin(1, Origin(getTestRoutee(requesters(4).ref), 401))
 
       receiveResponses(requesters(4), 1) mustBe List(DSAResponse(rid = 0, updates = upd401))
     }
@@ -186,4 +186,7 @@ class ResponderWorkerSpec extends AbstractActorSpec {
 
   private def aggregate[T](func: Seq[T] => T): T =
     func(receiveN(pool.nrOfInstances).map(_.asInstanceOf[T]))
+
+  private def getTestRoutee(actorRef: ActorRef) =
+    ActorSelectionRoutee(system.actorSelection(actorRef.path))
 }
