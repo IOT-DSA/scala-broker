@@ -98,7 +98,7 @@ mappings in Universal ++= Seq(
   file("scripts/stop-frontend") -> "bin/stop-frontend")
 
 // scoverage options
-coverageMinimum := 70
+coverageMinimum := 65
 coverageFailOnMinimum := true
 
 coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"

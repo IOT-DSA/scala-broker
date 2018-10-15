@@ -131,7 +131,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
           HandlerResult(ListRequest(tgtId, translatePath(path)))
         case Some(rec) =>
           addListOrigin(rec.targetId, origin)
-          HandlerResult(ListRequest(rid, translatePath(path)))
+          HandlerResult(ListRequest(rec.targetId, translatePath(path)))
       }
   }
 
@@ -201,16 +201,24 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
       Kamon.currentSpan().tag("rid", srcRid)
       Kamon.currentSpan().tag("kind", "SubscribeRequest")
 
-      //TODO: check for memory leak. Right now we are making available to create new subscriptions for Requester-Responder pair which already have at least one subscription
-
-      val tgtRid = ridRegistry.nextTgtId
-      ridRegistry.saveSubscribeLookup(ridOrigin, tgtRid)
-      val tgtSid = sidRegistry.nextTgtId
-      sidRegistry.saveLookup(srcPath.path, tgtSid)
-      Kamon.currentSpan().tag("sid", tgtSid)
-      val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
-      addSubscribeOrigin(tgtSid, sidOrigin)
-      HandlerResult(SubscribeRequest(tgtRid, tgtPath))
+      sidRegistry.lookupByPath(srcPath.path) match {
+        case None =>
+          val tgtRid = ridRegistry.nextTgtId
+          ridRegistry.saveSubscribeLookup(ridOrigin, tgtRid)
+          val tgtSid = sidRegistry.nextTgtId
+          sidRegistry.saveLookup(srcPath.path, tgtSid)
+          Kamon.currentSpan().tag("sid", tgtSid)
+          val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
+          addSubscribeOrigin(tgtSid, sidOrigin)
+          HandlerResult(SubscribeRequest(tgtRid, tgtPath))
+        case Some(tgtSid) =>
+          // Close and Subscribe response may come out of order, leaving until it's a problem
+          addSubscribeOrigin(tgtSid, sidOrigin)
+          val tgtRid = ridRegistry.nextTgtId
+          Kamon.currentSpan().tag("sid", tgtSid)
+          val tgtPath = srcPath.copy(path = translatePath(srcPath.path), sid = tgtSid)
+          HandlerResult(SubscribeRequest(tgtRid, tgtPath))
+      }
   }
 
   /**
@@ -304,7 +312,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
     override val ownId = _ownId
     override def persist[A](event: A)(handler: A => Unit): Unit = me.persist(event)(handler)
     override def onPersist: Unit = onPersistRegistry
-    override def log: LoggingAdapter = _log
+    @transient override def log: LoggingAdapter = _log
   }
 
   /**

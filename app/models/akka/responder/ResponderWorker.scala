@@ -104,5 +104,5 @@ class ResponderWorkerPersistenceBehaviorStub(val _ownId: String, val _log: Loggi
   override val ownId: String = _ownId
   override def persist[A](event: A)(handler: A => Unit): Unit = handler(event)
   override def onPersist: Unit = {}
-  override def log: LoggingAdapter = _log
+  @transient override def log: LoggingAdapter = _log
 }
