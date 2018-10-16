@@ -115,6 +115,27 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
           }
       }
     }
+    "send a message to a /sys/tokens node" in {
+      managers zip probes foreach {
+        case (mgr, probe) =>
+          mgr.dsaSend("/sys/tokens", RequestEnvelope(ListRequest(4, "/sys/tokens") :: Nil))(probe.ref)
+          inside(probe.receiveOne(timeout.duration)) {
+            case ResponseEnvelope(DSAResponse(4, _, Some(updates), _, _) :: Nil) =>
+              true
+          }
+      }
+    }
+
+    "send a message to a /sys/tokens node and get list of active tokens" in {
+      managers zip probes foreach {
+        case (mgr, probe) =>
+          mgr.dsaSend("/sys/tokens", RequestEnvelope(ListRequest(5, "/sys/tokens") :: Nil))(probe.ref)
+          inside(probe.receiveOne(timeout.duration)) {
+            case ResponseEnvelope(DSAResponse(5, _, Some(updates), _, _) :: Nil) =>
+              true
+          }
+      }
+    }
   }
 
   /**

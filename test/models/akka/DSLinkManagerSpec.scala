@@ -1,8 +1,10 @@
 package models.akka
 
-import akka.actor.{ ActorRef, ActorSystem }
+import akka.actor.{ActorRef, ActorSystem}
 import akka.routing.Routee
 import models.Settings
+
+import scala.concurrent.Future
 
 /**
  * DSLinkManager test suite.
@@ -45,5 +47,6 @@ object DSLinkManagerSpec {
     def dsaSend(path: String, message: Any)(implicit sender: ActorRef): Unit = ???
     def getDownlinkRoutee(name: String): Routee = ???
     def getUplinkRoutee(name: String): Routee = ???
+    def dsaAsk(dsaPath: String, message: Any)(implicit sender: akka.actor.ActorRef): Future[Any] = ???
   }
 }
