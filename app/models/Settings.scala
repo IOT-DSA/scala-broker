@@ -11,17 +11,15 @@ import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import scala.util.Try
 
 /**
- * Encapsulates application settings – both hardcoded and configured in `application.conf`.
- */
+  * Encapsulates application settings – both hardcoded and configured in `application.conf`.
+  */
 object Settings {
 
   val rootConfig = ConfigFactory.load
 
-  val SkipAuth = rootConfig.getBoolean("broker.skipAuth")
-
   /**
-   * Broker name.
-   */
+    * Broker name.
+    */
   val BrokerName = rootConfig.getString("broker.name")
 
   /**
@@ -30,8 +28,8 @@ object Settings {
   val BrokerKeyFilename = rootConfig.getString("broker.server-config.keyFilename")
 
   /**
-   * DSA Server Configuration.
-   */
+    * DSA Server Configuration.
+    */
   val ServerConfiguration = {
     val cfg = rootConfig.getConfig("broker.server-config")
 
@@ -44,16 +42,16 @@ object Settings {
       "salt" -> cfg.getString("salt"),
       "version" -> cfg.getString("version"),
       "updateInterval" -> cfg.getInt("updateInterval"),
-      "format" -> JsArray(Seq(cfg.getStringList("format").toArray():_*).map {
-                                            s => JsString(s.asInstanceOf[String])
-                                          }
+      "format" -> JsArray(Seq(cfg.getStringList("format").toArray(): _*).map {
+        s => JsString(s.asInstanceOf[String])
+      }
       )
     )
   }
 
   /**
-   * DSA Nodes.
-   */
+    * DSA Nodes.
+    */
   object Nodes {
     val Root = "broker"
     val Downstream = "downstream"
@@ -65,8 +63,8 @@ object Settings {
   }
 
   /**
-   * DSA Paths.
-   */
+    * DSA Paths.
+    */
   object Paths {
     val Root = "/"
     val Data = "/data"
@@ -80,8 +78,8 @@ object Settings {
   }
 
   /**
-   * Used in Allowed messages sent on handshake.  Not used any more
-   */
+    * Used in Allowed messages sent on handshake.  Not used any more
+    */
   @deprecated
   val Salt = rootConfig.getInt("broker.salt")
 
@@ -98,16 +96,16 @@ object Settings {
   val AkkaPersistenceSnapShotInterval = rootConfig.getInt("broker.akka-persistence-snapshot-interval")
 
   /**
-   * Interval to wait for actors' responses.
-   */
+    * Interval to wait for actors' responses.
+    */
   val QueryTimeout = rootConfig.getDuration("broker.query.timeout").getSeconds.seconds
 
   /**
-   * The maximum number of children in LIST response.
-   */
+    * The maximum number of children in LIST response.
+    */
   val ChildrenPerListResponse = rootConfig.getInt("broker.children.per.response")
 
-  object Subscriptions{
+  object Subscriptions {
     private val cfg = rootConfig.getConfig("broker.subscriptions")
     val reconnectionTimeout = cfg.intOrDefault("reconnectionTimeout", 30)
     val queueCapacity = cfg.intOrDefault("queue.capacity", 30)
@@ -115,23 +113,28 @@ object Settings {
     val aggregationPeriod = cfg.intOrDefault("send.batch.aggregation.period.ms", 5)
   }
 
-  object MetricsReporters{
+  object MetricsReporters {
     private val cfg = rootConfig.getConfig("kamon")
 
     val zipkinConfigured = cfg.atPath("zipkin.host").isResolved() &&
       cfg.atPath("zipkin.port").isResolved &&
-      Try{cfg.getInt("zipkin.port")}.isSuccess //by some reason settings from ENV variables are not null
+      Try {
+        cfg.getInt("zipkin.port")
+      }.isSuccess //by some reason settings from ENV variables are not null
 
     val statsdConfigured = cfg.atPath("statsd.hostname").isResolved() &&
       cfg.atPath("statsd.port").isResolved &&
-      Try{cfg.getInt("statsd.port")}.isSuccess
+      Try {
+        cfg.getInt("statsd.port")
+      }.isSuccess
 
-    case class HostAndPort(host:String, port:Int)
+    case class HostAndPort(host: String, port: Int)
+
   }
 
   /**
-   * WebSocket configuration.
-   */
+    * WebSocket configuration.
+    */
   object WebSocket {
     private val cfg = rootConfig.getConfig("broker.ws")
 
@@ -145,8 +148,8 @@ object Settings {
   }
 
   /**
-   * Responder configuration.
-   */
+    * Responder configuration.
+    */
   object Responder {
     private val cfg = rootConfig.getConfig("broker.responder")
 
@@ -156,13 +159,13 @@ object Settings {
   }
 
   /**
-   * The number of shards in the downstream pool.
-   */
+    * The number of shards in the downstream pool.
+    */
   val DownstreamShardCount = rootConfig.getInt("broker.downstream.shard.count")
 
   /**
-   * Metrics collector configuration
-   */
+    * Metrics collector configuration
+    */
   object Metrics {
     private val cfg = rootConfig.getConfig("broker.metrics")
 
@@ -178,8 +181,8 @@ object Settings {
   }
 
   /**
-   * InfluxDB configuration.
-   */
+    * InfluxDB configuration.
+    */
   object InfluxDb {
     private val cfg = rootConfig.getConfig("influxdb")
 
@@ -189,8 +192,8 @@ object Settings {
   }
 
   /**
-   * JDBC configuration.
-   */
+    * JDBC configuration.
+    */
   object JDBC {
     private val cfg = rootConfig.getConfig("db")
 
@@ -199,23 +202,24 @@ object Settings {
   }
 
   /**
-   * Logging options.
-   */
+    * Logging options.
+    */
   object Logging {
     private val cfg = rootConfig.getConfig("broker.logging")
 
     val ShowWebSocketPayload = cfg.getBoolean("show.ws.payload")
   }
 
-  implicit class ConfigWrapper(config:Config){
+  implicit class ConfigWrapper(config: Config) {
 
-    def getOrDefault[T](extractor: String => T)(path:String, default:T) = if(config.hasPath(path)){
+    def getOrDefault[T](extractor: String => T)(path: String, default: T) = if (config.hasPath(path)) {
       extractor(path)
     } else {
       default
     }
 
-    def intOrDefault = getOrDefault(path => config.getInt(path))(_,_)
+    def intOrDefault = getOrDefault(path => config.getInt(path))(_, _)
 
   }
+
 }

@@ -32,4 +32,5 @@ nodes.json.bak
 # App specific
 journal/
 native/
+snapshots/
 

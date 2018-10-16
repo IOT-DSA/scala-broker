@@ -3,16 +3,14 @@ package facades.websocket
 import java.net.URL
 
 import akka.Done
-import scala.concurrent.{Await, Future}
 import akka.actor._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.pattern.ask
 import akka.routing.Routee
-import akka.stream.{InvalidSequenceNumberException, Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
-import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.{InvalidSequenceNumberException, Materializer, OverflowStrategy}
 import akka.util.ByteString
 import controllers.BasicController
 import javax.inject.{Inject, Singleton}
@@ -24,7 +22,7 @@ import models.api.DSANode
 import models.handshake.{LocalKeys, RemoteKey}
 import models.metrics.Meter
 import models.rpc.MsgpackTransformer.{msaMessageFlowTransformer => msgpackMessageFlowTransformer}
-import models.rpc.{DSAMessage, PingMessage}
+import models.rpc.{DSAMessage, EmptyMessage, PingMessage, ResponseMessage}
 import models.util.UrlBase64
 import org.joda.time.DateTime
 import org.velvia.msgpack
@@ -153,11 +151,9 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
         } else {
           TextMessage.Strict(Json.toJson(msg).toString)
         }
-
       })
 
-      val (upgradeResponse, closed) = Http()
-        .singleWebSocketRequest(WebSocketRequest(url), wsFlow)
+      val (upgradeResponse, _) = Http().singleWebSocketRequest(WebSocketRequest(url), wsFlow)
 
       val connected = upgradeResponse.map { upgrade =>
         if (upgrade.response.status == StatusCodes.SwitchingProtocols)
@@ -260,7 +256,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
       val res = if (validateAuth(sessionInfo, clientAuth)) {
-        if (Settings.SkipAuth || validateAuth(sessionInfo, clientAuth))
+        if (checkToken(sessionInfo))
           f(sessionInfo)
         else {
           val errorString = s"Token check failed"
@@ -413,7 +409,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
                            overflow: OverflowStrategy) = {
     import akka.actor.Status._
 
-    val (futureSink, publisher) =  StreamRefs.sinkRef[DSAMessage]()
+    val (futureSink, publisher) = StreamRefs.sinkRef[DSAMessage]()
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()(materializer)
 
@@ -432,39 +428,32 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
 
       val subscriptionSrcRef = Source.fromPublisher(subscriptionsPublisher)
 
-        val wsProps = WebSocketActor.props(sink, routee,
+      val wsProps = WebSocketActor.props(sink, routee,
         WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
 
-
-
       val fromSocket = actorSystem.actorOf(Props(new Actor {
-          val wsActor = context.watch( context.actorOf(wsProps, "wsActor"))
+        val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
 
         def receive = {
-          case Success(_) | Failure(_) => wsActor ! PoisonPill
-          case Terminated(_)           => context.stop(self)
-          case other                   => wsActor ! other
+          case _ => sender ! wsActor
         }
 
         override def supervisorStrategy = OneForOneStrategy() {
-          case _ => SupervisorStrategy.Stop
+          case _ => SupervisorStrategy.restart
         }
       }))
-      subscriptionSrcRef.runWith(sink)
-      subscriptionSrcRef.runWith(sink)
 
-      val messageSink = Sink.actorRef(fromSocket, Success(()))
-      val src = Source.fromPublisher(publisher)
+      val wsActor = Await.result((fromSocket ? Some).mapTo[ActorRef], 5 second)
 
-      Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src)
+      val messageSink = Flow[Any].async.to(Sink.actorRef(wsActor, Success(())))
 
-        val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
+      val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
 
-        Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src).recover{
-          case e: InvalidSequenceNumberException =>
-            log.error(s"messages been lost: ${e.msg}", e)
-            EmptyMessage
-        }
+      Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src).recover {
+        case e: InvalidSequenceNumberException =>
+          log.error(s"messages been lost: ${e.msg}", e)
+          EmptyMessage
+      }
     }
   }
 
