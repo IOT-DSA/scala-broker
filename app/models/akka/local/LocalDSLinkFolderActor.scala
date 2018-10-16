@@ -111,7 +111,6 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
   }
 }
 
-
 /**
   * Factory for [[LocalDSLinkFolderActor]] instances.
   */
