@@ -1,8 +1,5 @@
 package models.akka.local
 
-import akka.cluster.Cluster
-import akka.cluster.ddata.DistributedData
-
 import scala.concurrent.duration.DurationInt
 import org.scalatest.Inside
 import akka.pattern.ask
@@ -11,8 +8,7 @@ import akka.util.Timeout
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.akka.{AbstractActorSpec, RootNodeActor}
 import models.akka.Messages.{GetDSLinkNames, GetLinkInfo, GetOrCreateDSLink, LinkInfo}
-import models.api.DistributedNodesRegistry
-import models.rpc.{DSAResponse, ListRequest}
+import models.rpc.{DSAResponse, InvokeRequest, ListRequest}
 
 /**
  * LocalDSLinkManager test suite.
@@ -82,6 +78,12 @@ class LocalDSLinkManagerSpec extends AbstractActorSpec with Inside {
       mgr.dsaSend("/defs/profile", RequestEnvelope(ListRequest(3, "/defs/profile") :: Nil))
       inside(receiveOne(timeout.duration)) {
         case ResponseEnvelope(DSAResponse(3, _, _, _, _) :: Nil) => true
+      }
+    }
+    "send a invoke message to a /sys/tokens/ node" in {
+      mgr.dsaSend("/sys/tokens", RequestEnvelope(InvokeRequest(4, "/sys/tokens") :: Nil))
+      inside(receiveOne(timeout.duration)) {
+        case ResponseEnvelope(DSAResponse(4, _, _, _, _) :: Nil) => true
       }
     }
   }

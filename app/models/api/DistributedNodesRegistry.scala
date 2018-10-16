@@ -7,7 +7,8 @@ import akka.cluster.ddata.Replicator.Update
 import akka.cluster.ddata.Replicator._
 import akka.util.Timeout
 import com.google.inject.Inject
-import models.Settings.QueryTimeout
+import models.Settings.{Paths, QueryTimeout}
+import models.akka.Messages.GetTokens
 import models.akka.StandardActions
 import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue.StringValue
@@ -54,6 +55,14 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
 
       log.debug("Created nodes: {}", toAdd)
       log.debug("Removed nodes: {}", toRemove)
+    case GetTokens =>
+      log.debug(s"ddNodeRegistry: GetTokens received")
+
+      val response = registry
+        .filter{ case (name, node ) => name.startsWith(Paths.Tokens + "/") && node.action.isEmpty }
+        .values.toList
+
+      sender ! response
   }
 
   def removeNode(p: String): Set[String] = {
@@ -137,23 +146,44 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
   }
 
   private def createNewNode(nodeDescription: DSANodeDescription, pPath: (Option[String], String)) = pPath match {
-    case (None, name) =>
+    case (None, name) => // root node
       val newOne: DSANode = TypedActor(context)
-        .typedActorOf(DistributedDSANode.props( None, new StringValue(""), nodeDescription, self, replicator))
+        .typedActorOf(DistributedDSANode.props( None, nodeDescription.value, nodeDescription, self, replicator))
 
       if (isNotCommon(name)) {
         StandardActions.bindDataRootActions(newOne)
       }
       newOne
-    case (Some(parent), name) => {
-      val parentNode: DSANode = registry.get(parent)
-        .getOrElse(getOrCreateNode(parent))
+    case (Some(parent), name) => { // child node
+      val parentNode: DSANode = registry.get(parent).getOrElse(getOrCreateNode(parent))
       val child = registry.get(nodeDescription.path).getOrElse {
         val newOne: DSANode = TypedActor(context)
-          .typedActorOf(DistributedDSANode.props(Some(parentNode), new StringValue(""), nodeDescription, self, replicator))
+          .typedActorOf(DistributedDSANode.props(Some(parentNode), nodeDescription.value, nodeDescription, self, replicator))
 
-        if (isNotCommon(name)) {
-          StandardActions.bindDataNodeActions(newOne)
+        parent match {
+          // Processing /sys/tokens node - add all required actions
+          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Tokens) => None
+          //            StandardActions.bindTokenGroupNodeActions(newOne)
+
+          // Processing /sys/tokens/<tokenid> - bind token actions
+          case parent if (parent + "/" + name).startsWith(Paths.Tokens + "/") && isNotCommon(name) => None
+          //            StandardActions.bindTokenNodeActions(newOne)
+
+          // Processing /sys/roles node - add all roles actions
+          case parent if (parent + "/" + name).equalsIgnoreCase(Paths.Roles) => None
+          //            StandardActions.bindRolesNodeActions(newOne)
+
+
+          // Processing /sys/roles/<role> - bind role actions
+          case parent if (parent + "/" + name).startsWith(Paths.Roles + "/")  && isNotCommon(name) => None
+          //            StandardActions.bindRoleNodeActions(newOne)
+
+          // Processing non common nodes (actions)
+          case parent if isNotCommon(name) =>
+            StandardActions.bindDataNodeActions(newOne)
+
+          // Processing any other nodes - do nothing
+          case parent => None
         }
         newOne
       }
