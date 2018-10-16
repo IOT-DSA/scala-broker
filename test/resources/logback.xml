@@ -25,10 +25,10 @@
 		<appender-ref ref="STDOUT" />
 	</appender>
 
-	<logger name="play" level="DEBUG" />
-	<logger name="application" level="DEBUG" />
-	<logger name="controllers" level="DEBUG" />
-	<logger name="models" level="DEBUG" />
+	<logger name="play" level="INFO" />
+	<logger name="application" level="INFO" />
+	<logger name="controllers" level="INFO" />
+	<logger name="models" level="INFO" />
 
 	<!-- Off these ones as they are annoying, and anyway we manage configuration 
 		ourselves -->
@@ -39,7 +39,7 @@
 	<logger name="com.gargoylesoftware.htmlunit.javascript" level="OFF" />
 	<logger name="it" level="DEBUG" />
 
-	<root level="WARN">
+	<root level="INFO">
 		<appender-ref ref="ASYNCFILE" />
 		<appender-ref ref="ASYNCSTDOUT" />
 	</root>

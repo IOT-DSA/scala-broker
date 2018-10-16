@@ -3,7 +3,8 @@ package models.akka
 import akka.actor.ActorRef
 import akka.actor.Status.Success
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.{ActorMaterializer, OverflowStrategy, SinkRef}
+import models.Settings.WebSocket.OnOverflow
 import models.akka.Messages._
 import models.metrics.Meter
 
@@ -16,19 +17,14 @@ import org.reactivestreams.Publisher
 import models.akka.QoSState._
 
 /**
- * Handles communication with a remote DSLink in Requester mode.
- */
-trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
+  * Handles communication with a remote DSLink in Requester mode.
+  */
+trait RequesterBehavior {
+  me: AbstractDSLinkActor with Meter =>
 
   implicit val materializer = ActorMaterializer()
 
   protected def dslinkMgr: DSLinkManager
-
-  //state actore to store different dslink state with persistance etc
-  val qosState = context.actorOf(QoSState.props(
-    reconnectionTime = Settings.Subscriptions.reconnectionTimeout,
-    maxCapacity = Settings.Subscriptions.queueCapacity
-  ), "stateKeeper")
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
   private var targetsByRid = collection.mutable.Map.empty[Int, String]
@@ -36,7 +32,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
 
   private var lastRid: Int = 0
 
-  val channel = Flow.fromGraph(new SubscriptionChannel(qosState))
+  val channel = new SubscriptionChannel(log)
 
   var toSocket: SourceQueueWithComplete[SubscriptionNotificationMessage] = _
   var subscriptionsPublisher: Publisher[DSAMessage] = _
@@ -48,10 +44,7 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
     case m @ RequestMessage(msg, ack, requests) =>
       log.debug("{}: received {}", ownId, m)
       processRequests(requests)
-      requests.lastOption foreach (req => persist(LastRidSet(req.rid)) { event =>
-        log.debug("{}: persisting {}", ownId, event)
-        lastRid = event.rid
-        saveSnapshot(RequesterBehaviorState(targetsByRid, targetsBySid, lastRid)) })
+      requests.lastOption foreach ( req => persist(LastRidSet(req.rid)) (event => lastRid = event.rid) )
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received in connected mode {}", ownId, e)
       cleanupStoredTargets(responses)
@@ -94,23 +87,26 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
       }
   }
 
-  override protected def afterConnection(): Unit = {
-    qosState ! Connected
-  }
-
-  override protected def afterDisconnection(): Unit = {
-    qosState ! Disconnected
-  }
-
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource(actor:ActorRef) = {
+  private def getSubscriptionSource(sinkRef: SinkRef[ResponseMessage]) = {
 
-    log.info("new subscription source connected: {}", actor)
+    log.info("new subscription source connected: {}", sinkRef)
 
-    val (toSocketVal, publisher) = Source.queue(100, OverflowStrategy.backpressure)
-      .via(channel).toMat(Sink.actorRef(actor, Success(())))(Keep.both).run()
+    val toSocketVal = Source.queue[SubscriptionNotificationMessage](100, OnOverflow)
+      .conflateWithSeed(List(_)){(list, next) => list :+ next}
+      .async
+      .via(Flow.fromGraph(channel))
+      .map{ item =>
+          countTags("qos.notification.out")
+        item
+      }
+      .conflateWithSeed(resp => new ResponseMessage(-1, None, List(resp))) {
+        (message, next) => message.copy(responses = message.responses :+ next)
+      }
+      .toMat(sinkRef.sink())(Keep.left)
+      .run()
 
     toSocket = toSocketVal
   }
@@ -154,15 +150,14 @@ trait RequesterBehavior { me: AbstractDSLinkActor with Meter =>
   private def handleSubscriptions(subscriptions:Seq[DSAResponse], connected: Boolean = true) = subscriptions foreach {
     r => withQosAndSid(r) foreach {
       message =>
-      val toSend = SubscriptionNotificationMessage(-1, None, List(message.response), message.sid, message.qos)
-      if (connected) {
-        log.debug("{}: sending subscription message [connected mode]: {}", ownId, toSend)
+      log.debug("sending subscription message: {}", message)
+      val toSend = SubscriptionNotificationMessage(message.response, message.sid, message.qos)
+
+      if(connected){
         // in connected state pushing to stream with backpressure logic
         toSocket offer toSend
-      } else if (message.qos >= QoS.Durable) {
-        //in disconnected - just send to state actor
-        log.debug("{}: put notification [disconnected mode]: {}", ownId, toSend)
-        qosState ! PutNotification(toSend)
+      } else if(message.qos >= QoS.Durable){
+        channel.putMessage(toSend)
       }
     }
   }

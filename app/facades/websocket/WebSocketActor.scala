@@ -2,11 +2,15 @@ package facades.websocket
 
 import java.util.UUID
 
+import akka.actor.Status.{Failure, Success}
 import org.joda.time.DateTime
-import akka.actor.{Actor, ActorLogging, ActorRef, Props, actorRef2Scala}
+import akka.actor.{Actor, ActorLogging, PoisonPill, Props, Terminated}
 import akka.dispatch.{BoundedMessageQueueSemantics, RequiresMessageQueue}
 import akka.routing.Routee
+import akka.stream.{Materializer, OverflowStrategy, SinkRef}
+import akka.stream.scaladsl.{Keep, Source}
 import kamon.Kamon
+import models.Settings.WebSocket.OnOverflow
 import models.{RequestEnvelope, ResponseEnvelope, formatMessage}
 import models.akka.{ConnectionInfo, IntCounter, RichRoutee}
 import models.akka.Messages.ConnectEndpoint
@@ -21,11 +25,16 @@ case class WebSocketActorConfig(connInfo: ConnectionInfo, sessionId: String, sal
 /**
  * Represents a WebSocket connection and communicates to the DSLink actor.
  */
-class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig)
+class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSocketActorConfig)(implicit mat: Materializer)
   extends Actor with ActorLogging with RequiresMessageQueue[BoundedMessageQueueSemantics]
   with Meter{
 
   protected val ci = config.connInfo
+
+  protected val out = Source.queue(100, OnOverflow)
+    .toMat(sinkRef.sink())(Keep.left)
+    .run()
+
   protected val linkName = ci.linkName
   protected val ownId = s"WSActor[$linkName]-${UUID.randomUUID.toString}"
 
@@ -62,22 +71,24 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
       sendAck(msg)
     case m @ RequestMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "request")
-      log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
+      log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      meterTags(messageTags("request.in", ci):_*)
+      countTags(messageTags("request.in", ci):_*)
     case m @ ResponseMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "response")
-      log.info("{}: received {} from WebSocket", ownId, formatMessage(m))
+      log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
-      meterTags(messageTags("response.in", ci):_*)
+      countTags(messageTags("response.in", ci):_*)
     case e @ RequestEnvelope(requests) =>
       log.debug("{}: received {}", ownId, e)
       sendRequests(requests: _*)
     case e @ ResponseEnvelope(responses) =>
       log.debug("{}: received {}", ownId, e)
       sendResponses(responses: _*)
+    case Success(_) | Failure(_) => self ! PoisonPill
+    case Terminated(_)           => context.stop(self)
   }
 
   /**
@@ -86,7 +97,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   private def sendResponses(responses: DSAResponse*) = if (!responses.isEmpty) {
     val msg = ResponseMessage(localMsgId.inc, None, responses.toList)
     sendToSocket(msg)
-    meterTags(messageTags("response.out", ci):_*)
+    countTags(messageTags("response.out", ci):_*)
   }
 
   /**
@@ -95,7 +106,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
   private def sendRequests(requests: DSARequest*) = if (!requests.isEmpty) {
     val msg = RequestMessage(localMsgId.inc, None, requests.toList)
     sendToSocket(msg)
-    meterTags(messageTags("request.out", ci):_*)
+    countTags(messageTags("request.out", ci):_*)
   }
 
   /**
@@ -113,7 +124,7 @@ class WebSocketActor(out: ActorRef, routee: Routee, config: WebSocketActorConfig
    */
   private def sendToSocket(msg: DSAMessage) = {
     log.debug("{}: sending {} to WebSocket", ownId, formatMessage(msg))
-    out ! msg
+    out.offer(msg)
   }
 }
 
@@ -124,6 +135,6 @@ object WebSocketActor {
   /**
    * Creates a new [[WebSocketActor]] props.
    */
-  def props(out: ActorRef, routee: Routee, config: WebSocketActorConfig) =
+  def props(out: SinkRef[DSAMessage], routee: Routee, config: WebSocketActorConfig)(implicit mat: Materializer) =
     Props(new WebSocketActor(out, routee, config))
 }

@@ -1,0 +1,15 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: broker
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+    - http:
+        paths: 
+        - path: / 
+          backend:
+            serviceName: "cloud-broker-external"
+            servicePort: 9000

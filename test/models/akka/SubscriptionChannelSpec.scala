@@ -2,13 +2,14 @@ package models.akka
 
 import akka.NotUsed
 import akka.actor.ActorSystem
+import akka.http.impl.util.DefaultNoLogging
 import akka.stream.{ActorMaterializer, OverflowStrategy, ThrottleMode}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import models.Settings.WebSocket.OnOverflow
 import models.akka.Messages.SubscriptionNotificationMessage
-import models.rpc.{DSAMessage, DSAResponse, ResponseMessage}
+import models.rpc.{DSAResponse, ResponseMessage}
 import org.scalatest.{GivenWhenThen, Matchers, WordSpecLike}
 
-import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -24,14 +25,14 @@ class SubscriptionChannelSpec extends WordSpecLike
 
       "deliver at least 1 message for every subscription for QoS == 0 if consumer is slow" in {
 
-        withFlow(200, 5, QoS.Default){
+        withFlow(200, 1, QoS.Default){
           (source, flow, sink) =>
 
             When("consumer is slow")
             And("qos == 0")
             val runnableGraph =
               source
-                .buffer(300, OverflowStrategy.backpressure)
+                .buffer(20, OnOverflow)
                 .via(flow)
                 .throttle(1, 20.millisecond, 1, ThrottleMode.shaping)
                 .toMat(sink)(Keep.right)
@@ -75,9 +76,9 @@ class SubscriptionChannelSpec extends WordSpecLike
             And("qos > 0")
             val runnableGraph =
               source
-                .buffer(300, OverflowStrategy.backpressure)
+           //     .buffer(300, OverflowStrategy.backpressure)
                 .via(flow)
-                .throttle(1, 20.millisecond, 1, ThrottleMode.shaping)
+            //    .throttle(1, 20.millisecond, 1, ThrottleMode.shaping)
                 .toMat(sink)(Keep.right)
 
             val result = Await.result(runnableGraph.run(), 5 seconds).toList.sorted
@@ -89,21 +90,19 @@ class SubscriptionChannelSpec extends WordSpecLike
       }
 
       def withFlow(iterations: Int, sids:Int, qosLevel:QoS.Level)(assertion: (
-        Source[SubscriptionNotificationMessage, NotUsed],
-        Flow[SubscriptionNotificationMessage, DSAMessage, NotUsed],
-        Sink[DSAMessage, Future[Set[Int]]]
+        Source[Seq[SubscriptionNotificationMessage], NotUsed],
+        Flow[Seq[SubscriptionNotificationMessage], DSAResponse, NotUsed],
+        Sink[DSAResponse, Future[Set[Int]]]
       ) => Unit) = {
 
-        val stateKeeper = as.actorOf(QoSState.props(100))
-
-        val ch = new SubscriptionChannel(stateKeeper)
+        val ch = new SubscriptionChannel(DefaultNoLogging)
         val flow = Flow.fromGraph(ch)
-        val list = 0 until iterations map { i => SubscriptionNotificationMessage(0, None, List(DSAResponse(i, None, None, None, None)), i % sids, qosLevel)}
-        val source = Source(list)
+        val list = 0 until iterations map { i => SubscriptionNotificationMessage(DSAResponse(i, None, None, None, None), i % sids, qosLevel)}
+        val source = Source(list).map(Seq(_))
 
-        val sink = Sink.fold[Set[Int], DSAMessage](Set[Int]())({
-          case (set, ResponseMessage(_, _, responses)) =>
-            set ++ responses.map(_.rid)
+        val sink = Sink.fold[Set[Int], DSAResponse](Set[Int]())({
+          case (set, DSAResponse(rid, _, _, _, _)) =>
+            set + rid
           case (set, _)  => set
         })
 

@@ -231,7 +231,11 @@ class ClusteredDSLinkFolderActorSpec extends AbstractActorSpec with Inside {
   }
 
   private def createActorSystem(port: Int) = {
-    val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$port")
+    val config = ConfigFactory.parseString(
+      s"""
+         |akka.remote.artery.canonical.port=$port
+         |akka.cluster.distributed-data.gossip-interval = 150 ms
+         |akka.remote.artery.advanced.aeron-dir=/tmp/aeron-$port-${Math.random()}""".stripMargin)
       .withFallback(ConfigFactory.load("backend.conf"))
     val systemName = config.getString("play.akka.actor-system")
     ActorSystem(systemName, config.resolve)

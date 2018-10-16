@@ -1,105 +1,110 @@
 package models.akka
 
-import akka.actor.{ActorRef, ActorSystem}
 import akka.stream._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler, StageLogging}
-import models.rpc.{DSAMessage, ResponseMessage}
-import akka.pattern.ask
+import models.rpc.{DSAMessage, DSAResponse, ResponseMessage}
 import akka.util.Timeout
+import akka.event.LoggingAdapter
 import models.Settings
 import models.akka.Messages._
-import models.akka.QoSState.{GetAllMessages, GetAndRemoveNext, PutNotification}
+import models.metrics.Meter
 
-import scala.collection.immutable.Queue
-import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext}
+import scala.collection.mutable.Queue
+import scala.collection.mutable
 
 
-class SubscriptionChannel(val store: ActorRef)
-                         (implicit actorSystem: ActorSystem, materializer: Materializer)
-  extends GraphStage[FlowShape[SubscriptionNotificationMessage, DSAMessage]] {
+class SubscriptionChannel(log: LoggingAdapter)
+  extends GraphStage[FlowShape[Seq[SubscriptionNotificationMessage], DSAResponse]] with Meter {
 
   type Sid = Int
+  val subscriptionsQueue = mutable.HashMap[Int, Queue[SubscriptionNotificationMessage]]()
 
-  val in = Inlet[SubscriptionNotificationMessage]("Subscriptions.in")
-  val out = Outlet[DSAMessage]("Subscriptions.out")
-  implicit val ctx = actorSystem.dispatcher
+  val in = Inlet[Seq[SubscriptionNotificationMessage]]("Subscriptions.in")
+  val out = Outlet[DSAResponse]("Subscriptions.out")
 
   val timeout = Settings.QueryTimeout
-
+  val maxBatch = Settings.Subscriptions.maxBatchSize
+  val maxQosCapacity = Settings.Subscriptions.queueCapacity
   implicit val implTimeout = Timeout(timeout)
 
-  override def shape: FlowShape[SubscriptionNotificationMessage, DSAMessage] = FlowShape.of(in, out)
+  override def shape: FlowShape[Seq[SubscriptionNotificationMessage], DSAResponse] = FlowShape.of(in, out)
+
+  def putMessage(message: SubscriptionNotificationMessage) = {
+    countTags("qos.notification.in.counter")
+    histogramValue("qos.notification.in.hist")(1)
+    val result = message match {
+      case item@SubscriptionNotificationMessage(_, _, QoS.Default) =>
+        if(subscriptionsQueue.contains(item.sid)){
+          countTags(s"qos.level.0.dropped")
+        }
+        subscriptionsQueue += (item.sid -> Queue(message))
+        log.debug("QoS == 0. Replacing with new queue")
+        countTags(s"qos.level.0.total")
+        item.sid
+      case item@SubscriptionNotificationMessage(_, _, _) =>
+        val maybeQ = subscriptionsQueue.get(item.sid).orElse(Some(Queue[SubscriptionNotificationMessage]()))
+
+        maybeQ.foreach { q =>
+          if(q.size > maxQosCapacity){
+            q.dequeue()
+            countTags(s"qos.level.${item.qos.index}.dropped")
+          }
+          q.enqueue(message)
+          histogramValue(s"qos.level.${item.qos.index}.queue.size")(q.size)
+        }
+
+        subscriptionsQueue += (item.sid -> maybeQ.get)
+
+        item.sid
+      case other =>
+    }
+
+    histogramValue("qos.sids.size")(subscriptionsQueue.size)
+
+    result
+  }
 
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
 
-    def storeIt(message: SubscriptionNotificationMessage) = (store ? PutNotification(message)).mapTo[Int]
-
-
     setHandler(in, new InHandler {
       override def onPush(): Unit = {
-
         log.debug("on push: {}", in)
-        val message = grab(in)
-
-        val callback = getAsyncCallback[Int]{
-          _=>
-            log.debug("storing {}", message)
-
-            if(isAvailable(out)){
-              pushNext
-            } else {
-              log.debug("out is unavailable.")
-            }
+        val messages = grab(in)
+        messages.foreach(putMessage(_))
+        if (isAvailable(out)) {
+          pushNext
         }
-
-        storeIt(message) foreach callback.invoke
-
       }
 
       override def onUpstreamFinish(): Unit = {
-        val futureTail = (store ? GetAllMessages).mapTo[Map[Int, Queue[SubscriptionNotificationMessage]]]
-        val tail = Await.result(futureTail, timeout)
+
+        val tail = subscriptionsQueue
         if (tail.nonEmpty) {
-          val leftItems = tail.mapValues(toResponseMsg(_)).values.filter(_.isDefined).map(_.get)
-          emitMultiple(out, leftItems.iterator)
+          val leftItems = tail.mapValues(_.map(toResponseMsg(_))).foreach { case (_, responses) =>
+            emitMultiple(out, responses.toList)
+          }
         }
         completeStage()
       }
 
     })
 
-    private def toResponseMsg(in:Seq[SubscriptionNotificationMessage]):Option[ResponseMessage] = {
-      if (!in.isEmpty) {
-        val msgId = in.head.msg
-        Some(ResponseMessage(msgId, None, in.flatMap(_.responses).toList))
-      } else None
-    }
+    private def toResponseMsg(in: SubscriptionNotificationMessage): DSAResponse = in.response
+
 
     def pushNext = {
-      // to avoid locking using 'getAsyncCallback' https://doc.akka.io/docs/akka/2.5/stream/stream-customize.html#using-asynchronous-side-channels
-      val futureMessage = (store ? GetAndRemoveNext).mapTo[Option[Queue[SubscriptionNotificationMessage]]]
-
-      val callback = getAsyncCallback[Option[Queue[SubscriptionNotificationMessage]]] {
-        _ foreach {
-          toResponseMsg(_).foreach { m =>
-            log.debug("push(out, {})", m)
-            push(out, m)
-            pull(in)
-          }
-        }
-      }
-
-      futureMessage foreach {
-        callback.invoke(_)
+      emitMultiple(out, subscriptionsQueue.valuesIterator.flatten.map(_.response))
+      subscriptionsQueue.clear()
+      if (!hasBeenPulled(in)) {
+        pull(in)
       }
     }
 
     setHandler(out, new OutHandler {
       override def onPull(): Unit = {
         log.debug("on pull")
-         if (!hasBeenPulled(in)) {
+        if (!hasBeenPulled(in)) {
           pull(in)
         }
       }

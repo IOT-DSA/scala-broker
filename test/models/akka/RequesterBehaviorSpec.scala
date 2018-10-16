@@ -74,17 +74,17 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
       requester.tell(envelope, testActor)
       ws.expectMsg(envelope)
     }
-    "has to be recovered" in {
-      requester ! PoisonPill
-      downstreamProbe.expectMsg(UnregisterDSLink("requester"))
-
-      Thread.sleep(500)
-      val requesterRecovered = system.actorOf(Props(new Requester(dslinkMgr, ActorRefRoutee(downstreamActor))), "requester")
-
-      whenReady(requesterRecovered ? GetLinkInfo) (inside(_) {
-        case LinkInfo(connInfo, _, _, _) => connInfo mustBe ci
-      })
-    }
+//    "has to be recovered" in {
+//      requester ! PoisonPill
+//      downstreamProbe.expectMsg(UnregisterDSLink("requester"))
+//
+//      Thread.sleep(500)
+//      val requesterRecovered = system.actorOf(Props(new Requester(dslinkMgr, ActorRefRoutee(downstreamActor))), "requester")
+//
+//      whenReady(requesterRecovered ? GetLinkInfo) (inside(_) {
+//        case LinkInfo(connInfo, _, _, _) => connInfo mustBe ci
+//      })
+//    }
   }
 }
 

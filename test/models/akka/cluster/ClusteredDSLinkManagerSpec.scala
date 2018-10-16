@@ -1,9 +1,11 @@
 package models.akka.cluster
 
+import java.util.concurrent.TimeUnit
+
 import scala.concurrent.duration.DurationInt
 import org.scalatest.Inside
 import com.typesafe.config.ConfigFactory
-import akka.actor.{ActorSystem}
+import akka.actor.ActorSystem
 import akka.cluster.Cluster
 import akka.cluster.ddata.DistributedData
 import akka.testkit.{TestActors, TestKit, TestProbe}
@@ -140,7 +142,13 @@ class ClusteredDSLinkManagerSpec extends AbstractActorSpec with Inside {
    * Creates a clustered actor system for testing.
    */
   private def createActorSystem(port: Int) = {
-    val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$port")
+    val config = ConfigFactory.parseString(
+      s"""
+         |akka.remote.artery.canonical.port=$port
+         |akka.cluster.distributed-data.gossip-interval = 150 ms
+         |akka.remote.artery.advanced.aeron-dir=/tmp/aeron-$port-${Math.random()}
+         |
+       """.stripMargin)
       .withFallback(ConfigFactory.load("backend.conf"))
     val systemName = config.getString("play.akka.actor-system")
     ActorSystem(systemName, config.resolve)

@@ -6,6 +6,7 @@ import akka.actor._
 import kamon.Kamon
 import models._
 import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState, PartOfPersistenceBehavior}
+import models.metrics.Meter
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
@@ -16,7 +17,7 @@ import _root_.akka.event.LoggingAdapter
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor with ActorLogging =>
+trait ResponderBehavior extends DSLinkStateSnapshotter with Meter{ me: PersistentActor with ActorLogging =>
   import RidRegistry._
   import models.akka.RichRoutee
 
@@ -113,7 +114,6 @@ trait ResponderBehavior extends DSLinkStateSnapshotter { me: PersistentActor wit
 
     log.debug("{}: RID after Rsp: {}", ownId, ridRegistry.info)
     log.debug("{}: SID after Rsp: {}", ownId, sidRegistry.info)
-
     results groupBy (_._1) mapValues (_.map(_._2))
   }
 

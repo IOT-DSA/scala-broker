@@ -28,7 +28,7 @@ case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = M
   }
 
   private def strType(value: DSAVal): Option[String] = value match {
-    case str: Option[DSAValue[String]] => Some(str.get.value)
+    case str: DSAValue[String] => Some(str.value)
     case _ => None
   }
 
@@ -365,7 +365,7 @@ class DistributedDSANode(_parent: Option[DSANode],
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
       case e@RequestEnvelope(requests) =>
-        log.info("{}: received {}", ownId, e)
+        log.debug("{}: received {}", ownId, e)
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
       case u: UpdateResponse[_] ⇒ // ignore
@@ -398,8 +398,6 @@ class DistributedDSANode(_parent: Option[DSANode],
       stash = stash :+ u
     }
   }
-
-
 
   private[this] def empty = DistributedDSANodeState.empty
 
