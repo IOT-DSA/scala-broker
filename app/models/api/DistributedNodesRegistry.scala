@@ -16,7 +16,8 @@ import models.rpc.{InvokeRequest, RemoveRequest, SetRequest}
 
 import scala.annotation.tailrec
 
-class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit cluster: Cluster, system: ActorSystem) extends Actor with ActorLogging {
+class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit cluster: Cluster, system: ActorSystem)
+  extends Actor with ActorLogging {
 
   implicit val timeout = Timeout(QueryTimeout)
   implicit val executionContext = system.dispatcher
@@ -198,7 +199,12 @@ class DistributedNodesRegistry @Inject()(val replicator: ActorRef)(implicit clus
   private def validPath(in: String) = if (in.startsWith("/")) in else s"/$in"
 }
 
+/**
+  * Factory for [[DistributedNodesRegistry]] instances.
+  */
 object DistributedNodesRegistry {
+
+  val ACTOR_NAME = "distributedNodesRegistry"
 
   case class AddNode(nodeDescription: DSANodeDescription)
 
@@ -221,7 +227,6 @@ object DistributedNodesRegistry {
     case (p: Option[String], head :: tail) => aggregateParent(p.orElse(Some("")).map(_ + "/" + head), tail)
   }
 
-  def props(replicator: ActorRef, cluster: Cluster, system: ActorSystem) = Props(new DistributedNodesRegistry(replicator)(cluster, system))
-
-
+  def props(replicator: ActorRef, cluster: Cluster, system: ActorSystem) =
+    Props(new DistributedNodesRegistry(replicator)(cluster, system))
 }

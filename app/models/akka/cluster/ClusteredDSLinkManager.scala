@@ -30,7 +30,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
 
   private val replicator = DistributedData(system).replicator
   private val distrubutedNodeRegistry: ActorRef = system
-    .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), "distributedNodesRegistry")
+    .actorOf(DistributedNodesRegistry.props(replicator, cluster, system), DistributedNodesRegistry.ACTOR_NAME)
 
 
   (distrubutedNodeRegistry ? AddNode(DSANodeDescription.init(Paths.Data, Some("broker/dataRoot")))).mapTo[DSANode] foreach {
