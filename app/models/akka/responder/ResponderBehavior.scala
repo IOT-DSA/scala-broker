@@ -73,7 +73,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
    * Processes incoming requests and responses.
    */
   val responderBehavior: Receive = {
-    case env @ RequestEnvelope(requests) =>
+    case env @ RequestEnvelope(requests, _) =>
       log.info("{}: received {} from {}", ownId, env, sender)
       val result = processRequests(requests)
       if (!result.requests.isEmpty)

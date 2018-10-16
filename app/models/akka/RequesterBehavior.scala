@@ -12,7 +12,7 @@ import scala.util.control.NonFatal
 import scala.collection.mutable.Set
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
-import models.rpc.DSAValue.DSAVal
+import models.rpc.DSAValue.{DSAMap, DSAVal}
 import org.reactivestreams.Publisher
 import models.akka.QoSState._
 
@@ -250,7 +250,8 @@ trait RequesterBehavior {
   private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
     requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) =>
-        val envelope = RequestEnvelope(reqs.toSeq)
+        val header: DSAMap = Map("dsId" -> me.connInfo.dsId)
+        val envelope = RequestEnvelope(reqs.toSeq, Some(header))
         log.debug("{}: sending {} to [{}]", ownId, envelope, to)
         dslinkMgr.dsaSend(to, envelope)
         logRequestBatch(to, envelope.requests)

@@ -31,7 +31,7 @@ class RootNodeActor extends Actor with ActorLogging {
   override def postStop() = log.info("[RootNode] actor stopped")
 
   def receive = {
-    case env @ RequestEnvelope(reqs) =>
+    case env @ RequestEnvelope(reqs, _) =>
       log.info(s"Received: $env")
       val responses = reqs map processDSARequest
       sender ! ResponseEnvelope(responses)

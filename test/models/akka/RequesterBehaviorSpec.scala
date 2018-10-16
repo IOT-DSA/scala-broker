@@ -9,8 +9,9 @@ import akka.pattern.ask
 import akka.util.Timeout
 import models.akka.local.LocalDSLinkManager
 import org.scalatest.Inside
-import scala.concurrent.duration.DurationInt
-import models.rpc.{ DSAResponse, ListRequest, RequestMessage }
+
+import scala.concurrent.duration.{Duration, DurationInt}
+import models.rpc.{DSAResponse, ListRequest, RequestMessage}
 import models.util.DsaToAkkaCoder._
 
 /**
@@ -57,17 +58,17 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
     "route requests to broker root" in {
       val requests = List(ListRequest(1, "/"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      brokerProbe.expectMsg(RequestEnvelope(requests))
+      brokerProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> ""))))
     }
     "route requests to downstream" in {
       val requests = List(ListRequest(1, "/downstream"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      downstreamProbe.expectMsg(RequestEnvelope(requests))
+      downstreamProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> ""))))
     }
     "route requests to links" in {
       val requests = List(ListRequest(1, "/downstream/abc def"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      abcProbe.expectMsg(RequestEnvelope(requests))
+      abcProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> ""))))
     }
     "forward responses to WS" in {
       val envelope = ResponseEnvelope(List(DSAResponse(1)))

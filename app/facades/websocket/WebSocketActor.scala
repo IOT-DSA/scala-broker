@@ -117,7 +117,7 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
       sendAck(msg)
       routee.foreach {_ ! m}
       countTags(messageTags("response.in", ci): _*)
-    case e@RequestEnvelope(requests) =>
+    case e @ RequestEnvelope(requests, _) =>
       log.debug("{}: received request envelope {}", ownId, e)
       sendRequests(requests: _*)
     case e@ResponseEnvelope(responses) =>
