@@ -71,21 +71,21 @@ class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSo
       sendAck(msg)
     case m @ RequestMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "request")
-      log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
+      log.info("{}: received request message {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
       countTags(messageTags("request.in", ci):_*)
     case m @ ResponseMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "response")
-      log.debug("{}: received {} from WebSocket", ownId, formatMessage(m))
+      log.info("{}: received response message {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
       routee ! m
       countTags(messageTags("response.in", ci):_*)
     case e @ RequestEnvelope(requests) =>
-      log.debug("{}: received {}", ownId, e)
+      log.debug("{}: received request envelope {}", ownId, e)
       sendRequests(requests: _*)
     case e @ ResponseEnvelope(responses) =>
-      log.debug("{}: received {}", ownId, e)
+      log.debug("{}: received response envelope {}", ownId, e)
       sendResponses(responses: _*)
     case Success(_) | Failure(_) => self ! PoisonPill
     case Terminated(_)           => context.stop(self)

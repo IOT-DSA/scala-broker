@@ -6,21 +6,22 @@ import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.cluster.Cluster
 import akka.cluster.ddata.ReplicatedData
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
-import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
+import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
 import akka.cluster.ddata.Replicator._
 import akka.event.Logging
 import akka.pattern.{PromiseRef, ask}
 import akka.util.Timeout
+import models.akka.Messages.{AppendDsId2Token, GetTokens}
 import models.{RequestEnvelope, ResponseEnvelope, Settings}
 import models.api.DistributedDSANode.DistributedDSANodeData
 import models.api.DistributedNodesRegistry.{AddNode, GetNodesByDescription}
 import models.rpc.DSAValue
 import models.util.LoggingAdapterInside
 
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
-case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = Map()) {
+case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = Map(), value: DSAVal = StringValue("")) {
   def profile: Option[String] = attrAndConf.get("$is").flatMap(strType _)
 
   def valueType: Option[DSAValueType] = attrAndConf.get("$type").flatMap { v =>
@@ -29,7 +30,7 @@ case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = M
 
   private def strType(value: DSAVal): Option[String] = value match {
     case str: DSAValue[String] => Some(str.value)
-    case _ => None
+    case _                             => None
   }
 
 }
@@ -66,6 +67,8 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   val dataKey = DistributedDSANodeKey(path)
 
+  val _system: ActorSystem = system
+
   //actors behaviors would be better, but we work with typed actor
   private var stateInitialized = false;
 
@@ -73,7 +76,8 @@ class DistributedDSANode(_parent: Option[DSANode],
   protected var initialData = nodeDescription.attrAndConf
 
   protected def ownId = s"ddNode[$path]"
-  private var stash:Vector[Update[DistributedDSANodeState]] = Vector()
+
+  private var stash: Vector[Update[DistributedDSANodeState]] = Vector()
   override protected var _sids: Map[Int, ActorRef] = Map.empty
   override protected var _rids: Map[Int, ActorRef] = Map.empty
   override implicit val executionContext: ExecutionContext = TypedActor.context.dispatcher
@@ -113,7 +117,6 @@ class DistributedDSANode(_parent: Option[DSANode],
   override def valueType_=(vt: DSAValueType): Unit = editProperty { old =>
     old.copy(configs = old.configs + ("$type" -> vt.toString))
   }
-
 
   override def displayName: Future[String] = Future.successful(
     data.configs.get("$name")
@@ -173,7 +176,7 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   override def child(name: String): Future[Option[DSANode]] = Future.successful(_children.get(name))
 
-  override def addChild(name: String, profile: Option[String] = None, valueType: Option[DSAValueType] = None): Future[DSANode] = {
+  override def addChild(name: String, profile: Option[String] = None, valueType: Option[DSAValueType] = None): Future[DSANode] = synchronized {
     _children.get(name).map(Future.successful).getOrElse {
       val description = DSANodeDescription.init(s"$path/$name", profile, valueType)
       (registry ? AddNode(description)).mapTo[DSANode] flatMap { actor =>
@@ -182,7 +185,6 @@ class DistributedDSANode(_parent: Option[DSANode],
       }
     }
   }
-
 
   override def addChild(name: String, node: DSANode): Future[DSANode] = {
     _children += (name -> node)
@@ -194,7 +196,7 @@ class DistributedDSANode(_parent: Option[DSANode],
     Future.successful(node)
   }
 
-  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = {
+  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = synchronized {
     _children.get(name).map(Future.successful).getOrElse {
       val map: Map[String, DSAVal] = paramsAndConfigs.toMap
       val description = DSANodeDescription(s"$path/$name", map)
@@ -217,8 +219,9 @@ class DistributedDSANode(_parent: Option[DSANode],
     _action = Some(a)
   }
 
-  override def invoke(params: DSAMap): Unit = {
-    _action foreach { a =>
+  override def invoke(params: DSAMap): Any = {
+    implicit val system: ActorSystem = TypedActor.context.system
+    _action map { a =>
       a.handler(ActionContext(this, params))
     }
   }
@@ -343,44 +346,86 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   override def onReceive(message: Any, sender: ActorRef): Unit = {
     message match {
-      case g@GetSuccess(dataKey, Some(msg)) => msg match {
+      case g @ GetSuccess(dataKey, Some(msg)) => msg match {
         case InitMe =>
           updateLocalState(g.get(dataKey))
-          stash.foreach{replicator ! _}
-          stash =  Vector()
+          stash.foreach {
+            replicator ! _
+          }
+          stash = Vector()
           //actors behaviors would be better, but we work with typed actor
           stateInitialized = true
           log.info("{} initialized with data: {}", ownId, data)
-        case a:Any =>
+        case a: Any =>
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
-      case NotFound(dataKey, Some(msg)) => msg match {
+      case NotFound(dataKey, Some(msg))       => msg match {
         case InitMe =>
-          stash.foreach{replicator ! _}
-          stash =  Vector()
+          stash.foreach {
+            replicator ! _
+          }
+          stash = Vector()
           //actors behaviors would be better, but we work with typed actor
           stateInitialized = true
           log.info("{} initialized from the scratch", ownId)
-        case a:Any =>
+        case a: Any =>
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
-      case e@RequestEnvelope(requests) =>
+      case e @ RequestEnvelope(requests)      =>
         log.debug("{}: received {}", ownId, e)
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
-      case u: UpdateResponse[_] ⇒ // ignore
+      case u: UpdateResponse[_]               ⇒ // ignore
         log.debug("{}: state successfully updated: {}", ownId, u.key)
-      case c@Changed(dataKey) ⇒
+      case c @ Changed(dataKey)               ⇒
         log.debug("Current elements: {}", c.get(dataKey))
         updateLocalState(c.get(dataKey))
-      case a:Any =>
+      // TODO: Extract following 2 methods (In the InMemoryDSANode too) into separated trait
+      case AppendDsId2Token(name, value) =>
+        appendDsId2config(name, value)
+      case GetTokens =>
+        getTokens(sender)
+      case a: Any                             =>
         log.warning("unhandled  message: {}", a)
     }
   }
 
+  private def getTokens(sender: ActorRef) = {
+    log.info(s"$ownId: GetTokens received")
+
+    val fResponse = children.map { m =>
+      m.values.filter(node => node.action.isEmpty).toList
+    }
+    val response = Await.result(fResponse, Duration.Inf)
+    sender ! response
+  }
+
+  private def appendDsId2config(name: String, value: String) = {
+    log.info(s"$ownId: received AppendDsId2Token ($name, $value)")
+    if (name.startsWith("$")) {
+
+      val fIds = config(name)
+
+      val v = fIds.onComplete { item =>
+        val values: DSAVal = item.get match {
+          case None => array(value)
+          case Some(arr) =>
+            val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
+            if (srcVal.contains(StringValue(value)))
+              array(value)
+            else
+              srcVal ++ Seq(StringValue(value))
+        }
+        addConfigs(name -> values)
+      }
+
+    } else
+      log.warning("UpdateToken's parameter does not contains '" + name + "' variable name")
+  }
+
   override def preStart(): Unit = {
-    val initTimeout:FiniteDuration = FiniteDuration(5, TimeUnit.SECONDS)// 5 minutes //we can't use standard one - it's too short. We can't use infinite - it's too
-    // long ;)
+    // 5 minutes we can't use standard one - it's too short. We can't use infinite - it's too long
+    val initTimeout: FiniteDuration = FiniteDuration(5, TimeUnit.SECONDS)
     replicator ! Get(dataKey, readLocal, Some(InitMe))
   }
 

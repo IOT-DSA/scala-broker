@@ -1,10 +1,11 @@
 package models.api
 
-import akka.actor.{ActorRef, TypedActor, TypedProps}
+import akka.actor.{ActorRef, ActorSystem, TypedActor, TypedProps}
 import akka.event.Logging
+import models.akka.Messages.{AppendDsId2Token, GetConfigVal, GetTokens}
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.api.DSAValueType.{DSADynamic, DSAValueType}
-import models.rpc.DSAValue.{DSAMap, DSAVal, array, obj}
+import models.rpc.DSAValue.{ArrayValue, DSAMap, DSAVal, StringValue, array, obj}
 import models.util.LoggingAdapterInside
 
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -32,6 +33,8 @@ class InMemoryDSANode(val parent: Option[DSANode])
   protected def ownId = s"[$path]"
   override implicit val executionContext:ExecutionContext = TypedActor.context.dispatcher
 
+  val system = TypedActor.context.system
+
   private var _value: DSAVal = _
   def value = Future.successful(_value)
   def value_=(v: DSAVal) = {
@@ -50,7 +53,7 @@ class InMemoryDSANode(val parent: Option[DSANode])
   def profile_=(p: String) = addConfigs("$is" -> p)
 
   protected var _configs = Map[String, DSAVal]("$is" -> "node")
-  def configs = Future.successful(_configs.toMap)
+  def configs = Future.successful(_configs)
   def config(name: String) = configs map (_.get(name))
   def addConfigs(configs: (String, DSAVal)*) = {
     val cfg = configs map {
@@ -91,12 +94,12 @@ class InMemoryDSANode(val parent: Option[DSANode])
   def addChild(name: String, profile:Option[String] = None, valueType:Option[DSAValueType] = None) = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
     val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
-    profile foreach{child.profile = _}
+    profile foreach {child.profile = _}
     valueType.foreach(child.valueType = _)
     addChild(name, child)
   }
 
-  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = {
+  override def addChild(name: String, paramsAndConfigs: (String, DSAVal)*): Future[DSANode] = synchronized {
     val props = DSANode.props(Some(TypedActor.self))
     val child:DSANode = TypedActor(TypedActor.context).typedActorOf(props, name.forAkka)
     child.addConfigs(paramsAndConfigs.filter(_._1.startsWith("$")):_*)
@@ -124,7 +127,10 @@ class InMemoryDSANode(val parent: Option[DSANode])
     _action = Some(a)
   }
 
-  def invoke(params: DSAMap) = _action foreach (_.handler(ActionContext(this, params)))
+  def invoke(params: DSAMap) = {
+    implicit val system: ActorSystem = TypedActor.context.system
+    _action map (_.handler(ActionContext(this, params)))
+  }
 
   protected var _sids = Map.empty[Int, ActorRef]
   def subscribe(sid: Int, ref: ActorRef) = _sids += sid -> ref
@@ -144,9 +150,42 @@ class InMemoryDSANode(val parent: Option[DSANode])
       val responses = requests flatMap handleRequest(sender)
       sender ! ResponseEnvelope(responses)
 
-    case msg @ _ => log.error("Unknown message: " + msg)
-  }
+    case AppendDsId2Token(name, value) =>
+      log.info(s"$ownId: received AppendDsId2Token ($name, $value)")
+      if(name.startsWith("$")) {
 
+        val oIds = _configs.get(name)
+        val values: DSAVal = oIds match {
+          case None => array(value)
+          case Some(arr)  =>
+            val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
+            if (srcVal.contains(StringValue(value)))
+              array(value)
+            else
+              srcVal ++ Seq(StringValue(value))
+        }
+
+        _configs ++= Seq(name -> values)
+      } else
+        log.warning("UpdateToken's parameter does not contains @ " + name)
+
+    case GetTokens =>
+      log.info(s"$ownId: GetTokens received")
+
+      val fResponse = children.map { m =>
+        m.values.filter(node => node.action.isEmpty).toList
+      }
+
+      val response = Await.result(fResponse, Duration.Inf)
+      sender ! response
+    case GetConfigVal(name) =>
+      log.info(s"$ownId: GetDSLinksIds received")
+      val fResp = config(name)
+      val response = Await.result(fResp, Duration.Inf)
+      sender ! response
+    case msg @ _ =>
+      log.error("Unknown message: " + msg)
+  }
 
   // event handlers
 
