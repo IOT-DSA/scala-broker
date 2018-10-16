@@ -9,7 +9,7 @@ import models.akka.Messages._
 import models.metrics.Meter
 
 import scala.util.control.NonFatal
-import scala.concurrent.duration._
+import scala.collection.mutable.Set
 import models.{RequestEnvelope, ResponseEnvelope, Settings, SubscriptionResponseEnvelope}
 import models.rpc._
 import models.rpc.DSAValue.DSAVal
@@ -27,8 +27,8 @@ trait RequesterBehavior {
   protected def dslinkMgr: DSLinkManager
 
   // used by Close and Unsubscribe requests to retrieve the targets of previously used RID/SID
-  private val targetsByRid = collection.mutable.Map.empty[Int, String]
-  private val targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
+  private var targetsByRid = collection.mutable.Map.empty[Int, String]
+  private var targetsBySid = collection.mutable.Map.empty[Int, PathAndQos]
 
   private var lastRid: Int = 0
 

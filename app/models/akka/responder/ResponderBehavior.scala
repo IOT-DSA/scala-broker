@@ -6,7 +6,6 @@ import akka.actor._
 import kamon.Kamon
 import models._
 import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState, PartOfPersistenceBehavior}
-import models.akka.{RequestsProcessed, ResponsesProcessed}
 import models.metrics.Meter
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod

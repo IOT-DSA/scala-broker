@@ -28,7 +28,7 @@ case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = M
   }
 
   private def strType(value: DSAVal): Option[String] = value match {
-    case str: Option[DSAValue[String]] => Some(str.get.value)
+    case str: DSAValue[String] => Some(str.value)
     case _ => None
   }
 
