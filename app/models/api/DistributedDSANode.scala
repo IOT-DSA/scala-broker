@@ -399,8 +399,6 @@ class DistributedDSANode(_parent: Option[DSANode],
     }
   }
 
-
-
   private[this] def empty = DistributedDSANodeState.empty
 
 }
