@@ -97,11 +97,13 @@ mappings in Universal ++= Seq(
   file("scripts/start-frontend") -> "bin/start-frontend",
   file("scripts/stop-frontend") -> "bin/stop-frontend")
 
-// scoverage options
+// coverage settings
 coverageMinimum := 65
 coverageFailOnMinimum := true
+coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*;" + //static generated front-end data
+                            "controllers.BenchmarkController;" + //controller for load tests
+                            "*package.scala;" //file with constants and configurations
 
-coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"
 aggregate in sonarScan := false
 
 sonarProperties := Map(

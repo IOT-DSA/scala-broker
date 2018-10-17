@@ -65,6 +65,18 @@ class DSAMessageSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
       json mustBe Json.obj("msg" -> 101, "ack" -> 20, "requests" -> Json.arr(baseJsonWithPath(List), baseJson(Close)))
       json.as[DSAMessage] mustBe msg
     }
+
+    "write single request in string" in {
+      val msg = RequestMessage(101, Some(20), ScalaList(CloseRequest(Rid)))
+      msg.toString mustBe s"RequestMessage(101,Some(20),List(CloseRequest($Rid)))"
+    }
+
+    "truncate to head multiple requests in string" in {
+      val msg = RequestMessage(101, Some(20), ScalaList(ListRequest(Rid, Path), ListRequest(Rid + 1, Path),
+                                                        CloseRequest(Rid + 1), CloseRequest(Rid)))
+      msg.toString mustBe s"RequestMessage(101,Some(20),List(ListRequest($Rid,$Path),...3 more))"
+    }
+
   }
 
   "ResponseMessage" should {
@@ -74,6 +86,16 @@ class DSAMessageSpec extends PlaySpec with GeneratorDrivenPropertyChecks {
       json mustBe Json.obj("msg" -> 101, "ack" -> 20, "responses" ->
         Json.arr(Json.obj("rid" -> 10, "stream" -> "closed"), Json.obj("rid" -> 11, "stream" -> "open")))
       json.as[DSAMessage] mustBe msg
+    }
+
+    "write single request in string" in {
+      val msg = ResponseMessage(101, Some(20), ScalaList(DSAResponse(10, Some(Closed))))
+      msg.toString mustBe s"ResponseMessage(101,Some(20),List(DSAResponse(10,Some(closed),None,None,None)))"
+    }
+
+    "truncate to head multiple requests in string" in {
+      val msg = ResponseMessage(101, Some(20), ScalaList(DSAResponse(10, Some(Closed)), DSAResponse(11, Some(Closed))))
+      msg.toString mustBe s"ResponseMessage(101,Some(20),List(DSAResponse(10,Some(closed),None,None,None),...1 more))"
     }
   }
 
