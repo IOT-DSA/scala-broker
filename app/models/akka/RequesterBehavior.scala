@@ -250,7 +250,7 @@ trait RequesterBehavior {
   private def batchAndRoute(requests: Iterable[(String, DSARequest)]) = {
     requests groupBy (_._1) mapValues (_.map(_._2)) foreach {
       case (to, reqs) =>
-        val header: DSAMap = Map("dsId" -> me.connInfo.dsId)
+        val header: DSAMap = Map("dsId" -> me.connInfo.dsId, "token" -> me.connInfo.tokenHash.getOrElse(""))
         val envelope = RequestEnvelope(reqs.toSeq, Some(header))
         log.debug("{}: sending {} to [{}]", ownId, envelope, to)
         dslinkMgr.dsaSend(to, envelope)

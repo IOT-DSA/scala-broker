@@ -29,8 +29,8 @@ case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = M
   }
 
   private def strType(value: DSAVal): Option[String] = value match {
-    case str: DSAValue[String] => Some(str.value)
-    case _ => None
+    case str: StringValue => Some(str.value)
+    case _                => None
   }
 
 }
@@ -309,7 +309,7 @@ class DistributedDSANode(_parent: Option[DSANode],
         case a: Any =>
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
-      case e @ RequestEnvelope(requests, _)      =>
+      case e @ RequestEnvelope(requests, _)   =>
         log.debug("{}: received {}", ownId, e)
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
@@ -321,9 +321,9 @@ class DistributedDSANode(_parent: Option[DSANode],
       // TODO: Extract following 2 methods (In the InMemoryDSANode too) into separated trait
       case AppendDsId2Token(name, value) =>
         appendDsId2config(name, value)
-      case GetTokens =>
+      case GetTokens                     =>
         getTokens(sender)
-      case a: Any =>
+      case a: Any                        =>
         log.warning("unhandled  message: {}", a)
     }
   }
@@ -346,7 +346,7 @@ class DistributedDSANode(_parent: Option[DSANode],
 
       val v = fIds.onComplete { item =>
         val values: DSAVal = item.get match {
-          case None => array(value)
+          case None      => array(value)
           case Some(arr) =>
             val srcVal = arr.asInstanceOf[ArrayValue].value.toSeq
             if (srcVal.contains(StringValue(value)))

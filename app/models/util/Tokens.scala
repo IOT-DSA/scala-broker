@@ -2,6 +2,7 @@ package models.util
 
 import models.api.DSANode
 import org.bouncycastle.jcajce.provider.digest.SHA256
+import play.api.Logger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -12,6 +13,16 @@ import scala.util.Random
   */
 object Tokens {
 
+  protected val log = Logger(getClass)
+
+  /**
+    * Extracts the first 16 digits of the token.
+    *
+    * @param token
+    * @return
+    */
+  def getTokenId(token: String) = token.take(16)
+
   /**
     * Creates a unique token for the node.
     *
@@ -20,7 +31,7 @@ object Tokens {
     */
   def makeTokenForNode(dsaNode: DSANode): Future[String] = {
     val token = createToken()
-    val tokenId = token.take(16)
+    val tokenId = getTokenId(token)
 
     dsaNode.child(tokenId).flatMap {
       case None => Future(token)
@@ -34,7 +45,7 @@ object Tokens {
     * @param curToken
     * @return
     */
-  def regenerate(curToken: String): String = curToken.take(16) + createToken().drop(16)
+  def regenerate(curToken: String): String = getTokenId(curToken) + createToken().drop(16)
 
   /**
     * Creates a new random token.
