@@ -155,8 +155,6 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
       Await.result(right.child("child1"), 1 second) shouldBe None
       Await.result(left.child("child1"), 1 second) shouldBe None
-
-
     }
 
     "description initialized properly" in {
