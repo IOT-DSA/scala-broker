@@ -7,12 +7,12 @@ import models.rpc.DSAValue
 
 @SerialVersionUID(1L)
 final case class DistributedDSANodeState(
-                                          value:LWWRegister[DSAValue[_]],
-                                          configs:LWWMap[String, DSAValue[_]],
-                                          attributes:LWWMap[String, DSAValue[_]],
-                                          subscriptions:LWWMap[Int, ActorRef],
-                                          listSubscriptions:LWWMap[Int, ActorRef],
-                                          children: LWWMap[String, DSANodeDescription]
+                                          value:LWWRegister[Option[DSAValue[_]]],
+                                          configs:LWWMap[String, Option[DSAValue[_]]],
+                                          attributes:LWWMap[String, Option[DSAValue[_]]],
+                                          subscriptions:LWWMap[Int, Option[ActorRef]],
+                                          listSubscriptions:LWWMap[Int, Option[ActorRef]],
+                                          children: LWWMap[String, Option[DSANodeDescription]]
                                         ) extends ReplicatedData {
 
   type T = DistributedDSANodeState
@@ -30,7 +30,7 @@ final case class DistributedDSANodeState(
 object DistributedDSANodeState{
 
   def empty(implicit cluster:Cluster) = DistributedDSANodeState(
-    LWWRegister(""),
+    LWWRegister(None),
     LWWMap.empty,
     LWWMap.empty,
     LWWMap.empty,
