@@ -30,10 +30,11 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter{ me: Persisten
   type ResponseHandler = PartialFunction[DSAResponse, List[(Routee, DSAResponse)]]
 
   // stores call records for forward and reverse RID lookup
-  private var ridRegistry = new RidRegistry(new PartOfPersistentResponderBehavior(ownId, log))
+  private val registryPersistentBehavior = new PartOfPersistentResponderBehavior(ownId, log)
+  private var ridRegistry = RidRegistry(registryPersistentBehavior)
 
   // stores call records for forward and reverse SID lookup (SUBSCRIBE/UNSUBSCRIBE only)
-  private var sidRegistry = new SidRegistry(new PartOfPersistentResponderBehavior(ownId, log))
+  private var sidRegistry = SidRegistry(registryPersistentBehavior)
 
   // stores responder's nodes' attributes locally
   private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
@@ -42,7 +43,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter{ me: Persisten
   private val requestHandler = handlePasstroughRequest orElse handleListRequest orElse
     handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
-  private val mainResponderBehaviorState = MainResponderBehaviorState(ridRegistry, sidRegistry, attributes)
+  private val mainResponderBehaviorState = MainResponderBehaviorState(ridRegistry.state, sidRegistry.state, attributes)
 
   def onPersistRegistry: Unit = saveResponderBehaviorSnapshot(mainResponderBehaviorState)
 
@@ -80,8 +81,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter{ me: Persisten
       addAttribute(event.nodePath, event.name, event.value)
     case offeredSnapshot: MainResponderBehaviorState =>
       log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
-      ridRegistry = offeredSnapshot.ridRegistry
-      sidRegistry = offeredSnapshot.sidRegistry
+      ridRegistry = RidRegistry(registryPersistentBehavior, offeredSnapshot.ridRegistry)
+      sidRegistry = SidRegistry(registryPersistentBehavior, offeredSnapshot.sidRegistry)
       attributes = offeredSnapshot.attributes
   }
 

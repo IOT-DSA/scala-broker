@@ -38,7 +38,7 @@ class WebSocketActor(sinkRef: SinkRef[DSAMessage], routee: Routee, config: WebSo
   protected val linkName = ci.linkName
   protected val ownId = s"WSActor[$linkName]-${UUID.randomUUID.toString}"
 
-  private val localMsgId = new IntCounter(1)
+  private val localMsgId = IntCounter(1)
 
   private val startTime = DateTime.now
 
