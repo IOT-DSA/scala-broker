@@ -413,7 +413,6 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   def collectDiffSet[K, V](newValues: Map[K, Option[V]], oldValues: Map[K, V]): DiffSet[K, V] = {
     val (deleted, upserted) = newValues.partition(_._2.isEmpty)
-    log.info("deleted:{}, updated:{}", deleted, upserted)
     try{
       val (created, other) = upserted.map(kv => (kv._1, kv._2.get)).partition { case (k, _) => oldValues.get(k).isEmpty }
       val updated = other.filter { case (key, value) => oldValues.get(key).isDefined && oldValues(key) != value }
