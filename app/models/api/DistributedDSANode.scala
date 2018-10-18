@@ -389,7 +389,6 @@ class DistributedDSANode(_parent: Option[DSANode],
     withUpdated -- diff.deleted
   }
 
-
   private[this] def editProperty[T](transform: DistributedDSANodeState => DistributedDSANodeState, maybePromise: Option[PromiseRef[T]] = None) = {
     // we don't want state to be send with empty state as new
     val u = Update(dataKey, empty, writeLocal, maybePromise)(transform)
