@@ -22,15 +22,15 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 case class DSANodeDescription(path: String, attrAndConf: Map[String, DSAVal] = Map(), value: DSAVal = StringValue("")) {
-  def profile: Option[String] = attrAndConf.get("$is").flatMap(strType _)
+  def profile: Option[String] = attrAndConf.get("$is").flatMap(strType)
 
   def valueType: Option[DSAValueType] = attrAndConf.get("$type").flatMap { v =>
-    strType(v).map(DSAValueType.byName(_))
+    strType(v).map(DSAValueType.byName)
   }
 
   private def strType(value: DSAVal): Option[String] = value match {
     case str: DSAValue[String] => Some(str.value)
-    case _                             => None
+    case _ => None
   }
 
 }
@@ -70,10 +70,9 @@ class DistributedDSANode(_parent: Option[DSANode],
   val _system: ActorSystem = system
 
   //actors behaviors would be better, but we work with typed actor
-  private var stateInitialized = false;
+  private var stateInitialized = false
 
   protected val log = Logging(TypedActor.context.system, getClass)
-  protected var initialData = nodeDescription.attrAndConf
 
   protected def ownId = s"ddNode[$path]"
 
@@ -81,9 +80,9 @@ class DistributedDSANode(_parent: Option[DSANode],
   override protected var _sids: Map[Int, ActorRef] = Map.empty
   override protected var _rids: Map[Int, ActorRef] = Map.empty
   override implicit val executionContext: ExecutionContext = TypedActor.context.dispatcher
-  val name = path.split("/").last
-  implicit val self = TypedActor.context.self
-  private[this] var data = DistributedDSANode.initialData(nodeDescription, initialVal)
+  val name: String = path.split("/").last
+  implicit val self: ActorRef = TypedActor.context.self
+  private[this] var data = DistributedDSANode.initialData(nodeDescription, initialVal, name)
 
   override protected def _configs: Map[String, DSAVal] = data.configs
 
@@ -95,14 +94,14 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   replicator ! Subscribe(dataKey, self)
 
-  val timeout = Settings.QueryTimeout
+  val timeout: FiniteDuration = Settings.QueryTimeout
 
-  implicit val implicitTimeout = Timeout(timeout)
+  implicit val implicitTimeout: Timeout = Timeout(timeout)
 
-  override def value: Future[DSAVal] = Future.successful(data.value)
+  override def value: Future[DSAVal] = Future.successful(data.value.getOrElse(DSAValue.StringValue("")))
 
   override def value_=(v: DSAVal): Unit = editProperty { old =>
-    old.copy(value = old.value.withValue(v))
+    old.copy(value = old.value.withValue(Some(v)))
   }
 
 
@@ -115,7 +114,7 @@ class DistributedDSANode(_parent: Option[DSANode],
     .map(DSAValueType.byName)
 
   override def valueType_=(vt: DSAValueType): Unit = editProperty { old =>
-    old.copy(configs = old.configs + ("$type" -> vt.toString))
+    old.copy(configs = old.configs + ("$type" -> Some(vt.toString)))
   }
 
   override def displayName: Future[String] = Future.successful(
@@ -125,7 +124,7 @@ class DistributedDSANode(_parent: Option[DSANode],
   )
 
   override def displayName_=(name: String): Unit = editProperty { old =>
-    old.copy(configs = old.configs + ("$name" -> name))
+    old.copy(configs = old.configs + ("$name" -> Some(name)))
   }
 
 
@@ -135,7 +134,7 @@ class DistributedDSANode(_parent: Option[DSANode],
 
 
   override def profile_=(p: String): Unit = editProperty { old =>
-    old.copy(configs = old.configs + ("$is" -> p))
+    old.copy(configs = old.configs + ("$is" -> Some(p)))
   }
 
 
@@ -145,18 +144,14 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   override def addConfigs(cfg: (String, DSAVal)*): Unit = {
     editProperty { old =>
-      val newConf = cfg.map(addSuffix("$")).foldLeft(old.configs)((c, next) => c + next)
+      val newConf = cfg.map(addSuffix("$")).foldLeft(old.configs)((c, next) => c + (next._1 -> Some(next._2)))
       old.copy(configs = newConf)
     }
   }
 
   override def removeConfig(name: String): Unit = {
-    val default = initialData.get(name)
-
-    default.foreach { value =>
-      editProperty { old =>
-        old.copy(configs = old.configs + (name -> value))
-      }
+    editProperty { old =>
+      old.copy(configs = old.configs + (name -> None))
     }
   }
 
@@ -165,11 +160,11 @@ class DistributedDSANode(_parent: Option[DSANode],
   override def attribute(name: String): Future[Option[DSAVal]] = Future.successful(data.attributes.get(name))
 
   override def addAttributes(cfg: (String, DSAVal)*): Unit = editProperty { old =>
-    old.copy(attributes = cfg.map(addSuffix("@")).foldLeft(old.attributes)((a, next) => a + next))
+    old.copy(attributes = cfg.map(addSuffix("@")).foldLeft(old.attributes)((a, next) => a + (next._1 -> Some(next._2))))
   }
 
   override def removeAttribute(name: String): Unit = editProperty { old =>
-    old.copy(attributes = old.attributes - name)
+    old.copy(attributes = old.attributes + (name -> None))
   }
 
   override def children: Future[Map[String, DSANode]] = Future.successful(_children)
@@ -190,7 +185,7 @@ class DistributedDSANode(_parent: Option[DSANode],
     _children += (name -> node)
 
     editProperty({ old =>
-      old.copy(children = old.children + (name -> DSANodeDescription.init(node.path, Some(node.profile), valueTypeSync)))
+      old.copy(children = old.children + (name -> Some(DSANodeDescription.init(node.path, Some(node.profile), valueTypeSync))))
     })
 
     Future.successful(node)
@@ -209,13 +204,13 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   override def removeChild(name: String): Unit = {
     editProperty { old =>
-      old.copy(children = old.children - name)
+      old.copy(children = old.children + (name -> None))
     }
   }
 
   override def action: Option[DSAAction] = _action
 
-  override def action_=(a: DSAAction) = {
+  override def action_=(a: DSAAction): Unit = {
     _action = Some(a)
   }
 
@@ -227,117 +222,60 @@ class DistributedDSANode(_parent: Option[DSANode],
   }
 
   override def subscribe(sid: Int, ref: ActorRef): Unit = editProperty { old =>
-    old.copy(subscriptions = old.subscriptions + (sid -> ref))
+    old.copy(subscriptions = old.subscriptions + (sid -> Some(ref)))
   }
 
   override def unsubscribe(sid: Int): Unit = editProperty { old =>
-    old.copy(subscriptions = old.subscriptions - sid)
+    old.copy(subscriptions = old.subscriptions + (sid -> None))
   }
 
   override def list(rid: Int, ref: ActorRef): Unit = editProperty { old =>
-    old.copy(listSubscriptions = old.listSubscriptions + (rid -> ref))
+    old.copy(listSubscriptions = old.listSubscriptions + (rid -> Some(ref)))
   }
 
   override def unlist(rid: Int): Unit = editProperty { old =>
-    old.copy(listSubscriptions = old.listSubscriptions - rid)
+    old.copy(listSubscriptions = old.listSubscriptions + (rid -> None))
   }
 
   private[this] def isLocal(ref: ActorRef): Boolean = ref.path.address == self.path.address
 
 
-  private[this] def updateLocalState(update: ReplicatedData) = update match {
+  private[this] def updateLocalState(update: ReplicatedData): Unit = update match {
     case d: DistributedDSANodeState =>
-      val newData = toLocalData(d)
 
-      val createdChildren = newData
-        .children
-        .filter(kv => !data.children.contains(kv._1))
-        .filter(kv => kv._2.attrAndConf.get("$is").isDefined) //in case of
+      val diff = collectDiff(d)
+
+      val createdChildren = diff.childrenDiff
+        .created
+        .filter(kv => kv._2.attrAndConf.get("$is").isDefined)
 
       val createdNodes: Future[Map[String, DSANode]] = if (createdChildren.isEmpty) {
         Future.successful(Map())
       } else {
-        (registry ? GetNodesByDescription(createdChildren.map(_._2).toSeq)).mapTo[Map[String, DSANode]]
+        (registry ? GetNodesByDescription(createdChildren.values.toSeq)).mapTo[Map[String, DSANode]]
       }
 
       createdNodes.foreach({ ch =>
 
-        def defaultIfEmpty(in: String, default: String) = if (in == null || in.isEmpty) default else in
+        val report = updatesReport(diff)
 
-        val newChildren = createdChildren.map { case (path, description) =>
-          array(path, obj(description.attrAndConf.toSeq: _*))
+        _children --= diff.childrenDiff.deleted
+        _sids = foldDiff(_sids, diff.subscriptionsDiff).filter(kv => isLocal(kv._2))
+        _rids = foldDiff(_rids, diff.listSubscriptionsDiff).filter(kv => isLocal(kv._2))
+
+        if(report.nonEmpty){
+          log.debug("sending updates to list subscriptions: {}", report)
+          notifyListActors(report.toArray[DSAVal]: _*)
         }
 
-        log.debug("new children \nnode:{} \nnewCHildren:{}", path, newChildren)
+        if(diff.valueDiff.isDefined) notifySubscribeActors(diff.valueDiff.get.getOrElse(StringValue("")))
 
-        val attrDiff = newData.attributes
-          .filter { case (k, v) => !data.attributes.get(k).isDefined || data.attributes(k) != v }
-
-        initialData ++= attrDiff.filter { case (k, _) => !initialData.contains(k) }
-
-        val confDiff = newData.configs
-          .filter { case (k, v) => !data.configs.get(k).isDefined || data.configs(k) != v }
-
-        initialData ++= confDiff.filter { case (k, _) => !initialData.contains(k) }
-
-        val removedAttr = data.attributes
-          .keySet.diff(newData.attributes.keySet)
-
-        val removedConf = data.configs
-          .keySet.diff(newData.configs.keySet)
-
-        //        val deleted = (
-        //          data.children.keySet.diff(newData.children.keySet)
-        //        ).map(n => obj("name" -> n, "change" -> "remove"))
-
-        _sids = newData.subscriptions.filter(kv => isLocal(kv._2))
-        _rids = newData.listSubscriptions.filter(kv => isLocal(kv._2))
-
-        log.debug("replicating data for \nnode:{} \nold:{}, \nnew:{}", path, data, newData)
-
-        val newAttr = newData.attributes ++ removedAttr
-          .filter(initialData.contains(_))
-          .map(k => (k -> initialData(k))).toMap[String, DSAVal]
-
-
-        val newConf = newData.configs ++ removedAttr
-          .filter(initialData.contains(_))
-          .map(k => (k -> initialData(k))).toMap[String, DSAVal]
-
-        val confUpdates = newConf.map { case (k, v) => array(k, v) }
-        val attrUpdates = newAttr.map { case (k, v) => array(k, v) }
-
-        if (data.value != newData.value) notifySubscribeActors(newData.value)
-
-        data = data.copy(
-          value = newData.value,
-          configs = data.configs ++ newConf,
-          attributes = data.attributes ++ newAttr,
-          subscriptions = newData.subscriptions,
-          listSubscriptions = newData.listSubscriptions,
-          children = newData.children
-        )
-
-        val updates = newChildren ++ attrUpdates ++ confUpdates // ++ deleted
-
-        if (!updates.isEmpty) {
-          log.debug("sending updates to list subscriptions: {}", updates)
-          notifyListActors(updates.toArray[DSAVal]: _*)
-        }
+        data = newDataFromDiff(diff)
       })
 
     case _ =>
       log.warning("Unsupported data type: {}", data)
   }
-
-  private[this] def toLocalData(d: DistributedDSANodeState): DistributedDSANodeData = DistributedDSANodeData(
-    d.value.value,
-    d.configs.entries,
-    d.attributes.entries,
-    d.subscriptions.entries,
-    d.listSubscriptions.entries,
-    d.children.entries
-  )
 
   private[this] def addSuffix(suffix: String)(tuple: (String, DSAValue.DSAVal)): (String, DSAValue.DSAVal) = {
     (if (tuple._1.startsWith(suffix)) tuple._1 else suffix + tuple._1) -> tuple._2
@@ -346,7 +284,7 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   override def onReceive(message: Any, sender: ActorRef): Unit = {
     message match {
-      case g @ GetSuccess(dataKey, Some(msg)) => msg match {
+      case g@GetSuccess(dataKey, Some(msg)) => msg match {
         case InitMe =>
           updateLocalState(g.get(dataKey))
           stash.foreach {
@@ -359,7 +297,7 @@ class DistributedDSANode(_parent: Option[DSANode],
         case a: Any =>
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
-      case NotFound(dataKey, Some(msg))       => msg match {
+      case NotFound(dataKey, Some(msg)) => msg match {
         case InitMe =>
           stash.foreach {
             replicator ! _
@@ -371,13 +309,13 @@ class DistributedDSANode(_parent: Option[DSANode],
         case a: Any =>
           log.warning("handler for message is not implemented:{}:{}", a, a.getClass)
       }
-      case e @ RequestEnvelope(requests)      =>
+      case e@RequestEnvelope(requests) =>
         log.debug("{}: received {}", ownId, e)
         val responses = requests flatMap handleRequest(sender)
         sender ! ResponseEnvelope(responses)
-      case u: UpdateResponse[_]               ⇒ // ignore
+      case u: UpdateResponse[_] ⇒ // ignore
         log.debug("{}: state successfully updated: {}", ownId, u.key)
-      case c @ Changed(dataKey)               ⇒
+      case c@Changed(dataKey) ⇒
         log.debug("Current elements: {}", c.get(dataKey))
         updateLocalState(c.get(dataKey))
       // TODO: Extract following 2 methods (In the InMemoryDSANode too) into separated trait
@@ -385,12 +323,12 @@ class DistributedDSANode(_parent: Option[DSANode],
         appendDsId2config(name, value)
       case GetTokens =>
         getTokens(sender)
-      case a: Any                             =>
+      case a: Any =>
         log.warning("unhandled  message: {}", a)
     }
   }
 
-  private def getTokens(sender: ActorRef) = {
+  private def getTokens(sender: ActorRef): Unit = {
     log.info(s"$ownId: GetTokens received")
 
     val fResponse = children.map { m =>
@@ -434,6 +372,24 @@ class DistributedDSANode(_parent: Option[DSANode],
     log.info("{} stopped", ownId)
   }
 
+  def newDataFromDiff(diff: DataDiff): DistributedDSANodeData = {
+    data.copy(
+      value = if(diff.valueDiff.isDefined) diff.valueDiff.get else data.value,
+      configs = foldDiff(data.configs, diff.configsDiff),
+      attributes = foldDiff(data.attributes, diff.attributesDiff),
+      subscriptions = foldDiff(data.subscriptions, diff.subscriptionsDiff),
+      listSubscriptions = foldDiff(data.listSubscriptions, diff.listSubscriptionsDiff),
+      children = foldDiff(data.children, diff.childrenDiff)
+    )
+  }
+
+  def foldDiff[K, V](initial:Map[K,V], diff:DiffSet[K, V]):Map[K,V] = {
+    val withNew = initial ++ diff.created
+    val withUpdated = withNew ++ diff.updated
+    withUpdated -- diff.deleted
+  }
+
+
   private[this] def editProperty[T](transform: DistributedDSANodeState => DistributedDSANodeState, maybePromise: Option[PromiseRef[T]] = None) = {
     // we don't want state to be send with empty state as new
     val u = Update(dataKey, empty, writeLocal, maybePromise)(transform)
@@ -446,22 +402,77 @@ class DistributedDSANode(_parent: Option[DSANode],
 
   private[this] def empty = DistributedDSANodeState.empty
 
+  def collectDiff(state: DistributedDSANodeState): DataDiff = DataDiff(
+    valueDiff = if (state.value.value != data.value) Some(state.value.value) else None,
+    configsDiff = collectDiffSet(state.configs.entries, data.configs),
+    attributesDiff = collectDiffSet(state.attributes.entries, data.attributes),
+    listSubscriptionsDiff = collectDiffSet(state.listSubscriptions.entries, data.listSubscriptions),
+    subscriptionsDiff = collectDiffSet(state.subscriptions.entries, data.subscriptions),
+    childrenDiff = collectDiffSet(state.children.entries, data.children)
+  )
+
+  def collectDiffSet[K, V](newValues: Map[K, Option[V]], oldValues: Map[K, V]): DiffSet[K, V] = {
+    val (deleted, upserted) = newValues.partition(_._2.isEmpty)
+    log.info("deleted:{}, updated:{}", deleted, upserted)
+    try{
+      val (created, other) = upserted.map(kv => (kv._1, kv._2.get)).partition { case (k, _) => oldValues.get(k).isEmpty }
+      val updated = other.filter { case (key, value) => oldValues.get(key).isDefined && oldValues(key) != value }
+
+      DiffSet(
+        deleted = deleted.keys.toSet,
+        created = created,
+        updated = updated
+      )
+    } catch {
+      case e:Exception =>
+        DiffSet(Map(), Map(), Set())
+    }
+
+  }
+
+  def updatesReport(diff: DataDiff): Iterable[DSAVal] = {
+
+    val dsValMapper: ((String, DSAVal)) => DSAVal = {case (k, v) => array(k, v)}
+    val dSANodeDescriptionMapper: ((String, DSANodeDescription)) => DSAVal = {case (k, v) => array(k, obj(v.attrAndConf.toSeq: _*))}
+
+    val confDiff = collectReport[DSAVal](diff.configsDiff, dsValMapper)
+    val attrDiff = collectReport[DSAVal](diff.attributesDiff, dsValMapper)
+    val childrenDiff = collectReport[DSANodeDescription](diff.childrenDiff, dSANodeDescriptionMapper)
+
+    confDiff ++ attrDiff ++ childrenDiff
+  }
+
+  def collectReport[T](diff: DiffSet[String, T], mapper: ((String, T)) => DSAVal): Iterable[DSAVal] = {
+    (diff.created.map(mapper(_)) ++ diff.updated.map(mapper(_))) ++ diff.deleted.map(toDeleteReport)
+  }
+
+  def toDeleteReport(key: String): DSAVal = obj("name" -> key, "change" -> "remove")
+
 }
+
+case class DataDiff(valueDiff: Option[Option[DSAVal]],
+                    configsDiff: DiffSet[String, DSAVal],
+                    attributesDiff: DiffSet[String, DSAVal],
+                    subscriptionsDiff: DiffSet[Int, ActorRef],
+                    listSubscriptionsDiff: DiffSet[Int, ActorRef],
+                    childrenDiff: DiffSet[String, DSANodeDescription])
+
+case class DiffSet[K, V](created: Map[K, V], updated: Map[K, V], deleted: Set[K])
 
 /**
   * Factory for [[DistributedDSANode]] instances.
   */
 object DistributedDSANode {
 
-  def initialData(nodeDescription: DSANodeDescription, value: DSAVal) = {
+  def initialData(nodeDescription: DSANodeDescription, value: DSAVal, name:String): DistributedDSANodeData = {
     DistributedDSANodeData(
-      value,
-      configs = nodeDescription.attrAndConf.filter(_._1.startsWith("$")),
+      Some(value),
+      configs = nodeDescription.attrAndConf.filter(_._1.startsWith("$")) + ("$name" -> StringValue(name)),
       attributes = nodeDescription.attrAndConf.filter(_._1.startsWith("@"))
     )
   }
 
-  case class DistributedDSANodeData(value: DSAVal,
+  case class DistributedDSANodeData(value: Option[DSAVal],
                                     configs: Map[String, DSAVal] = Map("$is" -> "node"),
                                     attributes: Map[String, DSAVal] = Map(),
                                     subscriptions: Map[Int, ActorRef] = Map(),

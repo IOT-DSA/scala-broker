@@ -43,7 +43,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
       When("change value on Int in first node")
       left.valueType = DSAValueType.DSANumber
-      left.value = 99999
+      left.value = NumericValue(99999)
       TimeUnit.MILLISECONDS.sleep(500)
       Then("value should be changed in right")
       val rightValue2 = Await.result(right.value, 2 seconds)
@@ -57,7 +57,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
     "add delete and change attributes" in withDistributedNodes("2555", "2556") { case (left, right) =>
 
       When("create attribute in first node")
-      left.addAttributes(("@first" -> "firstVal"), ("second" -> 123))
+      left.addAttributes(("@first" -> "firstVal"), ("second" -> NumericValue(123)))
 
       TimeUnit.MILLISECONDS.sleep(500)
 
@@ -83,14 +83,14 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
       TimeUnit.MILLISECONDS.sleep(500)
 
       Then("attribute should be droped to initial value")
-      Await.result(right.attribute("@first"), 1 second).get shouldBe StringValue("firstVal")
+      Await.result(right.attribute("@first"), 1 second) shouldBe None
 
     }
 
     "add delete and change configs" in withDistributedNodes("2555", "2556") { case (left, right) =>
 
       When("create config in first node")
-      left.addConfigs(("$first" -> "firstVal"), ("second" -> 123))
+      left.addConfigs(("$first" -> "firstVal"), ("second" -> NumericValue(123)))
 
       TimeUnit.MILLISECONDS.sleep(500)
 
@@ -117,7 +117,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
       TimeUnit.MILLISECONDS.sleep(500)
 
       Then("config should be dropped to initial value")
-      Await.result(right.config("$first"), 1 second).get shouldBe StringValue("firstVal")
+      Await.result(right.config("$first"), 1 second) shouldBe None
 
     }
 
@@ -133,17 +133,30 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
 
       TimeUnit.SECONDS.sleep(3)
 
+      val leftChildren = Await.result(left.children, 1 second)
       val rightChildren = Await.result(right.children, 1 second)
+
 
       rightChildren.get("child1").isDefined shouldBe true
       rightChildren.get("child2").isDefined shouldBe true
 
       rightChildren("child1").parent shouldBe Some(right)
 
+      rightChildren.map(_._1).toSet shouldBe leftChildren.map(_._1).toSet
+
       child1.profile shouldBe "broker/dataNode"
       rightChildren("child1").profile shouldBe "broker/dataNode"
 
       Await.result(rightChildren("child1").children, 1 second)("grandChild").parent.get shouldBe rightChildren.get("child1").get
+
+      right.removeChild("child1")
+
+      TimeUnit.SECONDS.sleep(3)
+
+      Await.result(right.child("child1"), 1 second) shouldBe None
+      Await.result(left.child("child1"), 1 second) shouldBe None
+
+
     }
 
     "description initialized properly" in {
@@ -156,7 +169,7 @@ class DistributedNodeSpec extends WordSpecLike with ClusterKit
         "@attr" -> attr
       )
 
-      val data = DistributedDSANode.initialData(DSANodeDescription("/somePath", map), "")
+      val data = DistributedDSANode.initialData(DSANodeDescription("/somePath", map), "", "name")
 
       data.configs.get("$conf") shouldBe Some(conf)
       data.attributes.get("@attr") shouldBe Some(attr)
