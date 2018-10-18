@@ -17,3 +17,5 @@ addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.0")
 addSbtPlugin("com.typesafe.sbt" % "sbt-multi-jvm" % "0.4.0")
 
 addSbtPlugin("com.github.mwz" % "sbt-sonar" % "1.5.0")
+
+addSbtPlugin("com.github.sbt" % "sbt-findbugs" % "2.0.0")
