@@ -22,7 +22,7 @@ class BenchmarkRequester(linkName: String, routee: Routee, config: BenchmarkRequ
 
   import context.dispatcher
 
-  private val ridGen = new IntCounter(1)
+  private val ridGen = IntCounter(1)
   private var invokeJob: Cancellable = null
 
   private var lastReportedAt: DateTime = _

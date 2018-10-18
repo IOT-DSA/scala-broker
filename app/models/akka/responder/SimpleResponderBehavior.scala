@@ -16,7 +16,7 @@ trait SimpleResponderBehavior extends ResponderBehavior { me: PersistentActor wi
   private val subsRegistry = new SubscribeCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-SUBS", log))
 
   val simpleResponderRecover: Receive = {
-    case  event: GroupCallRegistryRestoreProcess =>
+    case event: GroupCallRegistryRestoreProcess =>
       log.debug("{}: recovering with event {}", ownId, event)
       if (event.value == RegistryType.LIST) listRegistry.restoreGroupCallRegistry(event)
       if (event.value == RegistryType.SUBS) subsRegistry.restoreGroupCallRegistry(event)

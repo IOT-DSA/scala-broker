@@ -8,7 +8,8 @@ import models.Origin
 import models.akka.DSLinkMode.DSLinkMode
 import models.akka.Messages.LinkState
 import models.akka.local.LocalDSLinkFolderActor
-import models.akka.responder.RidRegistry.LookupRecord
+import models.akka.responder.RidRegistry.{LookupRecord, RidRegistryState}
+import models.akka.responder.SidRegistry.SidRegistryState
 import models.akka.responder._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.DSAVal
@@ -47,7 +48,7 @@ case class RequesterBehaviorState(targetsByRid: MutableMap[Int, String], targets
   */
 sealed trait AbstractResponderBehaviorState
 case class ResponderBehaviorState(main: MainResponderBehaviorState, additional: AbstractResponderBehaviorState)
-case class MainResponderBehaviorState(ridRegistry: RidRegistry, sidRegistry: SidRegistry, attributes: MutableMap[String, ImmutableMap[String, DSAVal]])
+case class MainResponderBehaviorState(ridRegistry: RidRegistryState, sidRegistry: SidRegistryState, attributes: MutableMap[String, ImmutableMap[String, DSAVal]])
 case class SimpleResponderBehaviorState(listBindings: ImmutableMap[Int, GroupCallRecord], subsBindings: ImmutableMap[Int, GroupCallRecord]) extends AbstractResponderBehaviorState
 case class PooledResponderBehaviorState(listPool: ConsistentHashingPool, subsPool: ConsistentHashingPool) extends AbstractResponderBehaviorState
 
