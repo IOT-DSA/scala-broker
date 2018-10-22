@@ -58,34 +58,34 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
     "route requests to broker root" in {
       val requests = List(ListRequest(1, "/"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      brokerProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> ""))))
+      brokerProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> "", "token" -> ""))))
     }
     "route requests to downstream" in {
       val requests = List(ListRequest(1, "/downstream"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      downstreamProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> ""))))
+      downstreamProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> "", "token" -> ""))))
     }
     "route requests to links" in {
       val requests = List(ListRequest(1, "/downstream/abc def"))
       requester.tell(RequestMessage(1, None, requests), ws.ref)
-      abcProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> ""))))
+      abcProbe.expectMsg(RequestEnvelope(requests, Some(Map("dsId" -> "", "token" -> ""))))
     }
     "forward responses to WS" in {
       val envelope = ResponseEnvelope(List(DSAResponse(1)))
       requester.tell(envelope, testActor)
       ws.expectMsg(envelope)
     }
-//    "has to be recovered" in {
-//      requester ! PoisonPill
-//      downstreamProbe.expectMsg(UnregisterDSLink("requester"))
-//
-//      Thread.sleep(500)
-//      val requesterRecovered = system.actorOf(Props(new Requester(dslinkMgr, ActorRefRoutee(downstreamActor))), "requester")
-//
-//      whenReady(requesterRecovered ? GetLinkInfo) (inside(_) {
-//        case LinkInfo(connInfo, _, _, _) => connInfo mustBe ci
-//      })
-//    }
+    "has to be recovered" in {
+      requester ! PoisonPill
+      downstreamProbe.expectMsg(UnregisterDSLink("requester"))
+
+      Thread.sleep(500)
+      val requesterRecovered = system.actorOf(Props(new Requester(dslinkMgr, ActorRefRoutee(downstreamActor))), "requester")
+
+      whenReady(requesterRecovered ? GetLinkInfo) (inside(_) {
+        case LinkInfo(connInfo, _, _, _) => connInfo mustBe ci
+      })
+    }
   }
 }
 
