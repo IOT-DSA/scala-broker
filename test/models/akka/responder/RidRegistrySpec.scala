@@ -4,7 +4,9 @@ import akka.routing.ActorSelectionRoutee
 import akka.testkit.TestProbe
 import models.Origin
 import models.akka.AbstractActorSpec
+import models.akka.IntCounter.IntCounterState
 import models.util.PartOfPersistenceBehaviorStub
+import collection.mutable.{Map => MutableMap}
 
 /**
  * RidRegistry test suite.
@@ -14,8 +16,9 @@ class RidRegistrySpec extends AbstractActorSpec {
   import models.rpc.DSAMethod._
 
   val Seq(a1, a2, a3) = (1 to 3) map (_ => ActorSelectionRoutee(system.actorSelection(TestProbe().ref.path)))
-
-  val registry = new RidRegistry(new PartOfPersistenceBehaviorStub)
+  def state = RidRegistryState(IntCounterState(1, 1), MutableMap.empty[Int, LookupRecord],
+    MutableMap.empty[Origin, LookupRecord], MutableMap.empty[String, LookupRecord])
+  val registry = new RidRegistry(new PartOfPersistenceBehaviorStub, state)
 
   "RidRegistry" should {
     "save/retrieve/remove LIST lookups" in {
