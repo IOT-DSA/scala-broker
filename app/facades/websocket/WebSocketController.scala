@@ -292,54 +292,31 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
     }
   }
 
-  private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: Option[String]): Boolean = {
-    if (Settings.AllowAllLinks)
-      true
-    else si.map(_.ci).fold(false) { ci =>
+  private def validateAuth(si: Option[DSLinkSessionInfo], clientAuth: Option[String]): Boolean =
+    Settings.AllowAllLinks || si.map(_.ci).exists { ci =>
       val localAuth = LocalKeys.saltSharedSecret(ci.salt.getBytes, ci.sharedSecret)
       clientAuth.getOrElse("") == localAuth
     }
-  }
 
-  private def checkToken(si: Option[DSLinkSessionInfo]): Boolean = {
-    if (Settings.AllowAllLinks)
-      true
-    else si.map(_.ci).fold({
-      log.warn("Token is absent!");
-      false
-    }) { ci =>
-      val token = ci.tokenHash
-      val dsaPath = "/sys/tokens"
+  private def checkToken(si: Option[DSLinkSessionInfo]): Boolean = Settings.AllowAllLinks ||
+    si.flatMap(_.ci.tokenHash).exists { token =>
+      val tokenId = token.take(16)
 
-      if (token.isEmpty)
-        log.warn("Client token is absent!")
+      val fActiveTokens = dslinkMgr.dsaAsk("/sys/tokens", GetTokens).mapTo[List[DSANode]]
 
-      val fActiveTokens = dslinkMgr.dsaAsk(dsaPath, GetTokens).mapTo[List[DSANode]]
-
-      val fExist = fActiveTokens.map { listNodes =>
-        log.debug("Available tokens are: " + listNodes.toString)
-        val tokenId = token.flatMap(a => Option(a.substring(0, 16)))
-
-        listNodes foreach (item => log.debug("node name is: " + item.name))
-
-        val r = listNodes.indexWhere(tokenId.isDefined && _.name.equals(tokenId.get))
-
-        r match {
-          case -1 => false
-          case i =>
-            val tokenNode = listNodes(i)
-            val check = for {
-              checkCount <- checkTokenCount(tokenId.get, tokenNode)
-              checkDate <- checkTokenDates(tokenId.get, tokenNode)
-            } yield checkCount && checkDate
-            Await.result(check, Duration.Inf)
-        }
+      val fExists = fActiveTokens.flatMap { listNodes =>
+        log.debug("Available tokens found: " + listNodes.map(_.name).mkString)
+        val found = listNodes.find(_.name == tokenId)
+        found.map(tokenNode => for {
+          checkCount <- checkTokenCount(tokenId, tokenNode)
+          checkDate <- checkTokenDates(tokenId, tokenNode)
+        } yield checkCount && checkDate
+        ).getOrElse(Future.successful(false))
       }
 
-      // TODO: try to avoid Await here
-      Await.result(fExist, Duration.Inf)
+      // TODO: rewrite to avoid Await here
+      Await.result(fExists, Duration.Inf)
     }
-  }
 
   def checkTokenDates(tokenId: String, tokenNode: DSANode) = {
     val dateRange = tokenNode.config("$timeRange")
