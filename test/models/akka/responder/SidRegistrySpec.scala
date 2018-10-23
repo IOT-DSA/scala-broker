@@ -15,6 +15,7 @@ class SidRegistrySpec extends AbstractActorSpec {
   val state = SidRegistryState(IntCounterState(1, 1), MutableMap.empty[Int, String], MutableMap.empty[String, Int])
   val registry = new SidRegistry(new PartOfPersistenceBehaviorStub, state)
 
+
   "SidRegistry" should {
     "save lookups" in {
       registry.size mustBe 0
