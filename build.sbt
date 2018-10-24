@@ -143,7 +143,6 @@ lazy val commonDependencies = Seq(
   "com.typesafe.akka"           %% "akka-persistence"            % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-remote"                 % AKKA_VERSION,
   "com.typesafe.akka"            % "akka-cluster-metrics_2.12"   % AKKA_VERSION,
-  "org.fusesource.leveldbjni"    % "leveldbjni-all"              % "1.8",
   "com.paulgoldbaum"            %% "scala-influxdb-client"       % "0.5.2",
   "org.bouncycastle"             % "bcprov-jdk15on"              % "1.51",
   "com.github.romix.akka"       %% "akka-kryo-serialization"     % "0.5.1",
@@ -162,7 +161,9 @@ lazy val commonDependencies = Seq(
   "io.kamon"                    %% "kamon-system-metrics"        % "1.0.0",
   "io.kamon"                    %% "kamon-core"                  % "1.0.0",
 //  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
-  "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12"
+  "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12",
+  "com.typesafe.akka"           %% "akka-persistence-cassandra"  % "0.91",
+  "com.typesafe.akka"           %% "akka-persistence-cassandra-launcher" % "0.91" % Test // Helps to start built-in single node of cassandra instance for tests
 )
 
 // akka and play test dependencies
