@@ -1,11 +1,14 @@
 package models.akka.responder
 
+import java.net.URLEncoder
+
 import scala.util.control.NonFatal
 import akka.persistence.PersistentActor
 import akka.actor._
+import akka.pattern._
 import kamon.Kamon
 import models._
-import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupRidSaved, LookupSidRestoreProcess, LookupSidSaved, MainResponderBehaviorState, PartOfPersistenceBehavior, RouteeNavigator}
+import models.akka._
 import models.metrics.Meter
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
@@ -13,14 +16,20 @@ import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
 import _root_.akka.routing.ActorSelectionRoutee
 import _root_.akka.routing.Routee
 import _root_.akka.event.LoggingAdapter
-import models.akka.cluster.{ClusteredDSLinkManager, ShardedRoutee}
-import _root_.akka.cluster.sharding.ClusterSharding
-import models.akka.responder.OriginUpdater._
+import _root_.akka.util._
+import models.akka.Messages.{GetRules, GetToken, GetTokens}
+import models.api.DSANode
+
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 /**
- * Handles communication with a remote DSLink in Responder mode.
- */
-trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNavigator { me: PersistentActor with ActorLogging =>
+  * Handles communication with a remote DSLink in Responder mode.
+  */
+trait ResponderBehavior extends DSLinkStateSnapshotter with Meter {
+  me: PersistentActor with ActorLogging =>
+
   import RidRegistry._
   import models.akka.RichRoutee
 
@@ -46,6 +55,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   protected def linkPath: String
+
   protected def ownId: String
 
   type RequestHandler = PartialFunction[DSARequest, HandlerResult]
@@ -62,19 +72,22 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   private var attributes = collection.mutable.Map.empty[String, Map[String, DSAVal]]
 
   // processes request using the appropriate handler
-  private val requestHandler = handlePasstroughRequest orElse handleListRequest orElse
+  private val requestHandler = handlePassthroughRequest orElse handleListRequest orElse
     handleSubscribeRequest orElse handleUnsubscribeRequest orElse handleCloseRequest
 
   private val mainResponderBehaviorState = MainResponderBehaviorState(ridRegistry.state, sidRegistry.state, attributes)
 
   def onPersistRegistry: Unit = saveResponderBehaviorSnapshot(mainResponderBehaviorState)
 
+  implicit val timeout = Timeout(5 seconds)
+
   /**
-   * Processes incoming requests and responses.
-   */
+    * Processes incoming requests and responses.
+    */
   val responderBehavior: Receive = {
-    case env @ RequestEnvelope(requests, _) =>
+    case env @ RequestEnvelope(requests, header) =>
       log.info("{}: received {} from {}", ownId, env, sender)
+      val tokenId = header.flatMap(_.get("token")).map(_.toString)
       val result = processRequests(requests)
       if (!result.requests.isEmpty)
         sendToEndpoint(RequestEnvelope(result.requests))
@@ -88,18 +101,33 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
       }
   }
 
+  private def getPermission(tokenId: Option[String]) = {
+    val tokenName = tokenId.filterNot(_.isEmpty).getOrElse("default")
+    val tokensSelection = context.actorSelection("/user/broker/sys/tokens")
+    for {
+      tokenNode <- (tokensSelection ? GetToken(tokenName)).mapTo[Option[DSANode]].filter(_.isDefined).map(_.get)
+      roleNode <- tokenNode.child("role")
+      role <- roleNode.map(_.value).getOrElse(Future.failed(new IllegalStateException("No role defined for token")))
+      roleSelection = context.actorSelection("/user/broker/sys/roles/" + role)
+      // TODO this is a nasty hack to retrieve the children of the role node, will be rewritten with DSANode code
+      rules <- (roleSelection ? GetTokens).mapTo[List[DSANode]]
+      matched = rules.filter(node => URLEncoder.encode(linkPath, "UTF-8").startsWith(node.name)).maxBy(_.name.length)
+      permission <- matched.value
+    } yield permission.toString
+  }
+
   /**
     * Recovers events and snapshots of responder behavior.
     */
   val responderRecover: Receive = {
-    case event: LookupRidRestoreProcess =>
+    case event: LookupRidRestoreProcess              =>
       val updatedEvent = event.update(updateRoutee)
       log.debug("{}: recovering with event {}", ownId, updatedEvent)
       ridRegistry.restoreRidRegistry(updatedEvent)
-    case event: LookupSidRestoreProcess =>
+    case event: LookupSidRestoreProcess              =>
       log.debug("{}: recovering with event {}", ownId, event)
       sidRegistry.restoreSidRegistry(event)
-    case event: AttributeSaved =>
+    case event: AttributeSaved                       =>
       log.debug("{}: recovering with event {}", ownId, event)
       addAttribute(event.nodePath, event.name, event.value)
     case offeredSnapshot: MainResponderBehaviorState =>
@@ -110,9 +138,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Processes the requests and returns requests that need to be forwaded to their destinations
-   * as well as the responses that need to be delivered to the originators.
-   */
+    * Processes the requests and returns requests that need to be forwaded to their destinations
+    * as well as the responses that need to be delivered to the originators.
+    */
   private def processRequests(requests: Seq[DSARequest]): HandlerResult = {
 
     val results = requests map (request => try {
@@ -128,8 +156,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Processes the responses and returns the translated ones groupped by their destinations.
-   */
+    * Processes the responses and returns the translated ones groupped by their destinations.
+    */
   def processResponses(responses: Seq[DSAResponse]): Map[Routee, Seq[DSAResponse]] = {
     val handler = handleSubscribeResponse orElse handleNonSubscribeResponse
 
@@ -142,13 +170,13 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Handles List request.
-   */
+    * Handles List request.
+    */
   private def handleListRequest: RequestHandler = {
     case ListRequest(rid, path) =>
       val origin = Origin(routee(sender.path), rid)
       ridRegistry.lookupByPath(path) match {
-        case None =>
+        case None      =>
           val tgtId = ridRegistry.nextTgtId
           ridRegistry.saveListLookup(path, tgtId)
           addListOrigin(tgtId, origin)
@@ -165,9 +193,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Translates the original request before sending it to responder link.
-   */
-  private def handlePasstroughRequest: RequestHandler = {
+    * Translates the original request before sending it to responder link.
+    */
+  private def handlePassthroughRequest: RequestHandler = {
 
     def tgtId(srcId: Int, method: DSAMethod) = {
       val tgtId = ridRegistry.nextTgtId
@@ -213,9 +241,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Handles Subscribe request.
-   * For each subscribe request we create new stream even previous stream is already exists
-   */
+    * Handles Subscribe request.
+    * For each subscribe request we create new stream even previous stream is already exists
+    */
   private def handleSubscribeRequest: RequestHandler = {
     case req @ SubscribeRequest(srcRid, _) =>
       val srcPath = req.path // to ensure there's only one path (see requester actor)
@@ -226,7 +254,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
       Kamon.currentSpan().tag("kind", "SubscribeRequest")
 
       sidRegistry.lookupByPath(srcPath.path) match {
-        case None =>
+        case None         =>
           val tgtRid = ridRegistry.nextTgtId
           ridRegistry.saveSubscribeLookup(ridOrigin, tgtRid)
           val tgtSid = sidRegistry.nextTgtId
@@ -246,8 +274,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Handles Unsubscribe request.
-   */
+    * Handles Unsubscribe request.
+    */
   private def handleUnsubscribeRequest: RequestHandler = {
     case req @ UnsubscribeRequest(rid, _) =>
       val ridOrigin = Origin(routee(sender.path), rid)
@@ -261,14 +289,14 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Handles Close request.
-   */
+    * Handles Close request.
+    */
   private def handleCloseRequest: RequestHandler = {
     case CloseRequest(rid) =>
       val origin = Origin(routee(sender().path), rid)
       ridRegistry.lookupByOrigin(origin) match {
         case Some(LookupRecord(_, tgtId, _, _)) => HandlerResult(CloseRequest(tgtId)) // passthrough call
-        case _ => // LIST call
+        case _                                  => // LIST call
           removeListOrigin(origin) map { targetId =>
             ridRegistry.lookupByTargetId(targetId) foreach ridRegistry.removeLookup
             HandlerResult(CloseRequest(targetId))
@@ -277,8 +305,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Forwards response to the recipients and returns nothing.
-   */
+    * Forwards response to the recipients and returns nothing.
+    */
   private def handleSubscribeResponse: ResponseHandler = {
     case rsp @ DSAResponse(0, _, _, _, _) =>
       log.debug("{}: handleSubscribeResponse: {}", ownId, rsp)
@@ -287,9 +315,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * If the response is for LIST request, forwards it to the list router. Otherwise
-   * translates the response's RID and returns to be sent to the requester.
-   */
+    * If the response is for LIST request, forwards it to the list router. Otherwise
+    * translates the response's RID and returns to be sent to the requester.
+    */
   private def handleNonSubscribeResponse: ResponseHandler = {
     case rsp if rsp.rid != 0 =>
       val result = ridRegistry.lookupByTargetId(rsp.rid) match {
@@ -303,77 +331,81 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
           val newResponse = rsp.copy(updates = Some(oldUpdates ++ attrUpdates))
           deliverListResponse(newResponse)
           Nil
-        case Some(rec @ LookupRecord(_, _, Some(origin), _)) =>
+        case Some(rec @ LookupRecord(_, _, Some(origin), _))      =>
           if (rsp.stream == Some(StreamState.Closed))
             ridRegistry.removeLookup(rec)
           List((origin.source, rsp.copy(rid = origin.sourceId)))
-        case _ =>
+        case _                                                    =>
           log.warning(s"$ownId: Cannot find original request for target RID: ${rsp.rid}")
           Nil
       }
       log.debug("{}: handleNonSubscribeResponse result: {}", ownId, result)
       result
   }
+
   /**
-   * Removes the linkPath prefix from the path.
-   */
+    * Removes the linkPath prefix from the path.
+    */
   private def translatePath(path: String) = {
     val chopped = path.drop(linkPath.size)
     if (!chopped.startsWith("/")) "/" + chopped else chopped
   }
 
   /**
-   * Extracts $base config from an update row.
-   */
+    * Extracts $base config from an update row.
+    */
   val adjustBase: PartialFunction[DSAVal, DSAVal] = {
     case v: ArrayValue if v.value.headOption == Some(StringValue("$base")) =>
       array("$base", linkPath + v.value.tail.head.toString)
-    case v: MapValue if v.value.contains("$base") =>
+    case v: MapValue if v.value.contains("$base")                          =>
       MapValue(v.value + ("$base" -> (linkPath + v.value("$base").toString)))
   }
 
   protected class PartOfPersistentResponderBehavior(val _ownId: String, val _log: LoggingAdapter) extends PartOfPersistenceBehavior {
     override val ownId = _ownId
+
     override def persist[A](event: A)(handler: A => Unit): Unit = me.persist(event)(handler)
+
     override def onPersist: Unit = onPersistRegistry
+
     @transient override def log: LoggingAdapter = _log
   }
 
   /**
-   * Adds the origin to the list of recipients for the given target RID.
-   */
+    * Adds the origin to the list of recipients for the given target RID.
+    */
   protected def addListOrigin(targetId: Int, origin: Origin): Unit
 
   /**
-   * Adds the origin to the list of recipients for the given target SID.
-   */
+    * Adds the origin to the list of recipients for the given target SID.
+    */
   protected def addSubscribeOrigin(targetId: Int, origin: Origin): Unit
 
   /**
-   * Removes the origin from the collection of LIST recipients it belongs to. Returns `Some(targetId)`
-   * if the call record can be removed (i.e. no listeners left), or None otherwise.
-   */
+    * Removes the origin from the collection of LIST recipients it belongs to. Returns `Some(targetId)`
+    * if the call record can be removed (i.e. no listeners left), or None otherwise.
+    */
   protected def removeListOrigin(origin: Origin): Option[Int]
 
   /**
-   * Removes the origin from the collection of SUBSCRIBE recipients it belongs to. Returns `Some(targetId)`
-   * if the call record can be removed (i.e. no listeners left), or None otherwise.
-   */
+    * Removes the origin from the collection of SUBSCRIBE recipients it belongs to. Returns `Some(targetId)`
+    * if the call record can be removed (i.e. no listeners left), or None otherwise.
+    */
   protected def removeSubscribeOrigin(origin: Origin): Option[Int]
 
   /**
-   * Delivers a LIST response to its recipients.
-   */
+    * Delivers a LIST response to its recipients.
+    */
   protected def deliverListResponse(rsp: DSAResponse): Unit
 
   /**
-   * Delivers a SUBSCRIBE response to its recipients.
-   */
+    * Delivers a SUBSCRIBE response to its recipients.
+    */
   protected def deliverSubscribeResponse(rsp: DSAResponse): Unit
 
   /**
-   * Sends a message to the endpoint, if connected.
-   */
+    * Sends a message to the endpoint, if connected.
+    */
   protected def sendToEndpoint(msg: Any): Unit
 
   /**
