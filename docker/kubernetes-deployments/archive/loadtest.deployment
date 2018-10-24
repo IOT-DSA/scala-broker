@@ -1,0 +1,33 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+namespace: default
+metadata:
+  name: cloud-broker-load
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-load
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-load
+    spec:
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        searches:
+          - cloud-broker-internal.default.svc.cluster.local
+      subdomain: "cloud-broker-internal"
+      containers:
+      - name: loadtest
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/loadtest"
+        imagePullPolicy: Always
+        env:
+          - name: BROKER_URLS
+            value: "cloud-broker-cluster-0:9000,cloud-broker-cluster-1:9000,cloud-broker-cluster-2:9000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"

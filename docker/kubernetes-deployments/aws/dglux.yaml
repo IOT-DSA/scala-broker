@@ -1,0 +1,79 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+namespace: default
+metadata:
+  name: dglux-mongo
+spec:
+  selector:
+    matchLabels:
+      app: dglux-mongo
+  replicas: 1
+  serviceName: dglux-mongo
+  template:
+    metadata:
+      labels:
+        app: dglux-mongo
+        depl_type: squad
+    spec:
+      subdomain: "dglux-mongo"
+      podManagementPolicy: Parallel
+      containers:
+      - name: dglux
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/dglux:latest"
+        imagePullPolicy: Always
+        serviceName: "dglux-mongo"
+        ports:
+        - containerPort: 8006
+        env:
+        - name: ASB_MONGO_URL
+          value: "mongodb://localhost:27017/admin"
+        - name: ASB_MONGO_USERNAME
+          value: root
+        - name: ASB_MONGO_PASSWORD
+          value: "hello"
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "500m"
+          limits:
+            memory: "500Mi"
+            cpu: "500m"
+      - name: mongo
+        image: "mongo:3"
+        imagePullPolicy: Always
+        serviceName: "dglux-mongo"
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: root
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          value: "hello"
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "500m"
+          limits:
+            memory: "500Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dglux-mongo
+  labels:
+    app: dglux-mongo
+spec:
+  ports:
+  - name: dglux-http
+    port: 8006
+    targetPort: 8006
+  selector:
+    app: dglux-mongo
+  status: loadBalancer
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 0.0.0.0/0
+  externalTrafficPolicy: Cluster
+
