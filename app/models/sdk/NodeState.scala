@@ -7,6 +7,7 @@ import models.rpc.DSAValue.{DSAMap, DSAVal}
   */
 case class NodeState(displayName: Option[String],
                      value: Option[DSAVal],
+                     action: Option[NodeAction],
                      attributes: DSAMap,
                      children: Set[String])
 
@@ -17,17 +18,18 @@ object NodeState {
   /**
     * An empty state, assigned to a node initially.
     */
-  val Empty = NodeState(None, None, Map.empty, Set.empty)
+  val Empty = NodeState(None, None, None, Map.empty, Set.empty)
 }
 
 /**
   * Status reported by the node to the clients.
   */
-case class NodeStatus(parent: Option[NodeRef],
-                      name: String,
-                      displayName: Option[String],
-                      value: Option[DSAVal],
-                      attributes: DSAMap)
+case class NodeStatus(name: String,
+                      parent: Option[NodeRef] = None,
+                      displayName: Option[String] = None,
+                      value: Option[DSAVal] = None,
+                      invokable: Boolean = false,
+                      attributes: DSAMap = Map.empty)
 
 /**
   * Factory for [[NodeStatus]] instances.
@@ -44,9 +46,10 @@ object NodeStatus {
     */
   def apply(name: String, parent: Option[NodeRef], state: NodeState): NodeStatus =
     NodeStatus(
-      parent,
       name,
+      parent,
       state.displayName,
       state.value,
+      state.action.isDefined,
       state.attributes)
 }

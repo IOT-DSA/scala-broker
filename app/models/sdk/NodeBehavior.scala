@@ -27,6 +27,15 @@ object NodeBehavior {
       none
     case (_, _, SetDisplayName(displayName)) => persist(DisplayNameChanged(displayName))
     case (_, _, SetValue(value))             => persist(ValueChanged(value))
+    case (a, b, SetAction(action))           => parent.map { _ =>
+      persist[ActionChanged, NodeState](ActionChanged(action))
+    }.getOrElse(throw new IllegalStateException("Root node cannot be an action"))
+    case (ctx, _, Invoke(args, ref))         => none.thenRun { state =>
+      import ctx.executionContext
+      val action = state.action.getOrElse(throw new IllegalStateException("Node has no action"))
+      val context = ActionContext(ctx.self, args)
+      action.handler(context) foreach (ref ! _)
+    }
     case (_, _, SetAttributes(attrs))        =>
       val attributes = attrs map {
         case (name, value) => ensurePrefix(name, "@") -> value
@@ -67,6 +76,7 @@ object NodeBehavior {
   val eventHandler: EventHandler[NodeState, NodeEvent] = {
     case (state, DisplayNameChanged(name))    => state.copy(displayName = Some(name))
     case (state, ValueChanged(value))         => state.copy(value = value)
+    case (state, ActionChanged(action))       => state.copy(action = Some(action))
     case (state, AttributesChanged(attrs))    => state.copy(attributes = attrs)
     case (state, AttributeAdded(name, value)) => state.copy(attributes = state.attributes + (name -> value))
     case (state, AttributeRemoved(name))      => state.copy(attributes = state.attributes - name)

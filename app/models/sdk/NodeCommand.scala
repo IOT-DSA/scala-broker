@@ -20,6 +20,9 @@ object NodeCommand {
   final case class SetDisplayName(name: String) extends Cmd
   final case class SetValue(value: Option[DSAVal]) extends Cmd
 
+  final case class SetAction(action: NodeAction) extends Cmd
+  final case class Invoke(args: DSAMap, replyTo: ActorRef[ActionResult]) extends Cmd
+
   final case class SetAttributes(attributes: DSAMap) extends Cmd
   final case class PutAttribute(name: String, value: DSAVal) extends Cmd
   final case class RemoveAttribute(name: String) extends Cmd

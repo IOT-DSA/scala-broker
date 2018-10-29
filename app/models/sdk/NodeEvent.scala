@@ -14,6 +14,7 @@ object NodeEvent {
 
   final case class DisplayNameChanged(name: String) extends NodeEvent
   final case class ValueChanged(value: Option[DSAVal]) extends NodeEvent
+  final case class ActionChanged(action: NodeAction) extends NodeEvent
 
   final case class AttributeAdded(name: String, value: DSAVal) extends NodeEvent
   final case class AttributeRemoved(name: String) extends NodeEvent
