@@ -8,7 +8,7 @@ import models.util.PartOfPersistenceBehaviorStub
  */
 class SidRegistrySpec extends AbstractActorSpec {
 
-  val registry = new SidRegistry(new PartOfPersistenceBehaviorStub)
+  val registry = SidRegistry(new PartOfPersistenceBehaviorStub)
 
   "SidRegistry" should {
     "save lookups" in {

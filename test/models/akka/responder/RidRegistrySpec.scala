@@ -15,7 +15,7 @@ class RidRegistrySpec extends AbstractActorSpec {
 
   val Seq(a1, a2, a3) = (1 to 3) map (_ => ActorSelectionRoutee(system.actorSelection(TestProbe().ref.path)))
 
-  val registry = new RidRegistry(new PartOfPersistenceBehaviorStub)
+  val registry = RidRegistry(new PartOfPersistenceBehaviorStub)
 
   "RidRegistry" should {
     "save/retrieve/remove LIST lookups" in {
