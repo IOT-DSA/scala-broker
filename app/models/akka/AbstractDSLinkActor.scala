@@ -4,6 +4,7 @@ import org.joda.time.DateTime
 import akka.persistence._
 import akka.actor.{ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.routing.Routee
+import facades.websocket.RouteeUpdateRequest
 import models.metrics.Meter
 import models.util.DsaToAkkaCoder._
 
@@ -52,7 +53,6 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
    * Called on link shut down, notifies the registry and logs the dslink status.
    */
   override def postStop() = {
-    endpoint foreach (_ ! PoisonPill)
     sendToRegistry(UnregisterDSLink(self.path.name.forDsa))
     log.info("{}: stopped", ownId)
   }
@@ -64,6 +64,10 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     case event: DSLinkBaseState =>
       log.debug("{}: recovering with event/snapshot {}", ownId, event)
       updateState(event)
+
+    case RecoveryCompleted =>
+      endpoint.foreach{_ ! RouteeUpdateRequest}
+      log.info("{}: recovery completed with persistenceId: '{}'", ownId, persistenceId)
   }
 
   private def updateState(event: DSLinkBaseState) = {

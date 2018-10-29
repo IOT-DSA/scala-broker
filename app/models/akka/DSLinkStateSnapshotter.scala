@@ -31,9 +31,6 @@ trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
         if (offeredSnapshot.responderBehaviorState.additional != null)
           receiveRecover(offeredSnapshot.responderBehaviorState.additional)
       }
-
-    case RecoveryCompleted =>
-      log.info("{}: recovery completed with persistenceId: '{}'", ownId, persistenceId)
   }
 
   val snapshotReceiver: Receive = {

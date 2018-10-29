@@ -2,7 +2,7 @@ package facades.websocket
 
 import java.net.URL
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
@@ -133,7 +133,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
         .map { case (_, i) => PingMessage(i.toInt) }
 
       val inFlow = Flow[Message].collect {
-        case TextMessage.Strict(s)   =>
+        case TextMessage.Strict(s) =>
           val json = Json.parse(s).as[DSAMessage]
           log.debug(s"upstream in: ${json}")
           json
@@ -327,7 +327,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
 
         r match {
           case -1 => false
-          case i  =>
+          case i =>
             val tokenNode = listNodes(i)
             val check = for {
               checkCount <- checkTokenCount(tokenId.get, tokenNode)
@@ -346,7 +346,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
     val dateRange = tokenNode.config("$timeRange")
 
     val check = dateRange map {
-      case None    =>
+      case None =>
         log.warn("TimeRange is absent in the token, pass the token")
         true
       case Some(x) =>
@@ -407,54 +407,30 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
                            registry: ActorRef,
                            bufferSize: Int,
                            overflow: OverflowStrategy) = {
-    import akka.actor.Status._
 
-    val (futureSink, publisher) = StreamRefs.sinkRef[DSAMessage]()
-      .toMat(Sink.asPublisher(false))(Keep.both)
-      .run()(materializer)
+    val config = WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt)
+    val wsProps = WebSocketActor.props(registry, config)
 
-    val sink = Await.result(futureSink, 10 second)
 
-    val fRoutee = (registry ? GetOrCreateDSLink(sessionInfo.ci.linkName)).mapTo[Routee]
 
-    fRoutee map { routee =>
+    val watcher = actorSystem.actorOf(Props(new Actor {
 
-      val (subscriptionsPusher, subscriptionsPublisher) = StreamRefs.sinkRef[ResponseMessage]()
-        .toMat(Sink.asPublisher(false))(Keep.both)
-        .run()(materializer)
+      val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
 
-      val subscriptionSink = Await.result(subscriptionsPusher, 10 second)
-      routee ! SubscriptionSourceMessage(subscriptionSink)
-
-      val subscriptionSrcRef = Source.fromPublisher(subscriptionsPublisher)
-
-      val wsProps = WebSocketActor.props(sink, routee,
-        WebSocketActorConfig(sessionInfo.ci, sessionInfo.sessionId, Settings.Salt))
-
-      val fromSocket = actorSystem.actorOf(Props(new Actor {
-        val wsActor = context.watch(context.actorOf(wsProps, "wsActor"))
-
-        def receive = {
-          case _ => sender ! wsActor
-        }
-
-        override def supervisorStrategy = OneForOneStrategy() {
-          case _ => SupervisorStrategy.restart
-        }
-      }))
-
-      val wsActor = Await.result((fromSocket ? Some).mapTo[ActorRef], 5 second)
-
-      val messageSink = Flow[Any].async.to(Sink.actorRef(wsActor, Success(())))
-
-      val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
-
-      Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src).recover {
-        case e: InvalidSequenceNumberException =>
-          log.error(s"messages been lost: ${e.msg}", e)
-          EmptyMessage
+      def receive = {
+        case _ => sender ! wsActor
       }
-    }
+
+      override def supervisorStrategy = OneForOneStrategy() {
+        case _ => SupervisorStrategy.restart
+      }
+    }))
+
+    for{
+      wsActor <- (watcher ? "GivMeActorPlease").mapTo[ActorRef]
+      flow <- (wsActor ? StreamRequest()).mapTo[Flow[DSAMessage, DSAMessage, NotUsed]]
+    } yield flow
+
   }
 
   /**
