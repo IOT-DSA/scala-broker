@@ -1,9 +1,7 @@
 package models.akka.responder
 
 import akka.actor.{Actor, ActorLogging, Props, actorRef2Scala}
-import akka.event.LoggingAdapter
 import models.Origin
-import models.akka.PartOfPersistenceBehavior
 import models.rpc.DSAResponse
 
 /**
@@ -17,7 +15,7 @@ abstract class ResponderWorker(poolId: String) extends Actor with ActorLogging {
 
   protected val registry: GroupCallRegistry
 
-  def receive = {
+  def receive: PartialFunction[Any, Unit] = {
     case LookupTargetId(origin)      => sender ! registry.lookupTargetId(origin)
 
     case AddOrigin(targetId, origin) => registry.addOrigin(targetId, origin, RegistryType.DEFAULT)
@@ -57,9 +55,9 @@ object ResponderWorker {
  */
 class ResponderListWorker(linkName: String) extends ResponderWorker(linkName + "/LST") {
 
-  protected val registry = new ListCallRegistry(new ResponderWorkerPersistenceBehaviorStub(ownId, log))
+  protected val registry = new ListCallRegistry(ownId, log)
 
-  override def receive = super.receive orElse {
+  override def receive: PartialFunction[Any, Unit] = super.receive orElse {
     case rsp @ DSAResponse(rid, stream, _, _, _) if rid != 0 =>
       log.debug(s"$ownId: received $rsp")
       registry.deliverResponse(rsp)
@@ -81,9 +79,9 @@ object ResponderListWorker {
  */
 class ResponderSubscribeWorker(linkName: String) extends ResponderWorker(linkName + "/SUB") {
 
-  protected val registry = new SubscribeCallRegistry(new ResponderWorkerPersistenceBehaviorStub(ownId, log))
+  protected val registry = new SubscribeCallRegistry(ownId, log)
 
-  override def receive = super.receive orElse {
+  override def receive: PartialFunction[Any, Unit] = super.receive orElse {
     case rsp @ DSAResponse(0, stream, updates, columns, error) =>
       log.debug(s"$ownId: received $rsp")
       registry.deliverResponse(rsp)
@@ -100,9 +98,3 @@ object ResponderSubscribeWorker {
   def props(linkName: String) = Props(new ResponderSubscribeWorker(linkName))
 }
 
-class ResponderWorkerPersistenceBehaviorStub(val _ownId: String, val _log: LoggingAdapter) extends PartOfPersistenceBehavior {
-  override val ownId: String = _ownId
-  override def persist[A](event: A)(handler: A => Unit): Unit = handler(event)
-  override def onPersist: Unit = {}
-  @transient override def log: LoggingAdapter = _log
-}

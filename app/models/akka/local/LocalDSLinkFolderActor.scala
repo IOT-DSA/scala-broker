@@ -2,11 +2,12 @@ package models.akka.local
 
 import akka.actor.{PoisonPill, Props, actorRef2Scala}
 import akka.routing.{ActorRefRoutee, Routee}
-import models.akka.{DSLinkCreated, DSLinkFolderActor, DSLinkFolderState, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered, IsNode, rows}
+import models.akka.{DSLinkFolderActor, IsNode, rows}
 import akka.stream.scaladsl.Source
 import models.akka.Messages._
 import models.rpc.DSAValue._
 import models.util.DsaToAkkaCoder._
+import persistence._
 
 /**
   * Actor for local DSA link folder node, such as `/upstream` or `/downstream`.

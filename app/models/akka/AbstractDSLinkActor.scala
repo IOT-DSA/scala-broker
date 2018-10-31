@@ -6,6 +6,7 @@ import akka.actor.{ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorR
 import akka.routing.Routee
 import models.metrics.Meter
 import models.util.DsaToAkkaCoder._
+import persistence.DSLinkBaseState
 
 /**
  * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.

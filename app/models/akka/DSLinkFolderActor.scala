@@ -10,8 +10,9 @@ import akka.stream.scaladsl.Source
 import models.akka.DSLinkMode.DSLinkMode
 import models.akka.Messages.{DSLinkNodeStats, LinkState}
 import models.akka.responder.SimpleResponderBehavior
-import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
+import models.rpc.{CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage}
 import models.{RequestEnvelope, Settings}
+import persistence._
 
 /**
  * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.
@@ -57,7 +58,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
       listRid = offeredSnapshot.listRid
   }
 
-  implicit val mat = ActorMaterializer()
+  implicit val mat: ActorMaterializer = ActorMaterializer()
 
   /**
    * Terminates the actor system if the actor's path does not match `/user/<path>`.
@@ -71,7 +72,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   /**
    * Removes DSLinks actors that do not have a connected endpoint.
    */
-  protected def removeDisconnectedDSLinks = {
+  protected def removeDisconnectedDSLinks(): Unit = {
     val disconnected = links.filterNot(_._2.connected).keys.toSeq
     persist(DSLinkRemoved(disconnected: _*)) { event =>
       log.debug("{}: persisting {}", ownId, event)
@@ -84,7 +85,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   /**
    * Searches DSLinks by name pattern.
    */
-  protected def findDSLinks(regex: String, limit: Int, offset: Int) = {
+  protected def findDSLinks(regex: String, limit: Int, offset: Int): List[String] = {
     log.debug("{}: searching for dslinks: pattern={}, limit={}, offset={}", ownId, regex, limit, offset)
     val pattern = Pattern.compile(regex)
     val filtered = links.keys.filter(pattern.matcher(_).matches).toList.sorted
@@ -94,7 +95,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   /**
    * Returns the current DSLink node stats.
    */
-  protected def buildDSLinkNodeStats = {
+  protected def buildDSLinkNodeStats: DSLinkNodeStats = {
     val requestersOn = links.count(_._2 == LinkState(DSLinkMode.Requester, true))
     val requestersOff = links.count(_._2 == LinkState(DSLinkMode.Requester, false))
     val respondersOn = links.count(_._2 == LinkState(DSLinkMode.Responder, true))
@@ -166,7 +167,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   /**
    * Generates and sends response messages to notify the listeners about the removed dslinks.
    */
-  protected def notifyOnRemove(names: String*) = listRid foreach { rid =>
+  protected def notifyOnRemove(names: String*): Unit = listRid foreach { rid =>
     val updates = names map (name => obj("name" -> name, "change" -> "remove"))
     self ! ResponseMessage(-1, None, DSAResponse(rid, Some(Open), Some(updates.toList)) :: Nil)
   }
@@ -174,7 +175,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   /**
    * Changes the recorded link state.
    */
-  protected def changeLinkState(name: String, mode: DSLinkMode, connected: Boolean, warnIfNotFound: Boolean) = {
+  protected def changeLinkState(name: String, mode: DSLinkMode, connected: Boolean, warnIfNotFound: Boolean): Unit = {
     links.get(name) match {
       case Some(_) =>
         persist(DSLinkRegistered(name, mode, connected)) { event =>

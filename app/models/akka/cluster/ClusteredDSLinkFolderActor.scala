@@ -1,19 +1,20 @@
 package models.akka.cluster
 
-import models.akka.{DSLinkCreated, DSLinkFolderActor, DSLinkFolderState, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered, IsNode, RichRoutee, rows}
+import models.akka.{DSLinkFolderActor, IsNode, RichRoutee, rows}
 import akka.actor.{Identify, PoisonPill, Props, actorRef2Scala}
 import akka.pattern.pipe
 import akka.routing.Routee
 import akka.stream.scaladsl.Source
 import models.akka.Messages._
 import models.rpc.DSAValue.{ArrayValue, DSAVal, StringValue, array, obj}
+import persistence._
 
 import scala.concurrent.Future
 
 /**
   * Actor for clustered DSA link folder node, such as `/upstream` or `/downstream`.
   */
-class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee, extraConfigs: (String, DSAVal)*)
+class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: String => Routee, extraConfigs: (String, DSAVal)*)
   extends DSLinkFolderActor(linkPath) with ClusteredActor {
 
   import context.dispatcher
@@ -154,6 +155,6 @@ object ClusteredDSLinkFolderActor {
   /**
     * Creates a new props for [[ClusteredDSLinkFolderActor]].
     */
-  def props(linkPath: String, linkProxy: (String) => Routee, extraConfigs: (String, DSAVal)*) =
+  def props(linkPath: String, linkProxy: String => Routee, extraConfigs: (String, DSAVal)*) =
     Props(new ClusteredDSLinkFolderActor(linkPath, linkProxy, extraConfigs: _*))
 }

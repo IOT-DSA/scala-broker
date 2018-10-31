@@ -1,13 +1,15 @@
-package models.akka
+package persistence
 
 import java.util.Date
 
 import akka.actor.ActorRef
 import akka.routing.ConsistentHashingPool
 import models.Origin
+import models.akka.{ConnectionInfo, PathAndQos}
 import models.akka.DSLinkMode.DSLinkMode
 import models.akka.Messages.LinkState
 import models.akka.local.LocalDSLinkFolderActor
+import models.akka.responder.RegistryType.Registry
 import models.akka.responder.RidRegistry.{LookupRecord, RidRegistryState}
 import models.akka.responder.SidRegistry.SidRegistryState
 import models.akka.responder._
@@ -26,7 +28,7 @@ case class DSLinkState(baseState: DSLinkBaseState,
                        responderBehaviorState: ResponderBehaviorState)
 
 /**
-  * Internal State of the abstract layer [[AbstractDSLinkActor]].
+  * Internal State of the abstract layer [[models.akka.AbstractDSLinkActor]].
   */
 case class DSLinkBaseState(endpoint: Option[ActorRef],
                            connInfo: ConnectionInfo,
@@ -42,6 +44,7 @@ case class RemoveTargetByRid(rid: Int)
 case class RemoveTargetBySid(sids: Int*)
 case class LastRidSet(rid: Int)
 case class RequesterBehaviorState(targetsByRid: MutableMap[Int, String], targetsBySid: MutableMap[Int, PathAndQos], lastRid: Int)
+case class ListRidUpdated(listRid: Option[Int])
 
 /**
   * Internal events to recover responder behavior [[ResponderBehaviorState]], [[SimpleResponderBehaviorState]] and [[PooledResponderBehavior]] state.
@@ -63,16 +66,15 @@ case class LookupSidRemoved(tgtId: Int) extends LookupSidRestoreProcess
 case class AttributeSaved(nodePath: String, name: String, value: DSAVal)
 
 sealed trait GroupCallRegistryRestoreProcess { val value: RegistryType.Registry }
-case class OriginAdded(targetId: Int, origin: Origin, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value = regTypeVal }
-case class OriginRemoved(origin: Origin, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value = regTypeVal }
-case class RecordRemoved(targetId: Int, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value = regTypeVal }
+case class OriginAdded(targetId: Int, origin: Origin, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value: Registry = regTypeVal }
+case class OriginRemoved(origin: Origin, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value: Registry = regTypeVal }
+case class RecordRemoved(targetId: Int, regTypeVal: RegistryType.Registry) extends GroupCallRegistryRestoreProcess { val value: Registry = regTypeVal }
 
 /**
-  * Internal events to recover [[DSLinkFolderActor]] and [[LocalDSLinkFolderActor]] state.
+  * Internal events to recover [[models.akka.DSLinkFolderActor]] and [[LocalDSLinkFolderActor]] state.
   */
 case class DSLinkFolderState(links: ImmutableMap[String, LinkState], listRid: Option[Int])
 case class DSLinkCreated(name: String)
 case class DSLinkRemoved(names: String*)
 case class DSLinkRegistered(name: String, mode: DSLinkMode, connected: Boolean)
 case class DSLinkUnregistered(name: String)
-case class ListRidUpdated(listRid: Option[Int])

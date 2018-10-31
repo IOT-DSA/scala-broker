@@ -1,12 +1,12 @@
 package models.util
 
 import akka.event.LoggingAdapter
-import models.akka.PartOfPersistenceBehavior
+import persistence.PartOfPersistenceBehavior
 
 class PartOfPersistenceBehaviorStub extends PartOfPersistenceBehavior {
   override val ownId: String = ""
   override def persist[A](event: A)(handler: A => Unit): Unit = handler(event)
-  override def onPersist: Unit = {}
+  override def afterPersist: Unit = {}
   override def log: LoggingAdapter = new LoggingAdapter {
     override protected def notifyError(message: String): Unit = ???
     override protected def notifyError(cause: Throwable, message: String): Unit = ???

@@ -2,7 +2,6 @@ package models
 
 import java.util.Base64
 
-import models.akka.QoS
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -80,27 +79,27 @@ package object rpc {
   implicit val DSARequestFormat: Format[DSARequest] = new Format[DSARequest] {
     import DSAMethod._
 
-    implicit val SubscriptionPathFormat = Json.format[SubscriptionPath]
+    implicit val SubscriptionPathFormat: OFormat[SubscriptionPath] = Json.format[SubscriptionPath]
 
-    implicit val DSAMethodReads = enumReads(DSAMethod)
+    implicit val DSAMethodReads: Reads[rpc.DSAMethod.Value] = enumReads(DSAMethod)
 
-    val ListRequestFormat = Json.format[ListRequest]
-    val SetRequestFormat = (
+    val ListRequestFormat: OFormat[ListRequest] = Json.format[ListRequest]
+    val SetRequestFormat: OFormat[SetRequest] = (
       (__ \ 'rid).format[Int] ~
       (__ \ 'path).format[String] ~
       (__ \ 'value).format[DSAVal] ~
       (__ \ 'permit).formatNullable[String])(SetRequest, unlift(SetRequest.unapply))
-    val RemoveRequestFormat = Json.format[RemoveRequest]
-    val InvokeRequestFormat = (
+    val RemoveRequestFormat: OFormat[RemoveRequest] = Json.format[RemoveRequest]
+    val InvokeRequestFormat: OFormat[InvokeRequest] = (
       (__ \ 'rid).format[Int] ~
       (__ \ 'path).format[String] ~
       (__ \ 'params).formatNullable[DSAMap].inmap(emptyIfNone, noneIfEmpty) ~
       (__ \ 'permit).formatNullable[String])(InvokeRequest, unlift(InvokeRequest.unapply))
-    val SubscribeRequestFormat = Json.format[SubscribeRequest]
-    val UnsubscribeRequestFormat = Json.format[UnsubscribeRequest]
-    val CloseRequestFormat = Json.format[CloseRequest]
+    val SubscribeRequestFormat: OFormat[SubscribeRequest] = Json.format[SubscribeRequest]
+    val UnsubscribeRequestFormat: OFormat[UnsubscribeRequest] = Json.format[UnsubscribeRequest]
+    val CloseRequestFormat: OFormat[CloseRequest] = Json.format[CloseRequest]
 
-    def writes(req: DSARequest) = baseJson(req) ++ (req match {
+    def writes(req: DSARequest): JsObject = baseJson(req) ++ (req match {
       case x: ListRequest        => ListRequestFormat.writes(x)
       case x: SetRequest         => SetRequestFormat.writes(x)
       case x: RemoveRequest      => RemoveRequestFormat.writes(x)
@@ -110,7 +109,7 @@ package object rpc {
       case x: CloseRequest       => CloseRequestFormat.writes(x)
     }).as[JsObject]
 
-    def reads(json: JsValue) = (json \ "method").as[DSAMethod] match {
+    def reads(json: JsValue): JsResult[DSARequest] = (json \ "method").as[DSAMethod] match {
       case List        => ListRequestFormat.reads(json)
       case Set         => SetRequestFormat.reads(json)
       case Remove      => RemoveRequestFormat.reads(json)
@@ -148,7 +147,7 @@ package object rpc {
   /**
    * DSAResponse <-> JSON
    */
-  implicit val StreamStateReads = enumReads(StreamState)
+  implicit val StreamStateReads: Reads[StreamState.Value] = enumReads(StreamState)
   implicit val DSAResponseFormat: Format[DSAResponse] = Json.format[DSAResponse]
 
   /**
@@ -156,11 +155,11 @@ package object rpc {
    */
   implicit val DSAMessageFormat: Format[DSAMessage] = new Format[DSAMessage] {
 
-    val AllowedMessageFormat = Json.format[AllowedMessage]
+    val AllowedMessageFormat: OFormat[AllowedMessage] = Json.format[AllowedMessage]
 
-    val PingMessageFormat = Json.format[PingMessage]
+    val PingMessageFormat: OFormat[PingMessage] = Json.format[PingMessage]
 
-    val PongMessageFormat = Json.format[PongMessage]
+    val PongMessageFormat: OFormat[PongMessage] = Json.format[PongMessage]
 
     val RequestMessageFormat: Format[RequestMessage] = (
       (__ \ 'msg).format[Int] ~
@@ -173,7 +172,7 @@ package object rpc {
       (__ \ 'responses).format[List[DSAResponse]])(ResponseMessage, unlift(ResponseMessage.unapply))
 
 
-    def writes(msg: DSAMessage) = msg match {
+    def writes(msg: DSAMessage): JsValue = msg match {
       case EmptyMessage       => Json.obj()
       case m: AllowedMessage  => AllowedMessageFormat.writes(m)
       case m: PingMessage     => PingMessageFormat.writes(m)
@@ -182,7 +181,7 @@ package object rpc {
       case m: ResponseMessage => ResponseMessageFormat.writes(m)
     }
 
-    def reads(json: JsValue) = json match {
+    def reads(json: JsValue): JsResult[DSAMessage] = json match {
       case JsObject(fields) if fields.isEmpty => JsSuccess(EmptyMessage)
       case JsObject(fields) if fields.contains("allowed") => AllowedMessageFormat.reads(json)
       case JsObject(fields) if fields.contains("requests") => RequestMessageFormat.reads(json)
@@ -199,13 +198,13 @@ package object rpc {
 
   def stringToBinary(str: String): Binary = Base64.getDecoder.decode(str.drop(BinaryPrefix.length))
 
-  def jsonMapToValues(fields: Map[String, JsValue]) = fields.map { case (a, b) => a -> b.as[DSAVal] }.toMap[String, DSAVal]
+  def jsonMapToValues(fields: Map[String, JsValue]): Map[String, DSAVal] = fields.map { case (a, b) => a -> b.as[DSAVal] }.toMap[String, DSAVal]
 
-  def jsonListToValues(items: Iterable[JsValue]) = items map (_.as[DSAVal]) toList
+  def jsonListToValues(items: Iterable[JsValue]): List[DSAVal] = items map (_.as[DSAVal]) toList
 
-  def valueMapToJson(fields: Map[String, DSAVal]) = fields map { case (a, b) => (a -> Json.toJson(b)) }
+  def valueMapToJson(fields: Map[String, DSAVal]): Map[String, JsValue] = fields map { case (a, b) => a -> Json.toJson(b) }
 
-  def valueListToJson(items: Iterable[DSAVal]) = items map (Json.toJson(_))
+  def valueListToJson(items: Iterable[DSAVal]): Iterable[JsValue] = items map (Json.toJson(_))
 
   /**
    * Extracts SID from an update row.
@@ -218,7 +217,7 @@ package object rpc {
   /**
    * Replaces SID in an update row.
    */
-  def replaceSid(row: DSAVal, sid: Int) = row match {
+  def replaceSid(row: DSAVal, sid: Int): DSAVal = row match {
     case v: ArrayValue => ArrayValue(sid :: v.value.tail.toList)
     case v: MapValue   => MapValue(v.value + ("sid" -> sid))
     case v             => v

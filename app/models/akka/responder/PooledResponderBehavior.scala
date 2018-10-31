@@ -4,7 +4,7 @@ import scala.concurrent.duration.DurationInt
 import akka.actor._
 import akka.persistence.PersistentActor
 import akka.routing.{Broadcast, ConsistentHashingPool}
-import models.akka.{MainResponderBehaviorState, PooledResponderBehaviorState, ResponderBehaviorState}
+import persistence.{MainResponderBehaviorState, PooledResponderBehaviorState, ResponderBehaviorState}
 import models.{Origin, Settings}
 import models.rpc.DSAResponse
 

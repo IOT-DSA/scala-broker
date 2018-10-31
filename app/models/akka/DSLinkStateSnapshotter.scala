@@ -5,6 +5,7 @@ import akka.persistence._
 import com.typesafe.config.Config
 import models.Settings
 import models.util.DsaToAkkaCoder._
+import persistence._
 
 trait DSLinkStateSnapshotter extends PersistentActor with ActorLogging {
 

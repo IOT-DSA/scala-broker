@@ -3,8 +3,8 @@ package models.akka.responder
 import akka.actor._
 import akka.persistence.PersistentActor
 import models.Origin
-import models.akka.{GroupCallRegistryRestoreProcess, MainResponderBehaviorState, ResponderBehaviorState, SimpleResponderBehaviorState}
 import models.rpc.DSAResponse
+import persistence.{GroupCallRegistryRestoreProcess, MainResponderBehaviorState, ResponderBehaviorState, SimpleResponderBehaviorState}
 
 /**
   * Handles communication with a remote DSLink in Responder mode using local maps
@@ -12,8 +12,8 @@ import models.rpc.DSAResponse
   */
 trait SimpleResponderBehavior extends ResponderBehavior { me: PersistentActor with ActorLogging =>
 
-  private val listRegistry = new ListCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-LIST", log))
-  private val subsRegistry = new SubscribeCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-SUBS", log))
+  private val listRegistry = new ListCallRegistry(ownId + "-LIST", log)
+  private val subsRegistry = new SubscribeCallRegistry(ownId + "-SUBS", log)
 
   val simpleResponderRecover: Receive = {
     case event: GroupCallRegistryRestoreProcess =>

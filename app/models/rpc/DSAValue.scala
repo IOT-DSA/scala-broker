@@ -6,10 +6,10 @@ package models.rpc
 sealed trait DSAValue[T] extends Serializable {
   val value: T
 
-  override def toString = value.toString
+  override def toString: String = value.toString
 
-  override def hashCode = value.hashCode()
-  override def equals(other: Any) = other match {
+  override def hashCode: Int = value.hashCode()
+  override def equals(other: Any): Boolean = other match {
     case that: DSAValue[T] => (that canEqual this) && value == that.value
     case _                 => false
   }
@@ -28,9 +28,9 @@ object DSAValue {
 
   implicit class NumericValue(val value: BigDecimal) extends DSAValue[BigDecimal]
 
-  implicit def longToNumericValue(x: Long) = NumericValue(x)
+  implicit def longToNumericValue(x: Long): NumericValue = NumericValue(x)
 
-  implicit def doubleToNumericValue(x: Double) = NumericValue(x)
+  implicit def doubleToNumericValue(x: Double): NumericValue = NumericValue(x)
 
   implicit class StringValue(val value: String) extends DSAValue[String]
 
@@ -42,7 +42,7 @@ object DSAValue {
 
   implicit class ArrayValue(val value: DSAArray) extends DSAValue[DSAArray]
 
-  def array(values: DSAVal*) = ArrayValue(values.toList)
+  def array(values: DSAVal*): ArrayValue = ArrayValue(values.toList)
 
-  def obj(tuples: (String, DSAVal)*) = MapValue(tuples.toMap)
+  def obj(tuples: (String, DSAVal)*): MapValue = MapValue(tuples.toMap)
 }

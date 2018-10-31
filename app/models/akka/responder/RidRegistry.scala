@@ -4,14 +4,16 @@ import collection.mutable.{Map => MutableMap}
 import models.Origin
 import models.akka.IntCounter.IntCounterState
 import models.akka.responder.RidRegistry.RidRegistryState
-import models.akka.{IntCounter, LookupRidRemoved, LookupRidRestoreProcess, LookupRidSaved, PartOfPersistenceBehavior}
+import models.akka.IntCounter
 import models.rpc.DSAMethod
 import models.rpc.DSAMethod.DSAMethod
+import persistence._
 
 /**
  * Request registry tied to RID.
  */
-class RidRegistry(val persistenceBehavior: PartOfPersistenceBehavior, var state: RidRegistryState) {
+class RidRegistry(var state: RidRegistryState,
+                  val persistenceBehavior: PersistenceBehavior[LookupRidRestoreProcess, RidRegistryState]) {
   import models.akka.responder.RidRegistry.LookupRecord
 
   private val nextTargetId: IntCounter = new IntCounter(state.internalCounterState)
@@ -51,18 +53,16 @@ class RidRegistry(val persistenceBehavior: PartOfPersistenceBehavior, var state:
    * Saves the lookup and persist this event.
    */
   private def saveLookup(method: DSAMethod, origin: Option[Origin], path: Option[String], tgtId: Int): Unit = {
-    persistenceBehavior.persist(LookupRidSaved(method, origin, path, tgtId)) { event =>
-      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
+    persistenceBehavior.persist(LookupRidSaved(method, origin, path, tgtId), state) { event =>
       addLookup(event.method, event.origin, event.path, event.tgtId)
-      persistenceBehavior.onPersist
     }
   }
 
   private def addLookup(method: DSAMethod, origin: Option[Origin], path: Option[String], tgtId: Int): Unit = {
     val record = LookupRecord(method, tgtId, origin, path)
     state.callsByTargetId += tgtId → record
-    origin foreach (state.callsByOrigin += _ → record)
-    path foreach (state.callsByPath += _ → record)
+    origin foreach (state.callsByOrigin += _ -> record)
+    path foreach (state.callsByPath += _ -> record)
   }
 
   /**
@@ -85,11 +85,7 @@ class RidRegistry(val persistenceBehavior: PartOfPersistenceBehavior, var state:
    * Removes the call record and persist this event.
    */
   def removeLookup(record: LookupRecord): Unit = {
-    persistenceBehavior.persist(LookupRidRemoved(record)) { event =>
-      persistenceBehavior.log.debug("{}: persisting {}", persistenceBehavior.ownId, event)
-      internalRemoveLookup(event.record)
-      persistenceBehavior.onPersist
-    }
+    persistenceBehavior.persist(LookupRidRemoved(record), state) {event => internalRemoveLookup(event.record)}
   }
 
   private def internalRemoveLookup(record: LookupRecord): Unit = {
@@ -138,11 +134,12 @@ object RidRegistry {
   case class RidRegistryState(internalCounterState: IntCounterState, callsByTargetId: MutableMap[Int, LookupRecord],
                               callsByOrigin: MutableMap[Origin, LookupRecord], callsByPath: MutableMap[String, LookupRecord])
 
-  def apply(persistenceBehavior: PartOfPersistenceBehavior, state: RidRegistryState): RidRegistry = new RidRegistry(persistenceBehavior, state)
+  def apply(state: RidRegistryState,
+            persistenceBehavior: PersistenceBehavior[LookupRidRestoreProcess, RidRegistryState]): RidRegistry = new RidRegistry(state, persistenceBehavior)
 
-  def apply(persistenceBehavior: PartOfPersistenceBehavior): RidRegistry = {
-    def state = RidRegistryState(IntCounterState(1, 1), MutableMap.empty[Int, LookupRecord],
-                                 MutableMap.empty[Origin, LookupRecord], MutableMap.empty[String, LookupRecord])
-    new RidRegistry(persistenceBehavior, state)
+  object RidRegistryState {
+    def empty() = RidRegistryState(IntCounterState(1, 1), MutableMap.empty[Int, LookupRecord],
+                                   MutableMap.empty[Origin, LookupRecord], MutableMap.empty[String, LookupRecord])
   }
 }
+

@@ -15,6 +15,7 @@ import models.rpc._
 import models.rpc.DSAValue.DSAVal
 import org.reactivestreams.Publisher
 import models.akka.QoSState._
+import persistence._
 
 /**
   * Handles communication with a remote DSLink in Requester mode.
@@ -172,7 +173,7 @@ trait RequesterBehavior {
             val qos = targetsBySid.get(sid).map(_.qos) getOrElse(QoS.Default)
             SubscriptionResponseEnvelope(response, sid, qos)
         }
-    } getOrElse(List())
+    } getOrElse List.empty
   }
 
   /**
