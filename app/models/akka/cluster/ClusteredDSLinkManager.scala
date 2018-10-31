@@ -10,6 +10,7 @@ import akka.cluster.ddata.DistributedData
 import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
 import akka.pattern.ask
+import models.Settings
 
 import scala.concurrent.Future
 
@@ -19,6 +20,7 @@ import scala.concurrent.Future
 class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSystem) extends DSLinkManager {
 
   import models.Settings._
+  import ClusteredDSLinkManager._
 
   implicit val ctx = system.dispatcher
 
@@ -121,20 +123,6 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
   }
 
   /**
-    * Extracts DSLink name and payload from the message.
-    */
-  private val extractEntityId: ShardRegion.ExtractEntityId = {
-    case EntityEnvelope(linkName, payload) => (linkName, payload)
-  }
-
-  /**
-    * Extracts Shard Id from the message.
-    */
-  private val extractShardId: ShardRegion.ExtractShardId = {
-    case EntityEnvelope(linkName, _) => (math.abs(linkName.hashCode) % DownstreamShardCount).toString
-  }
-
-  /**
     * Shard region for downstream links.
     */
   val dnlinkRegion = createRegion(Nodes.Downstream, dnlinkProps)
@@ -161,14 +149,12 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
         typeName,
         linkProps,
         settings,
-        extractEntityId,
-        extractShardId,
-        new CustomAllocationStrategy(threshold, maxSimultaneousRebalance),
-        PoisonPill
+        ClusteredDSLinkManager.extractEntityId,
+        ClusteredDSLinkManager.extractShardId
+       // new CustomAllocationStrategy(threshold, maxSimultaneousRebalance),
+      //  PoisonPill
       )
     }
-
-
   }
 
   private def routeToDistributed(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit =
@@ -176,4 +162,19 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
 
   private def ask4Distributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Future[Any] =
     distrubutedNodeRegistry ? RouteMessage(path, message, sender)
+}
+
+object ClusteredDSLinkManager {
+
+  /**
+    * Extracts DSLink name and payload from the message.
+    */
+  val extractEntityId: ShardRegion.ExtractEntityId = {
+    case EntityEnvelope(linkName, payload) => (linkName, payload)
+  }
+
+  val extractShardId: ShardRegion.ExtractShardId = {
+    case EntityEnvelope(linkName, _) => (math.abs(linkName.hashCode) % Settings.DownstreamShardCount).toString
+  }
+
 }

@@ -16,7 +16,6 @@ import controllers.BasicController
 import javax.inject.{Inject, Singleton}
 import models.Settings
 import models.akka.Messages.{AppendDsId2Token, GetOrCreateDSLink, GetTokens, RemoveDSLink}
-import models.akka.QoSState.SubscriptionSourceMessage
 import models.akka.{BrokerActors, ConnectionInfo, DSLinkManager, RichRoutee}
 import models.api.DSANode
 import models.handshake.{LocalKeys, RemoteKey}
@@ -422,7 +421,9 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
       }
 
       override def supervisorStrategy = OneForOneStrategy() {
-        case _ => SupervisorStrategy.restart
+        case any =>
+          log.error("restarting websocket: {}", any)
+          SupervisorStrategy.restart
       }
     }))
 

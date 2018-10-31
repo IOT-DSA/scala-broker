@@ -4,7 +4,7 @@ import scala.concurrent.duration.DurationInt
 import akka.actor._
 import akka.persistence.PersistentActor
 import akka.routing.{Broadcast, ConsistentHashingPool}
-import models.akka.{MainResponderBehaviorState, PooledResponderBehaviorState, ResponderBehaviorState}
+import models.akka.{MainResponderBehaviorState, PooledResponderBehaviorState, ResponderBehaviorState, RouteeNavigator}
 import models.{Origin, Settings}
 import models.rpc.DSAResponse
 
@@ -12,7 +12,7 @@ import models.rpc.DSAResponse
  * Handles communication with a remote DSLink in Responder mode using a router and a pool of workers
  * for implementing multi-recipient responce delivery (LIST, SUBSCRIBE).
  */
-trait PooledResponderBehavior extends ResponderBehavior { me: PersistentActor with ActorLogging =>
+trait PooledResponderBehavior extends ResponderBehavior { me:RouteeNavigator with PersistentActor with ActorLogging =>
 
   import context.system
   import ResponderWorker._

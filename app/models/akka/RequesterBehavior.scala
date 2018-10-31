@@ -37,6 +37,8 @@ trait RequesterBehavior {
   var toSocket: SourceQueueWithComplete[SubscriptionNotificationMessage] = _
   var subscriptionsPublisher: Publisher[DSAMessage] = _
 
+  me.afterConnection = me.afterConnection :+ getSubscriptionSource _
+
   /**
    * Processes incoming messages from Requester DSLink and dispatches responses to it.
    */
@@ -60,15 +62,10 @@ trait RequesterBehavior {
         log.debug("send to endpoint other: {}", other)
         sendToEndpoint(ResponseEnvelope(other))
       }
-
-    case SubscriptionSourceMessage(actorRef) =>
-      getSubscriptionSource(actorRef)
   }
 
   // requester mixin for disconnected behavior
   val requesterDisconnected: Receive = {
-    case SubscriptionSourceMessage(actorRef) =>
-      getSubscriptionSource(actorRef)
     case e @ ResponseEnvelope(responses) =>
 
       log.debug("{}: received in disconnected mode {}", ownId, e)
@@ -87,12 +84,13 @@ trait RequesterBehavior {
       }
   }
 
+
   /**
     * @return stream subscriptions stream publisher
     */
-  private def getSubscriptionSource(sinkRef: SinkRef[ResponseMessage]) = {
+  private def getSubscriptionSource(actorRef: ActorRef) = {
 
-    log.info("new subscription source connected: {}", sinkRef)
+    log.info("new subscription source connected: {}", actorRef)
 
     val toSocketVal = Source.queue[SubscriptionNotificationMessage](100, OnOverflow)
       .conflateWithSeed(List(_)){(list, next) => list :+ next}
@@ -102,10 +100,10 @@ trait RequesterBehavior {
           countTags("qos.notification.out")
         item
       }
-      .conflateWithSeed(resp => new ResponseMessage(-1, None, List(resp))) {
+      .conflateWithSeed(resp => ResponseEnvelope(List(resp))) {
         (message, next) => message.copy(responses = message.responses :+ next)
       }
-      .toMat(sinkRef.sink())(Keep.left)
+      .toMat(Sink.actorRef(actorRef, Success(())))(Keep.left)
       .run()
 
     toSocket = toSocketVal
@@ -141,10 +139,11 @@ trait RequesterBehavior {
    * Sends Unsubscribe for all open subscriptions and Close for List commands.
    */
   def stopRequester() = {
-    batchAndRoute(targetsByRid map { case (rid, target) => target -> CloseRequest(rid) })
-    batchAndRoute(targetsBySid.zipWithIndex map {
-      case ((sid, PathAndQos(target, _)), index) => target -> UnsubscribeRequest(lastRid + index + 1, sid)
-    })
+    // TODO  We definitely should do it, but not here
+//    batchAndRoute(targetsByRid map { case (rid, target) => target -> CloseRequest(rid) })
+//    batchAndRoute(targetsBySid.zipWithIndex map {
+//      case ((sid, PathAndQos(target, _)), index) => target -> UnsubscribeRequest(lastRid + index + 1, sid)
+//    })
   }
 
   private def handleSubscriptions(subscriptions:Seq[DSAResponse], connected: Boolean = true) = subscriptions foreach {

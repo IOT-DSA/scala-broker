@@ -3,14 +3,14 @@ package models.akka.responder
 import akka.actor._
 import akka.persistence.PersistentActor
 import models.Origin
-import models.akka.{GroupCallRegistryRestoreProcess, MainResponderBehaviorState, ResponderBehaviorState, SimpleResponderBehaviorState}
+import models.akka.{GroupCallRegistryRestoreProcess, MainResponderBehaviorState, ResponderBehaviorState, RouteeNavigator, SimpleResponderBehaviorState}
 import models.rpc.DSAResponse
 
 /**
   * Handles communication with a remote DSLink in Responder mode using local maps
   * for implementing multi-recipient responce delivery (LIST, SUBSCRIBE).
   */
-trait SimpleResponderBehavior extends ResponderBehavior { me: PersistentActor with ActorLogging =>
+trait SimpleResponderBehavior extends ResponderBehavior { me: RouteeNavigator with PersistentActor with ActorLogging =>
 
   private val listRegistry = new ListCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-LIST", log))
   private val subsRegistry = new SubscribeCallRegistry(new PartOfPersistentResponderBehavior(ownId + "-SUBS", log))

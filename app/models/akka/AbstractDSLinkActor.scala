@@ -23,7 +23,8 @@ import models.util.DsaToAkkaCoder._
  * When the actor is disconnected, it stashes incoming messages and releases them to the endpoint, once it
  * becomes connected again.
  */
-abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor with DSLinkStateSnapshotter with Stash with ActorLogging with Meter {
+abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor with DSLinkStateSnapshotter with Stash with RouteeNavigator with ActorLogging with
+  Meter {
   import Messages._
 
   protected val linkName = self.path.name.forDsa
@@ -39,6 +40,8 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
 
   private var lastConnected: Option[DateTime] = None
   private var lastDisconnected: Option[DateTime] = None
+
+  var afterConnection:Seq[ActorRef => Unit] = Seq()
 
   /**
    * Called on link start up: notifies the registry and logs the dslink status.
@@ -64,10 +67,22 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     case event: DSLinkBaseState =>
       log.debug("{}: recovering with event/snapshot {}", ownId, event)
       updateState(event)
+      endpoint.foreach( endP =>
+        afterConnection.foreach(_(endP))
+      )
 
     case RecoveryCompleted =>
-      endpoint.foreach{_ ! RouteeUpdateRequest}
-      log.info("{}: recovery completed with persistenceId: '{}'", ownId, persistenceId)
+      afterRecovery
+  }
+
+  def afterRecovery():Unit = {
+    endpoint.foreach{ ep =>
+      ep ! RouteeUpdateRequest()
+      log.debug("{}: unstashing all stored messages", ownId)
+      unstashAll()
+      context.become(connected orElse snapshotReceiver)
+    }
+    log.info("{}: recovery completed with persistenceId: '{}'", ownId, persistenceId)
   }
 
   private def updateState(event: DSLinkBaseState) = {
@@ -95,19 +110,19 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
-    case ConnectEndpoint(ref, ci) =>
+    case ConnectEndpoint(ci) =>
       log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
       disconnectFromEndpoint(true)
-      connectToEndpoint(ref, ci)
+      connectToEndpoint(sender, ci)
   }
 
   /**
    * Handles messages in DISCONNECTED state.
    */
   def disconnected: Receive = {
-    case ConnectEndpoint(ref, ci) =>
+    case ConnectEndpoint(ci) =>
       log.info("{}: connected to Endpoint", ownId)
-      connectToEndpoint(ref, ci)
+      connectToEndpoint(sender(), ci)
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
@@ -121,10 +136,6 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
       stash()
   }
 
-  protected def afterConnection():Unit = {}
-
-  protected def afterDisconnection():Unit = {}
-
   /**
    * Associates this DSLink with an endpoint.
    */
@@ -136,13 +147,12 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
       log.debug("{}: persisting {}", ownId, event)
       updateState(event)
       saveSnapshot(event)
-
       sendToRegistry(DSLinkStateChanged(linkName, event.connInfo.mode, true))
 
       log.debug("{}: unstashing all stored messages", ownId)
       unstashAll()
+      afterConnection.foreach(_(ref))
       context.become(connected orElse snapshotReceiver)
-      afterConnection()
     }
   }
 
@@ -163,7 +173,6 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
 
       sendToRegistry(DSLinkStateChanged(linkName, event.connInfo.mode, false))
       context.become(disconnected orElse snapshotReceiver)
-      afterDisconnection()
     }
   }
 

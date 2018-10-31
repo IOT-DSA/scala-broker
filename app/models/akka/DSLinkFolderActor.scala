@@ -19,7 +19,7 @@ import models.{RequestEnvelope, Settings}
  * When started, it verifies its own location against the `linkPath` parameter. For example,
  * if linkPath is set to "/downstream", the actor path needs to be "/user/downstream".
  */
-abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor with ActorLogging with SimpleResponderBehavior {
+abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor with ActorLogging with RouteeNavigator with SimpleResponderBehavior {
   import models.rpc.DSAValue._
   import models.rpc.StreamState._
   
@@ -34,6 +34,16 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   override def preStart = log.info(s"$ownId actor created")
 
   override def postStop = log.info(s"$ownId actor stopped")
+
+  /**
+    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
+    */
+  override def getDownlinkRoutee(dsaName: String): Routee = ???
+
+  /**
+    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
+    */
+  override def getUplinkRoutee(dsaName: String): Routee = ???
 
   val dslinkFolderRecover: Receive = {
     case event: DSLinkCreated =>

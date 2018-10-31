@@ -22,7 +22,6 @@ import akka.pattern.ask
 import scala.concurrent.Future
 import java.util.concurrent.{TimeUnit => TU}
 
-import models.akka.QoSState.SubscriptionSourceMessage
 
 /**
   * Encapsulates WebSocket actor configuration.
@@ -63,8 +62,8 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
     for (_ <- updateRoutee()) {
-      routee.foreach {
-        _ ! ConnectEndpoint(self, ci)
+      routee.foreach { r =>
+        r ! ConnectEndpoint(ci)
       }
       incrementTags(tagsForConnection("connected")(ci): _*)
     }
@@ -79,7 +78,7 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
     * Sends a DSAMessage to a WebSocket connection.
     */
   private def sendToSocket(msg: DSAMessage) = {
-    log.info("{}: sending {} to WebSocket {}", ownId, formatMessage(msg), out)
+    log.debug("{}: sending {} to WebSocket {}", ownId, formatMessage(msg), out)
     out.offer(msg)
   }
 
@@ -128,7 +127,11 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
       sendResponses(responses: _*)
     case StreamRequest() =>
       sender ! createWSFlow()
-    case RouteeUpdateRequest => routee = updateRoutee()
+    case RouteeUpdateRequest() =>
+      routee = updateRoutee()
+      routee.foreach{r =>
+        log.info("dslink routee updated {}", routee)
+      }
     case Success(_) | Failure(_) => self ! PoisonPill
     case Terminated(_) => context.stop(self)
   }
@@ -161,32 +164,19 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
     */
   private def createWSFlow(): Flow[DSAMessage, DSAMessage, NotUsed] = {
 
-    val (subscriptionsPusher, subscriptionsPublisher) = StreamRefs.sinkRef[ResponseMessage]()
-      .toMat(Sink.asPublisher(false))(Keep.both)
-      .run()
-
-
-    val subscriptionSrcRef = Source.fromPublisher(subscriptionsPublisher)
     val messageSink = Flow[Any].async.to(Sink.actorRef(self, Success(())))
-    val src = Source.fromPublisher(publisher).merge(subscriptionSrcRef)
-
-
-    for {
-      dslinkActor <- routee
-      subscriptionSink <- subscriptionsPusher
-    } {
-      dslinkActor ! SubscriptionSourceMessage(subscriptionSink)
-    }
-
+    val src = Source.fromPublisher(publisher)
     Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src).recover {
       case e: InvalidSequenceNumberException =>
         log.error(s"messages been lost: ${e.msg}", e)
         EmptyMessage
+
+      case e:Exception =>
+        log.error(s"Some strange exception: ${e.getMessage}", e)
+        throw e
     }
 
   }
-
-
 }
 
 /**

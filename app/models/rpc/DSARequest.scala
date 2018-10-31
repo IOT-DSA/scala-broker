@@ -73,7 +73,7 @@ case class SubscribeRequest(rid: Int, paths: List[SubscriptionPath]) extends DSA
   }
 }
 object SubscribeRequest {
-  def apply(rid: Int, paths: SubscriptionPath*): SubscribeRequest = apply(rid, paths.toList)
+  def apply(rid: Int,  paths: SubscriptionPath*): SubscribeRequest = apply(rid, paths.toList)
 }
 
 /**

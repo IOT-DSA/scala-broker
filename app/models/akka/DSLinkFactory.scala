@@ -8,7 +8,7 @@ import akka.routing.Routee
  * Combines [[AbstractDSLinkActor]] with Requester behavior and abstract Responder behavior
  * (to be provided by the subclasses).
  */
-abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends AbstractDSLinkActor(registry)
+abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee) extends AbstractDSLinkActor(registry)
   with RequesterBehavior with ResponderBehavior {
   
   protected val linkPath = dsaParent + "/" + linkName
@@ -34,6 +34,16 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
    * Handles messages in CONNECTED state.
    */
   override def connected = super.connected orElse requesterBehavior orElse responderBehavior orElse snapshotReceiver
+
+  /**
+    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
+    */
+  override def getDownlinkRoutee(dsaName: String): Routee = dslinkMgr.getDownlinkRoutee(dsaName)
+
+  /**
+    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
+    */
+  override def getUplinkRoutee(dsaName: String): Routee = dslinkMgr.getUplinkRoutee(dsaName)
 }
 
 /**
@@ -41,7 +51,7 @@ abstract class BaseDSLinkActor(dsaParent: String, registry: Routee) extends Abst
  * SUBSCRIBE calls.
  */
 class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee)
-  extends BaseDSLinkActor(dsaParent, registry)
+  extends BaseDSLinkActor(dslinkMgr, dsaParent, registry)
   with SimpleResponderBehavior {
 
   override def receiveRecover = super.receiveRecover orElse simpleResponderRecover
@@ -52,7 +62,7 @@ class SimpleDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registr
  * for managing LIST and SUBSCRIBE bindings.
  */
 class PooledDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee)
-  extends BaseDSLinkActor(dsaParent, registry)
+  extends BaseDSLinkActor(dslinkMgr, dsaParent, registry)
   with PooledResponderBehavior {
 
   override def receiveRecover = super.receiveRecover orElse pooledResponderRecover

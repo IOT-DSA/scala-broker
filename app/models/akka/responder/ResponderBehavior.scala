@@ -5,7 +5,7 @@ import akka.persistence.PersistentActor
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState, PartOfPersistenceBehavior}
+import models.akka.{AttributeSaved, DSLinkManager, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState, PartOfPersistenceBehavior, RouteeNavigator}
 import models.metrics.Meter
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
@@ -13,15 +13,32 @@ import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
 import _root_.akka.routing.ActorSelectionRoutee
 import _root_.akka.routing.Routee
 import _root_.akka.event.LoggingAdapter
+import models.akka.cluster.{ClusteredDSLinkManager, ShardedRoutee}
+import _root_.akka.cluster.sharding.ClusterSharding
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior extends DSLinkStateSnapshotter with Meter{ me: PersistentActor with ActorLogging =>
+trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNavigator with PersistentActor with ActorLogging =>
   import RidRegistry._
   import models.akka.RichRoutee
 
-  private def routee = ActorSelectionRoutee(context.actorSelection(sender.path))
+  private def routee = {
+    val path = sender.path
+    val nodeType = path.elements.find(name => name == Settings.Nodes.Downstream || name == Settings.Nodes.Upstream)
+
+    nodeType match {
+      case Some(Settings.Nodes.Downstream) => getDownlinkRoutee(sender.path.name)
+      case Some(Settings.Nodes.Upstream) => getUplinkRoutee(sender.path.name)
+      case None => ActorSelectionRoutee(context.actorSelection(sender.path))
+    }
+  }
+
+  private def shardingRoutee(nodeType:String): ShardedRoutee = {
+    val sharding = ClusterSharding(context.system)
+    val region = sharding.startProxy(nodeType, Some("backend"), ClusteredDSLinkManager.extractEntityId, ClusteredDSLinkManager.extractShardId)
+    ShardedRoutee(region, sender.path.name)
+  }
 
   protected def linkPath: String
   protected def ownId: String
