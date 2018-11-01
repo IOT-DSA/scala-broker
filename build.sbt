@@ -143,6 +143,7 @@ lazy val commonDependencies = Seq(
   "com.typesafe.akka"           %% "akka-persistence"            % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-remote"                 % AKKA_VERSION,
   "com.typesafe.akka"            % "akka-cluster-metrics_2.12"   % AKKA_VERSION,
+  "org.fusesource.leveldbjni"    % "leveldbjni-all"              % "1.8",
   "com.paulgoldbaum"            %% "scala-influxdb-client"       % "0.5.2",
   "org.bouncycastle"             % "bcprov-jdk15on"              % "1.51",
   "com.github.romix.akka"       %% "akka-kryo-serialization"     % "0.5.1",
