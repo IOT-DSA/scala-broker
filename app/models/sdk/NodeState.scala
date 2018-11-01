@@ -1,15 +1,21 @@
 package models.sdk
 
+import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue.{DSAMap, DSAVal}
 
 /**
   * The internal state of the node.
   */
-case class NodeState(displayName: Option[String],
-                     value: Option[DSAVal],
+case class NodeState(value: Option[DSAVal],
                      action: Option[NodeAction],
                      attributes: DSAMap,
-                     children: Set[String])
+                     configs: DSAMap,
+                     children: Set[String]) {
+
+  val valueType: DSAValueType = configs.valueType
+  val profile: String = configs.profile
+  val displayName: Option[String] = configs.displayName
+}
 
 /**
   * Predefined states.
@@ -18,7 +24,7 @@ object NodeState {
   /**
     * An empty state, assigned to a node initially.
     */
-  val Empty = NodeState(None, None, None, Map.empty, Set.empty)
+  val Empty = NodeState(None, None, Map.empty, Map.empty, Set.empty)
 }
 
 /**
@@ -26,10 +32,15 @@ object NodeState {
   */
 case class NodeStatus(name: String,
                       parent: Option[NodeRef] = None,
-                      displayName: Option[String] = None,
                       value: Option[DSAVal] = None,
                       invokable: Boolean = false,
-                      attributes: DSAMap = Map.empty)
+                      attributes: DSAMap = Map.empty,
+                      configs: DSAMap = Map.empty) {
+
+  val valueType: DSAValueType = configs.valueType
+  val profile: String = configs.profile
+  val displayName: Option[String] = configs.displayName
+}
 
 /**
   * Factory for [[NodeStatus]] instances.
@@ -48,8 +59,8 @@ object NodeStatus {
     NodeStatus(
       name,
       parent,
-      state.displayName,
       state.value,
       state.action.isDefined,
-      state.attributes)
+      state.attributes,
+      state.configs)
 }

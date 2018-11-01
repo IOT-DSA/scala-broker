@@ -8,7 +8,9 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import models.akka.AbstractActorSpec
 import models.api.DSAValueType
+import models.api.DSAValueType._
 import models.rpc.DSAValue._
+import models.sdk
 import models.sdk.NodeBehavior._
 import models.sdk.NodeCommand._
 
@@ -63,35 +65,58 @@ class NodeBehaviorSpec extends AbstractActorSpec {
 
   "NodeBehavior" should {
     "handle basic management commands" in {
-      root ! SetDisplayName("Root")
       root ! SetValue(Some(555))
-      checkStatus(root, NodeStatus("root", None, Some("Root"), Some(555), false))
+      checkStatus(root, NodeStatus(name = "root", value = Some(555)))
     }
     "handle attribute commands" in {
       root ! SetAttributes(Map("a" -> 1, "@b" -> 2))
-      checkStatus(root, NodeStatus("root", None, Some("Root"), Some(555), false, Map("@a" -> 1, "@b" -> 2)))
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), attributes = Map("@a" -> 1, "@b" -> 2)))
       root ! PutAttribute("x", true)
-      checkStatus(root, NodeStatus("root", None, Some("Root"), Some(555), false, Map("@a" -> 1, "@b" -> 2, "@x" -> true)))
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), attributes = Map("@a" -> 1, "@b" -> 2, "@x" -> true)))
       root ! RemoveAttribute("b")
-      checkStatus(root, NodeStatus("root", None, Some("Root"), Some(555), false, Map("@a" -> 1, "@x" -> true)))
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), attributes = Map("@a" -> 1, "@x" -> true)))
       root ! RemoveAttribute("@x")
-      checkStatus(root, NodeStatus("root", None, Some("Root"), Some(555), false, Map("@a" -> 1)))
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), attributes = Map("@a" -> 1)))
       root ! ClearAttributes
-      checkStatus(root, NodeStatus("root", None, Some("Root"), Some(555), false, Map.empty))
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), attributes = Map.empty))
+    }
+    "handle special config commands" in {
+      root ! SetDisplayName("Root")
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), configs = Map(DisplayCfg -> "Root")))
+      root ! SetValueType(DSANumber)
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), configs = Map(DisplayCfg -> "Root",
+        ValueTypeCfg -> DSANumber)))
+      root ! SetProfile("something")
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), configs = Map(DisplayCfg -> "Root",
+        ValueTypeCfg -> DSANumber, ProfileCfg -> "something")))
+    }
+    "handle general config commands" in {
+      root ! SetConfigs(Map("a" -> 1, "$b" -> 2))
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), configs = Map("$a" -> 1, "$b" -> 2)))
+      root ! PutConfig("x", true)
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), configs = Map("$a" -> 1, "$b" -> 2, "$x" -> true)))
+      root ! RemoveConfig("b")
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), configs = Map("$a" -> 1, "$x" -> true)))
+      root ! RemoveConfig("$x")
+      checkStatus(root, NodeStatus(name = "root", value = Some(555), configs = Map("$a" -> 1)))
+      root ! ClearConfigs
+      checkStatus(root, NodeStatus(name = "root", value = Some(555)))
     }
     "handle AddChild command" in {
       val fChildA = root ? (AddChild("aaa", _)): Future[NodeRef]
       whenReady(fChildA) { child =>
         child ! SetDisplayName("Aaa")
         child ! SetValue(Some(true))
-        checkStatus(child, NodeStatus("aaa", Some(root), Some("Aaa"), Some(true), false, Map.empty))
+        checkStatus(child, NodeStatus(name = "aaa", parent = Some(root), value = Some(true),
+          configs = Map(DisplayCfg -> "Aaa")))
       }
       val fChildB = root ? (AddChild("bbb", _)): Future[NodeRef]
       whenReady(fChildB) { child =>
         child ! SetDisplayName("Bbb")
         child ! SetValue(Some(2))
         child ! SetAttributes(Map("x" -> "y"))
-        checkStatus(child, NodeStatus("bbb", Some(root), Some("Bbb"), Some(2), false, Map("@x" -> "y")))
+        checkStatus(child, NodeStatus(name = "bbb", parent = Some(root), value = Some(2), attributes = Map("@x" -> "y"),
+          configs = Map(DisplayCfg -> "Bbb")))
       }
     }
     "handle GetChildren command" in {
@@ -102,7 +127,8 @@ class NodeBehaviorSpec extends AbstractActorSpec {
     "handle GetChild command" in {
       val fChild: Future[Option[NodeRef]] = root ? (GetChild("aaa", _))
       whenReady(fChild) { child =>
-        checkStatus(child.value, NodeStatus("aaa", Some(root), Some("Aaa"), Some(true), false, Map.empty))
+        checkStatus(child.value, NodeStatus(name = "aaa", parent = Some(root), value = Some(true),
+          configs = Map(DisplayCfg -> "Aaa")))
       }
     }
     "handle RemoveChild command" in {
@@ -125,7 +151,8 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       }, Param("x", DSAValueType.DSANumber))
       fChild foreach { child =>
         child.value ! SetAction(action)
-        checkStatus(child.value, NodeStatus("bbb", Some(root), Some("Bbb"), Some(2), true, Map("@x" -> "y")))
+        checkStatus(child.value, NodeStatus(name = "bbb", parent = Some(root), value = Some(2), invokable = true,
+          attributes = Map("@x" -> "y"), configs = Map(DisplayCfg -> "Bbb")))
       }
     }
     "handle valid Invoke command" in {
@@ -161,14 +188,15 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       expectTerminated(root.toUntyped)
 
       val root2 = system.spawn(node("root", None), "root")
-      checkStatus(root2, NodeStatus("root", None, Some("Root"), Some(555), false, Map("@a" -> 1, "@b" -> true)))
+      checkStatus(root2, NodeStatus(name = "root", value = Some(555), attributes = Map("@a" -> 1, "@b" -> true)))
       whenReady(root2 ? (GetChildren)) { children =>
         children.map(_.path.name).toSet mustBe Set("a1", "a2")
       }
 
       val fChild: Future[Option[NodeRef]] = root2 ? (GetChild("a1", _))
       whenReady(fChild) { child =>
-        checkStatus(child.value, NodeStatus("a1", Some(root2), Some("A1"), Some(3), false, Map("@x" -> true)))
+        checkStatus(child.value, NodeStatus(name = "a1", parent = Some(root2), value = Some(3),
+          attributes = Map("@x" -> true), configs = Map(DisplayCfg -> "A1")))
       }
     }
   }

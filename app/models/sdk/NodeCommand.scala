@@ -2,6 +2,7 @@ package models.sdk
 
 import akka.Done
 import akka.actor.typed.ActorRef
+import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue.{DSAMap, DSAVal}
 
 /**
@@ -15,9 +16,14 @@ sealed trait NodeCommand extends Serializable
 object NodeCommand {
   type Cmd = NodeCommand
 
+  /* node state commands */
+
   final case class GetStatus(replyTo: ActorRef[NodeStatus]) extends Cmd
 
   final case class SetDisplayName(name: String) extends Cmd
+  final case class SetValueType(vType: DSAValueType) extends Cmd
+  final case class SetProfile(profile: String) extends Cmd
+
   final case class SetValue(value: Option[DSAVal]) extends Cmd
 
   final case class SetAction(action: NodeAction) extends Cmd
@@ -27,6 +33,11 @@ object NodeCommand {
   final case class PutAttribute(name: String, value: DSAVal) extends Cmd
   final case class RemoveAttribute(name: String) extends Cmd
   final case object ClearAttributes extends Cmd
+
+  final case class SetConfigs(configs: DSAMap) extends Cmd
+  final case class PutConfig(name: String, value: DSAVal) extends Cmd
+  final case class RemoveConfig(name: String) extends Cmd
+  final case object ClearConfigs extends Cmd
 
   final case class GetChildren(replyTo: ActorRef[NodeRefs]) extends Cmd
   final case class GetChild(name: String, replyTo: ActorRef[Option[NodeRef]]) extends Cmd
