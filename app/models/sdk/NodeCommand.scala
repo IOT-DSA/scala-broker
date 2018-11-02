@@ -8,7 +8,7 @@ import models.rpc.DSAValue.{DSAMap, DSAVal}
 /**
   * Command that can be sent to a typed actor representing a DSA node.
   */
-sealed trait NodeCommand extends Serializable
+trait NodeCommand extends Serializable
 
 /**
   * Available node commands.
@@ -46,4 +46,21 @@ object NodeCommand {
   final case class RemoveChildren(replyTo: ActorRef[Done]) extends Cmd
 
   final case object Stop extends Cmd
+
+  /* subscription commands */
+
+  final case class AddValueListener(ref: ValueListener) extends Cmd
+  final case class AddAttributeListener(ref: AttributeListener) extends Cmd
+  final case class AddConfigListener(ref: ConfigListener) extends Cmd
+  final case class AddChildListener(ref: ChildListener) extends Cmd
+
+  final case class RemoveValueListener(ref: ValueListener) extends Cmd
+  final case class RemoveAttributeListener(ref: AttributeListener) extends Cmd
+  final case class RemoveConfigListener(ref: ConfigListener) extends Cmd
+  final case class RemoveChildListener(ref: ChildListener) extends Cmd
+
+  final case object RemoveAllValueListeners extends Cmd
+  final case object RemoveAllAttributeListeners extends Cmd
+  final case object RemoveAllConfigListeners extends Cmd
+  final case object RemoveAllChildListeners extends Cmd
 }

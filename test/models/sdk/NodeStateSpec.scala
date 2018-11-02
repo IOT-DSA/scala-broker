@@ -38,5 +38,5 @@ class NodeStateSpec extends AbstractActorSpec {
     }
   }
 
-  private def stateWithConfig(cfgs: (String, DSAVal)*) = NodeState(None, None, Map.empty, cfgs.toMap, Set.empty)
+  private def stateWithConfig(cfgs: (String, DSAVal)*) = DefaultNodeState(None, None, Map.empty, cfgs.toMap, Set.empty)
 }

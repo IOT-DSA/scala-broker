@@ -5,14 +5,15 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
+import akka.testkit.TestProbe
 import akka.util.Timeout
 import models.akka.AbstractActorSpec
 import models.api.DSAValueType
 import models.api.DSAValueType._
 import models.rpc.DSAValue._
-import models.sdk
 import models.sdk.NodeBehavior._
 import models.sdk.NodeCommand._
+import models.sdk.NodeEvent._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -147,7 +148,10 @@ class NodeBehaviorSpec extends AbstractActorSpec {
           parent <- (ctx.actionNode ? (GetStatus)).map(_.parent.value)
           status <- parent ? (GetStatus)
           value = status.value.getOrElse(0: DSAVal)
-        } yield ActionResult(x * (value: Int), Some(src))
+        } yield {
+          parent ! SetValue(Some((value: Int) + 1))
+          ActionResult(x * (value: Int), Some(src))
+        }
       }, Param("x", DSAValueType.DSANumber))
       fChild foreach { child =>
         child.value ! SetAction(action)
@@ -160,10 +164,12 @@ class NodeBehaviorSpec extends AbstractActorSpec {
         child <- (root ? (GetChild("bbb", _))): Future[Option[NodeRef]]
         result <- (child.value ? (Invoke(Map("x" -> 5), _))): Future[ActionResult]
         stream <- result.stream.value.take(3).runWith(Sink.seq)
-      } yield (result.value, stream)
+        status <- root ? (GetStatus)
+      } yield (result.value, stream, status)
       whenReady(fResult) { res =>
         res._1 mustBe NumericValue(5 * 555)
         res._2 mustBe Seq(1: DSAVal, 2: DSAVal, 3: DSAVal)
+        res._3.value mustBe Some(556: DSAVal)
       }
     }
     "handle RemoveChildren command" in {
@@ -188,7 +194,7 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       expectTerminated(root.toUntyped)
 
       val root2 = system.spawn(node("root", None), "root")
-      checkStatus(root2, NodeStatus(name = "root", value = Some(555), attributes = Map("@a" -> 1, "@b" -> true)))
+      checkStatus(root2, NodeStatus(name = "root", value = Some(556), attributes = Map("@a" -> 1, "@b" -> true)))
       whenReady(root2 ? (GetChildren)) { children =>
         children.map(_.path.name).toSet mustBe Set("a1", "a2")
       }
@@ -201,5 +207,112 @@ class NodeBehaviorSpec extends AbstractActorSpec {
     }
   }
 
+  val link = system.spawn(node("link", None), "link")
+
+  "NodeBehavior" should {
+    "notify about value changes" in {
+      val probe1 = TestProbe()
+      val probe2 = TestProbe()
+      link ! AddValueListener(probe1.ref)
+      link ! AddValueListener(probe2.ref)
+      link ! SetValue(Some("abc"))
+      probe1.expectMsg(ValueChanged(Some("abc")))
+      probe2.expectMsg(ValueChanged(Some("abc")))
+      link ! RemoveValueListener(probe1.ref)
+      link ! SetValue(None)
+      probe1.expectNoMessage()
+      probe2.expectMsg(ValueChanged(None))
+      link ! RemoveAllValueListeners
+      link ! SetValue(Some("xyz"))
+      probe1.expectNoMessage()
+      probe2.expectNoMessage()
+    }
+    "notify about attribute changes" in {
+      val probe1 = TestProbe()
+      val probe2 = TestProbe()
+      link ! AddAttributeListener(probe1.ref)
+      link ! AddAttributeListener(probe2.ref)
+      link ! SetAttributes(Map("a" -> 1, "b" -> true))
+      probe1.expectMsg(AttributesChanged(Map("@a" -> 1, "@b" -> true)))
+      probe2.expectMsg(AttributesChanged(Map("@a" -> 1, "@b" -> true)))
+      link ! PutAttribute("@c", "xyz")
+      probe1.expectMsg(AttributeAdded("@c", "xyz"))
+      probe2.expectMsg(AttributeAdded("@c", "xyz"))
+      link ! RemoveAttributeListener(probe1.ref)
+      link ! RemoveAttribute("b")
+      probe1.expectNoMessage()
+      probe2.expectMsg(AttributeRemoved("@b"))
+      link ! ClearAttributes
+      probe1.expectNoMessage()
+      probe2.expectMsg(AttributesChanged(Map.empty))
+      link ! RemoveAllAttributeListeners
+      link ! PutAttribute("d", 5)
+      probe1.expectNoMessage()
+      probe2.expectNoMessage()
+    }
+    "notify about config changes" in {
+      val probe1 = TestProbe()
+      val probe2 = TestProbe()
+      link ! AddConfigListener(probe1.ref)
+      link ! AddConfigListener(probe2.ref)
+      link ! SetConfigs(Map("a" -> 1, "b" -> true))
+      probe1.expectMsg(ConfigsChanged(Map("$a" -> 1, "$b" -> true)))
+      probe2.expectMsg(ConfigsChanged(Map("$a" -> 1, "$b" -> true)))
+      link ! PutConfig("$c", "xyz")
+      probe1.expectMsg(ConfigAdded("$c", "xyz"))
+      probe2.expectMsg(ConfigAdded("$c", "xyz"))
+      link ! RemoveConfigListener(probe1.ref)
+      link ! RemoveConfig("b")
+      probe1.expectNoMessage()
+      probe2.expectMsg(ConfigRemoved("$b"))
+      link ! ClearConfigs
+      probe1.expectNoMessage()
+      probe2.expectMsg(ConfigsChanged(Map.empty))
+      link ! SetDisplayName("Link")
+      probe1.expectNoMessage()
+      probe2.expectMsg(ConfigAdded("$name", "Link"))
+      link ! SetValueType(DSAArray)
+      probe1.expectNoMessage()
+      probe2.expectMsg(ConfigAdded("$type", DSAArray))
+      link ! SetProfile("device")
+      probe1.expectNoMessage()
+      probe2.expectMsg(ConfigAdded("$is", "device"))
+      link ! RemoveAllConfigListeners
+      link ! PutConfig("$x", 3)
+      probe1.expectNoMessage()
+      probe2.expectNoMessage()
+    }
+    "notify about child changes" in {
+      val probe1 = TestProbe()
+      val probe2 = TestProbe()
+      link ! AddChildListener(probe1.ref)
+      link ! AddChildListener(probe2.ref)
+      link ! AddChild("aaa", null)
+      link ! AddChild("bbb", null)
+      probe1.expectMsg(ChildAdded("aaa"))
+      probe1.expectMsg(ChildAdded("bbb"))
+      probe2.expectMsg(ChildAdded("aaa"))
+      probe2.expectMsg(ChildAdded("bbb"))
+      link ! RemoveChildListener(probe1.ref)
+      link ! RemoveChild("aaa", null)
+      probe1.expectNoMessage()
+      probe2.expectMsg(ChildRemoved("aaa"))
+      link ! RemoveChildren(null)
+      probe1.expectNoMessage()
+      probe2.expectMsg(ChildrenRemoved)
+      link ! RemoveAllChildListeners
+      link ! AddChild("ccc", null)
+      probe1.expectNoMessage()
+      probe2.expectNoMessage()
+    }
+  }
+
+  /**
+    * Compares the current node status against the expected one.
+    *
+    * @param node
+    * @param expected
+    * @return
+    */
   def checkStatus(node: NodeRef, expected: NodeStatus) = whenReady(node ? (GetStatus))(_ mustBe expected)
 }
