@@ -124,7 +124,7 @@ spec:
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
-          value: "-Xmx6500m"
+          value: "-Xmx6500m -D"
         - name: STATSD_HOST
           value: cloud-metrics-internal.default.svc.cluster.local
         - name: STATSD_PORT
@@ -148,7 +148,7 @@ spec:
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
-          value: "/opt/docker/conf/backend.conf"
+          value: "/opt/docker/conf/backend-cassandra.conf"
         resources:
           requests:
             memory: "3500Mi"
