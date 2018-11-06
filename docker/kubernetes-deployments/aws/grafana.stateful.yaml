@@ -42,6 +42,7 @@ spec:
   - metadata:
       name: metrics-data
     spec:
+      storageClassName: fast
       accessModes:
       - ReadWriteOnce
       resources:
