@@ -53,7 +53,7 @@ spec:
           - name: HEAP_NEWSIZE
             value: 100M
           - name: CASSANDRA_SEEDS
-            value: "cassandra-0.cassandra.default.svc.cluster.local"
+            value: "cassandra-0.cassandra-internal.default.svc.cluster.local"
           - name: CASSANDRA_CLUSTER_NAME
             value: "CloudBroker"
           - name: CASSANDRA_DC
