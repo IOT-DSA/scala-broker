@@ -61,6 +61,8 @@ spec:
               fieldPath: metadata.name
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
+        - name: CASSANDRA_SEED_NODES
+          value: "cassandra-0"
         - name: AKKA_SEED_NODES
           value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
@@ -143,6 +145,8 @@ spec:
               fieldPath: status.podIP
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
+        - name: CASSANDRA_SEED_NODES
+          value: "cassandra-0"
         - name: AKKA_SEED_NODES
           value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
