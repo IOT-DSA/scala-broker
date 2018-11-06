@@ -1,14 +1,20 @@
 package models.akka.responder
 
 import models.akka.AbstractActorSpec
+import models.akka.IntCounter.IntCounterState
+import models.akka.responder.SidRegistry.SidRegistryState
 import models.util.PartOfPersistenceBehaviorStub
+
+import collection.mutable.{Map => MutableMap}
 
 /**
  * SidRegistry test suite.
  */
 class SidRegistrySpec extends AbstractActorSpec {
 
-  val registry = new SidRegistry(new PartOfPersistenceBehaviorStub)
+  val state = SidRegistryState(IntCounterState(1, 1), MutableMap.empty[Int, String], MutableMap.empty[String, Int])
+  val registry = new SidRegistry(new PartOfPersistenceBehaviorStub, state)
+
 
   "SidRegistry" should {
     "save lookups" in {
