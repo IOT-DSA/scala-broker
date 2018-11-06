@@ -22,7 +22,7 @@ spec:
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cassandra-internal.default.svc.cluster.local cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -102,7 +102,7 @@ spec:
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cassandra-internal.default.svc.cluster.local cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster-squad
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
