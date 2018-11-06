@@ -152,7 +152,7 @@ spec:
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
-          value: "/opt/docker/conf/backend-cassandra.conf"
+          value: "/opt/docker/conf/backend_cassandra.conf"
         resources:
           requests:
             memory: "3500Mi"
