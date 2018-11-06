@@ -72,7 +72,7 @@ spec:
         resources:
           requests:
             memory: "3500Mi"
-            cpu: "1700m"
+            cpu: "3700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"
@@ -156,7 +156,7 @@ spec:
         resources:
           requests:
             memory: "3500Mi"
-            cpu: "1700m"
+            cpu: "3700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"
