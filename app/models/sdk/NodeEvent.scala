@@ -5,7 +5,7 @@ import models.rpc.DSAValue._
 /**
   * Events processed by a node.
   */
-trait NodeEvent extends Serializable
+sealed trait NodeEvent extends Serializable
 
 /**
   * Available node events.
@@ -14,20 +14,20 @@ object NodeEvent {
 
   final case class ActionChanged(action: NodeAction) extends NodeEvent
 
-  sealed trait ValueEvent extends NodeEvent
+  trait ValueEvent extends NodeEvent
   final case class ValueChanged(value: Option[DSAVal]) extends ValueEvent
 
-  sealed trait AttributeEvent extends NodeEvent
+  trait AttributeEvent extends NodeEvent
   final case class AttributeAdded(name: String, value: DSAVal) extends AttributeEvent
   final case class AttributeRemoved(name: String) extends AttributeEvent
   final case class AttributesChanged(attributes: DSAMap) extends AttributeEvent
 
-  sealed trait ConfigEvent extends NodeEvent
+  trait ConfigEvent extends NodeEvent
   final case class ConfigAdded(name: String, value: DSAVal) extends ConfigEvent
   final case class ConfigRemoved(name: String) extends ConfigEvent
   final case class ConfigsChanged(attributes: DSAMap) extends ConfigEvent
 
-  sealed trait ChildEvent extends NodeEvent
+  trait ChildEvent extends NodeEvent
   final case class ChildAdded(name: String) extends ChildEvent
   final case class ChildRemoved(name: String) extends ChildEvent
   final case object ChildrenRemoved extends ChildEvent

@@ -31,6 +31,8 @@ class NodeBehaviorSpec extends AbstractActorSpec {
 
   import system.dispatcher
 
+  val noMsgWait = 500 milliseconds
+
   "NodeBehavior" should {
     "work as a typed ActorSystem" in {
       val actorSystem = createActorSystem("dsa")
@@ -220,12 +222,12 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       probe2.expectMsg(ValueChanged(Some("abc")))
       link ! RemoveValueListener(probe1.ref)
       link ! SetValue(None)
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ValueChanged(None))
       link ! RemoveAllValueListeners
       link ! SetValue(Some("xyz"))
-      probe1.expectNoMessage()
-      probe2.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
+      probe2.expectNoMessage(noMsgWait)
     }
     "notify about attribute changes" in {
       val probe1 = TestProbe()
@@ -240,15 +242,15 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       probe2.expectMsg(AttributeAdded("@c", "xyz"))
       link ! RemoveAttributeListener(probe1.ref)
       link ! RemoveAttribute("b")
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(AttributeRemoved("@b"))
       link ! ClearAttributes
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(AttributesChanged(Map.empty))
       link ! RemoveAllAttributeListeners
       link ! PutAttribute("d", 5)
-      probe1.expectNoMessage()
-      probe2.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
+      probe2.expectNoMessage(noMsgWait)
     }
     "notify about config changes" in {
       val probe1 = TestProbe()
@@ -263,24 +265,24 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       probe2.expectMsg(ConfigAdded("$c", "xyz"))
       link ! RemoveConfigListener(probe1.ref)
       link ! RemoveConfig("b")
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ConfigRemoved("$b"))
       link ! ClearConfigs
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ConfigsChanged(Map.empty))
       link ! SetDisplayName("Link")
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ConfigAdded("$name", "Link"))
       link ! SetValueType(DSAArray)
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ConfigAdded("$type", DSAArray))
       link ! SetProfile("device")
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ConfigAdded("$is", "device"))
       link ! RemoveAllConfigListeners
       link ! PutConfig("$x", 3)
-      probe1.expectNoMessage()
-      probe2.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
+      probe2.expectNoMessage(noMsgWait)
     }
     "notify about child changes" in {
       val probe1 = TestProbe()
@@ -295,15 +297,15 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       probe2.expectMsg(ChildAdded("bbb"))
       link ! RemoveChildListener(probe1.ref)
       link ! RemoveChild("aaa", null)
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ChildRemoved("aaa"))
       link ! RemoveChildren(null)
-      probe1.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
       probe2.expectMsg(ChildrenRemoved)
       link ! RemoveAllChildListeners
       link ! AddChild("ccc", null)
-      probe1.expectNoMessage()
-      probe2.expectNoMessage()
+      probe1.expectNoMessage(noMsgWait)
+      probe2.expectNoMessage(noMsgWait)
     }
   }
 

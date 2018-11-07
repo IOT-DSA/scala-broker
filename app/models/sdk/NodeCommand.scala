@@ -8,7 +8,7 @@ import models.rpc.DSAValue.{DSAMap, DSAVal}
 /**
   * Command that can be sent to a typed actor representing a DSA node.
   */
-trait NodeCommand extends Serializable
+sealed trait NodeCommand extends Serializable
 
 /**
   * Available node commands.
