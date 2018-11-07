@@ -44,7 +44,7 @@ spec:
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
-          value: "-Xmx1000m"
+          value: "-Xmx2000m"
         - name: STATSD_HOST
           value: cloud-metrics-internal.default.svc.cluster.local
         - name: STATSD_PORT
@@ -67,11 +67,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "100m"
+            memory: "2Gi"
+            cpu: "1000m"
           limits:
-            memory: "1Gi"
-            cpu: "300m"
+            memory: "2Gi"
+            cpu: "1500m"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -117,7 +117,7 @@ spec:
         - containerPort: 9443
         env:
         - name: JAVA_OPTS
-          value: "-Xmx1000m"
+          value: "-Xmx2000m"
         - name: STATSD_HOST
           value: cloud-metrics-internal.default.svc.cluster.local
         - name: STATSD_PORT
@@ -144,11 +144,11 @@ spec:
           value: "/opt/docker/conf/backend.conf"
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "100m"
+            memory: "2Gi"
+            cpu: "1000m"
           limits:
-            memory: "1Gi"
-            cpu: "300m"
+            memory: "2Gi"
+            cpu: "1500m"
 ---
 apiVersion: v1
 kind: Service
