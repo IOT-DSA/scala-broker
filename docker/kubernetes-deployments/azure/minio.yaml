@@ -1,0 +1,59 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels:
+    app: minio
+  namespace: spinnaker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+        app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: minio
+        image: minio/minio
+        env:
+        - name: MINIO_ACCESS_KEY
+          value: "AKIAIOSFODNN7EXAMPLE"
+        - name: MINIO_SECRET_KEY
+          value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        ports:
+        - containerPort: 9000
+        resources:
+          limits:
+            cpu: 100m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        command: 
+         - minio
+         - server
+         - /data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: spinnaker
+  labels:
+    app: minio
+spec:
+  ports:
+  - port: 9000
+    targetPort: 9000
+  selector:
+    app: minio
+
+# docker run -p 9000:9000 --name minio1 \
+#   -e "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" \
+#   -e "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
+#   minio/minio server /data
