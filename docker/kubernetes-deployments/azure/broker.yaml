@@ -99,7 +99,6 @@ spec:
       - name: broker-cluster-squad
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
         imagePullPolicy: Always
-
         livenessProbe:
           httpGet:
             path: /health
