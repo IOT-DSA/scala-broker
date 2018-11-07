@@ -16,10 +16,6 @@ spec:
       labels:
         app: cloud-broker-cluster
     spec:
-      # subdomain: "cloud-broker-internal"
-      # dnsConfig:
-      #   searches:
-      #   - cloud-broker-internal.default.svc.cluster.local
       initContainers:
       - name: init-resolv
         image: "busybox"
@@ -93,10 +89,6 @@ spec:
         app: cloud-broker-cluster
         depl_type: squad
     spec:
-      # subdomain: "cloud-broker-internal-squad"
-      # dnsConfig:
-      #   searches:
-      #   - cloud-broker-internal.default.svc.cluster.local
       initContainers:
       - name: init-resolv
         image: "busybox"
