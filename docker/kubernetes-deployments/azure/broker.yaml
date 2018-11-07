@@ -24,7 +24,7 @@ spec:
         - name: regcred
       containers:
       - name: broker-cluster
-        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance"
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -97,7 +97,7 @@ spec:
         - name: regcred
       containers:
       - name: broker-cluster-squad
-        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance"
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
