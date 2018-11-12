@@ -15,4 +15,6 @@ trait RouteeNavigator {
     */
   def getUplinkRoutee(dsaName: String): Routee
 
+  def updateRoutee(routee:Routee): Routee
+
 }

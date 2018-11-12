@@ -9,8 +9,8 @@ import models.rpc.DSAValue.DSAVal
  * Encapsulates information about a List or Subscribe call - the requesters assigned to it
  * and the last received response, if any.
  */
-class GroupCallRecord {
-  private var _origins = Set.empty[Origin]
+class GroupCallRecord(initialOrigins:Set[Origin] = Set.empty, originalLastResp:Option[DSAResponse] = None) {
+  private var _origins = initialOrigins
   private var _lastResponse: Option[DSAResponse] = None
 
   def lastResponse = _lastResponse

@@ -61,12 +61,6 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
   override def preStart() = {
     log.info("{}: initialized, sending 'allowed' to client", ownId)
     sendAllowed(config.salt)
-    for (_ <- updateRoutee()) {
-      routee.foreach { r =>
-        r ! ConnectEndpoint(ci)
-      }
-      incrementTags(tagsForConnection("connected")(ci): _*)
-    }
   }
 
   /**
@@ -83,7 +77,15 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
   }
 
   private def updateRoutee(): Future[Routee] = {
-    (registry ? GetOrCreateDSLink(config.connInfo.linkName)).mapTo[Routee]
+    val future = (registry ? GetOrCreateDSLink(config.connInfo.linkName)).mapTo[Routee]
+    future.map{ r =>
+
+      r ! ConnectEndpoint(ci)
+      log.info("send ConnectEndpoint({}) to {}", ci, r)
+      incrementTags(tagsForConnection("connected")(ci): _*)
+      r
+
+    }
   }
 
   /**
@@ -107,17 +109,13 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
       Kamon.currentSpan().tag("type", "request")
       log.debug("{}: received request message {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
-      routee.foreach {
-        _ ! m
-      }
+      routee.foreach {_ ! m}
       countTags(messageTags("request.in", ci): _*)
     case m@ResponseMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "response")
       log.debug("{}: received response message {} from WebSocket", ownId, formatMessage(m))
       sendAck(msg)
-      routee.foreach {
-        _ ! m
-      }
+      routee.foreach {_ ! m}
       countTags(messageTags("response.in", ci): _*)
     case e@RequestEnvelope(requests) =>
       log.debug("{}: received request envelope {}", ownId, e)
@@ -129,11 +127,14 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
       sender ! createWSFlow()
     case RouteeUpdateRequest() =>
       routee = updateRoutee()
+      log.info("{}: receives RouteeUpdateRequest", ownId)
       routee.foreach{r =>
-        log.info("dslink routee updated {}", routee)
+        log.info("{}: dslink routee updated {}", ownId, routee)
       }
     case Success(_) | Failure(_) => self ! PoisonPill
-    case Terminated(_) => context.stop(self)
+    case Terminated(ref) =>
+      log.info("{} terminated by {}", ownId, ref)
+      context.stop(self)
   }
 
   /**
@@ -163,7 +164,7 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
     * Create/connect to new/existing DSLInkActor
     */
   private def createWSFlow(): Flow[DSAMessage, DSAMessage, NotUsed] = {
-
+    log.info("{}: receives RouteeUpdateRequest", ownId)
     val messageSink = Flow[Any].async.to(Sink.actorRef(self, Success(())))
     val src = Source.fromPublisher(publisher)
     Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src).recover {

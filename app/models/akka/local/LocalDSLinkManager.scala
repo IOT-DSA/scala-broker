@@ -54,4 +54,6 @@ class LocalDSLinkManager()(implicit val system: ActorSystem) extends DSLinkManag
     case dsaPath if dsaPath.startsWith(Paths.Upstream)   => system.actorSelection("/user" + dsaPath.forAkka) ? message
     case dsaPath                                         => system.actorSelection("/user/" + Nodes.Root + dsaPath.forAkka) ? message
   }
+
+  override def updateRoutee(routee: Routee): Routee = routee
 }

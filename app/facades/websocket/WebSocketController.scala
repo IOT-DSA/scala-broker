@@ -423,7 +423,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
       override def supervisorStrategy = OneForOneStrategy() {
         case any =>
           log.error("restarting websocket: {}", any)
-          SupervisorStrategy.restart
+          SupervisorStrategy.stop
       }
     }))
 

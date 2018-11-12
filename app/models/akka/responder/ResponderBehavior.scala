@@ -5,7 +5,7 @@ import akka.persistence.PersistentActor
 import akka.actor._
 import kamon.Kamon
 import models._
-import models.akka.{AttributeSaved, DSLinkManager, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupSidRestoreProcess, MainResponderBehaviorState, PartOfPersistenceBehavior, RouteeNavigator}
+import models.akka.{AttributeSaved, DSLinkStateSnapshotter, LookupRidRestoreProcess, LookupRidSaved, LookupSidRestoreProcess, LookupSidSaved, MainResponderBehaviorState, PartOfPersistenceBehavior, RouteeNavigator}
 import models.metrics.Meter
 import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
@@ -15,6 +15,7 @@ import _root_.akka.routing.Routee
 import _root_.akka.event.LoggingAdapter
 import models.akka.cluster.{ClusteredDSLinkManager, ShardedRoutee}
 import _root_.akka.cluster.sharding.ClusterSharding
+import models.akka.responder.OriginUpdater._
 
 /**
  * Handles communication with a remote DSLink in Responder mode.
@@ -23,8 +24,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNa
   import RidRegistry._
   import models.akka.RichRoutee
 
-  private def routee = {
-    val path = sender.path
+  private def routee(path:ActorPath) = {
     val nodeType = path.elements.find(name => name == Settings.Nodes.Downstream || name == Settings.Nodes.Upstream)
 
     nodeType match {
@@ -88,8 +88,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNa
     */
   val responderRecover: Receive = {
     case event: LookupRidRestoreProcess =>
-      log.debug("{}: recovering with event {}", ownId, event)
-      ridRegistry.restoreRidRegistry(event)
+      val updatedEvent = event.update(updateRoutee)
+      log.debug("{}: recovering with event {}", ownId, updatedEvent)
+      ridRegistry.restoreRidRegistry(updatedEvent)
     case event: LookupSidRestoreProcess =>
       log.debug("{}: recovering with event {}", ownId, event)
       sidRegistry.restoreSidRegistry(event)
@@ -140,7 +141,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNa
    */
   private def handleListRequest: RequestHandler = {
     case ListRequest(rid, path) =>
-      val origin = Origin(routee, rid)
+      val origin = Origin(routee(sender.path), rid)
       ridRegistry.lookupByPath(path) match {
         case None =>
           val tgtId = ridRegistry.nextTgtId
@@ -165,7 +166,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNa
 
     def tgtId(srcId: Int, method: DSAMethod) = {
       val tgtId = ridRegistry.nextTgtId
-      ridRegistry.savePassthroughLookup(method, Origin(routee, srcId), tgtId)
+      ridRegistry.savePassthroughLookup(method, Origin(routee(sender.path), srcId), tgtId)
       tgtId
     }
 
@@ -213,8 +214,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNa
   private def handleSubscribeRequest: RequestHandler = {
     case req @ SubscribeRequest(srcRid, _) =>
       val srcPath = req.path // to ensure there's only one path (see requester actor)
-      val ridOrigin = Origin(routee, srcRid)
-      val sidOrigin = Origin(routee, srcPath.sid)
+      val ridOrigin = Origin(routee(sender.path), srcRid)
+      val sidOrigin = Origin(routee(sender.path), srcPath.sid)
 
       Kamon.currentSpan().tag("rid", srcRid)
       Kamon.currentSpan().tag("kind", "SubscribeRequest")
@@ -244,8 +245,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNa
    */
   private def handleUnsubscribeRequest: RequestHandler = {
     case req @ UnsubscribeRequest(rid, _) =>
-      val ridOrigin = Origin(routee, rid)
-      val sidOrigin = Origin(routee, req.sid)
+      val ridOrigin = Origin(routee(sender.path), rid)
+      val sidOrigin = Origin(routee(sender.path), req.sid)
       removeSubscribeOrigin(sidOrigin) map { targetSid =>
         sidRegistry.removeLookup(targetSid)
         val tgtRid = ridRegistry.nextTgtId
@@ -259,7 +260,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNa
    */
   private def handleCloseRequest: RequestHandler = {
     case CloseRequest(rid) =>
-      val origin = Origin(routee, rid)
+      val origin = Origin(routee(sender().path), rid)
       ridRegistry.lookupByOrigin(origin) match {
         case Some(LookupRecord(_, tgtId, _, _)) => HandlerResult(CloseRequest(tgtId)) // passthrough call
         case _ => // LIST call

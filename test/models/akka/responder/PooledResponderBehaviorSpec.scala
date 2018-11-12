@@ -211,5 +211,7 @@ object PooledResponderBehaviorSpec {
       * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
       */
     override def getUplinkRoutee(dsaName: String): Routee = ???
+
+    override def updateRoutee(routee: Routee): Routee = ???
   }
 }

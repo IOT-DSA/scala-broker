@@ -3,6 +3,8 @@ package models.akka
 import akka.actor.Props
 import models.akka.responder.{PooledResponderBehavior, ResponderBehavior, SimpleResponderBehavior}
 import akka.routing.Routee
+import models.Settings.Nodes
+import models.akka.cluster.ShardedRoutee
 
 /**
  * Combines [[AbstractDSLinkActor]] with Requester behavior and abstract Responder behavior
@@ -44,6 +46,8 @@ abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, dsaParent: String, regi
     * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
     */
   override def getUplinkRoutee(dsaName: String): Routee = dslinkMgr.getUplinkRoutee(dsaName)
+
+  override def updateRoutee(routee: Routee): Routee = dslinkMgr.updateRoutee(routee)
 }
 
 /**

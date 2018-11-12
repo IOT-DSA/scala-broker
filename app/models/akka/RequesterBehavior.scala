@@ -38,6 +38,7 @@ trait RequesterBehavior {
   var subscriptionsPublisher: Publisher[DSAMessage] = _
 
   me.afterConnection = me.afterConnection :+ getSubscriptionSource _
+  me.afterConnection = me.afterConnection :+ updateSubscriptions _
 
   /**
    * Processes incoming messages from Requester DSLink and dispatches responses to it.
@@ -159,6 +160,15 @@ trait RequesterBehavior {
         channel.putMessage(toSend)
       }
     }
+  }
+
+  private def updateSubscriptions(actorRef: ActorRef) = {
+    val ridUpdates = targetsByRid.map{ case(rid, path) => ListRequest(rid, path) }
+    val sidUpdates = targetsBySid.map{case(sid, pathAndQos) => SubscribeRequest(sid,
+      SubscriptionPath(pathAndQos.path, sid, Some(pathAndQos.qos.index)))
+    }
+
+
   }
 
   private def isSubscription(response:DSAResponse):Boolean = response.rid == 0

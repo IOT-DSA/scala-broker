@@ -2,10 +2,10 @@ package models.akka
 
 import scala.concurrent.duration.DurationInt
 import org.scalatest.Inside
-import akka.actor.{ PoisonPill, Props }
+import akka.actor.{ActorRef, PoisonPill, Props}
 import akka.pattern.ask
-import akka.routing.{ ActorRefRoutee, Routee }
-import akka.testkit.{ TestActorRef, TestProbe }
+import akka.routing.{ActorRefRoutee, Routee}
+import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 
 /**
@@ -121,5 +121,7 @@ object AbstractDSLinkActorSpec {
       * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
       */
     override def getUplinkRoutee(dsaName: String): Routee = ???
+
+    override def updateRoutee(routee: Routee): Routee = ???
   }
 }

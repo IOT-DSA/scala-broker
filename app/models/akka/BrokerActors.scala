@@ -27,6 +27,7 @@ class BrokerActors @Inject() (actorSystem: ActorSystem, dslinkMgr: DSLinkManager
    * Create actors for clusterless deployment.
    */
   private def createLocalActors = {
+
     val root = actorSystem.actorOf(RootNodeActor.props, Nodes.Root)
 
     val downstream = actorSystem.actorOf(LocalDSLinkFolderActor.props(

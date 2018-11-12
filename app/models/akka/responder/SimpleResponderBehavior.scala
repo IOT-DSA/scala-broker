@@ -5,6 +5,7 @@ import akka.persistence.PersistentActor
 import models.Origin
 import models.akka.{GroupCallRegistryRestoreProcess, MainResponderBehaviorState, ResponderBehaviorState, RouteeNavigator, SimpleResponderBehaviorState}
 import models.rpc.DSAResponse
+import OriginUpdater._
 
 /**
   * Handles communication with a remote DSLink in Responder mode using local maps
@@ -17,13 +18,15 @@ trait SimpleResponderBehavior extends ResponderBehavior { me: RouteeNavigator wi
 
   val simpleResponderRecover: Receive = {
     case event: GroupCallRegistryRestoreProcess =>
-      log.debug("{}: recovering with event {}", ownId, event)
-      if (event.value == RegistryType.LIST) listRegistry.restoreGroupCallRegistry(event)
-      if (event.value == RegistryType.SUBS) subsRegistry.restoreGroupCallRegistry(event)
+      val updated = event.update(updateRoutee)
+      log.debug("{}: recovering with event {}", ownId, updated)
+      if (updated.value == RegistryType.LIST) listRegistry.restoreGroupCallRegistry(updated)
+      if (updated.value == RegistryType.SUBS) subsRegistry.restoreGroupCallRegistry(updated)
     case offeredSnapshot: SimpleResponderBehaviorState =>
-      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
-      listRegistry.setBindings(offeredSnapshot.listBindings)
-      subsRegistry.setBindings(offeredSnapshot.subsBindings)
+      val updated = offeredSnapshot.update(updateRoutee)
+      log.debug("{}: recovering with snapshot {}", ownId, updated)
+      listRegistry.setBindings(updated.listBindings)
+      subsRegistry.setBindings(updated.subsBindings)
   }
 
   /**

@@ -45,6 +45,9 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
     */
   override def getUplinkRoutee(dsaName: String): Routee = ???
 
+
+  override def updateRoutee(routee: Routee): Routee = routee
+
   val dslinkFolderRecover: Receive = {
     case event: DSLinkCreated =>
       log.debug("{}: recovering with event {}", ownId, event)
