@@ -212,6 +212,5 @@ object SimpleResponderBehaviorSpec {
       */
     override def getUplinkRoutee(dsaName: String): Routee = ???
 
-    override def updateRoutee(routee: Routee): Routee = ???
   }
 }
