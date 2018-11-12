@@ -5,7 +5,7 @@ import akka.actor.Props
 import akka.routing.{NoRoutee, Routee}
 import akka.testkit.TestProbe
 import models.{RequestEnvelope, ResponseEnvelope}
-import models.akka.{AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages}
+import models.akka.{AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages, RouteeNavigator}
 import models.rpc._
 import models.rpc.DSAValue.{StringValue, longToNumericValue, obj}
 import models.util.DsaToAkkaCoder._
@@ -196,7 +196,7 @@ object PooledResponderBehaviorSpec {
   /**
    * Test actor.
    */
-  class Responder() extends AbstractDSLinkActor(NoRoutee) with PooledResponderBehavior {
+  class Responder() extends AbstractDSLinkActor(NoRoutee) with RouteeNavigator with PooledResponderBehavior {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def persistenceId = linkPath
     override def connected = super.connected orElse responderBehavior orElse snapshotReceiver

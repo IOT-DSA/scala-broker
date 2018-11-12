@@ -11,7 +11,7 @@ import models.akka.cluster.ShardedRoutee
  * (to be provided by the subclasses).
  */
 abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee) extends AbstractDSLinkActor(registry)
-  with RequesterBehavior with ResponderBehavior {
+  with RouteeNavigator with RequesterBehavior with ResponderBehavior {
   
   protected val linkPath = dsaParent + "/" + linkName
 
@@ -40,7 +40,7 @@ abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, dsaParent: String, regi
   /**
     * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
     */
-  override def getDownlinkRoutee(dsaName: String): Routee = dslinkMgr.getDownlinkRoutee(dsaName)
+  override def getDownlinkRoutee(dsaName: String): Routee  = dslinkMgr.getDownlinkRoutee(dsaName)
 
   /**
     * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
@@ -71,6 +71,8 @@ class PooledDSLinkActor(val dslinkMgr: DSLinkManager, dsaParent: String, registr
 
   override def receiveRecover = super.receiveRecover orElse pooledResponderRecover
 }
+
+
 
 /**
  * Factory for DSLink actors, supports the following responder implementation:

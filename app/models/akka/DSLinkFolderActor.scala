@@ -35,6 +35,12 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
 
   override def postStop = log.info(s"$ownId actor stopped")
 
+
+
+  override def updateRoutee(routee: Routee): Routee = routee
+
+
+
   /**
     * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
     */
@@ -44,9 +50,6 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
     * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
     */
   override def getUplinkRoutee(dsaName: String): Routee = ???
-
-
-  override def updateRoutee(routee: Routee): Routee = routee
 
   val dslinkFolderRecover: Receive = {
     case event: DSLinkCreated =>

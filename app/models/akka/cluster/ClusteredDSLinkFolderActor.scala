@@ -145,7 +145,7 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
     Source(configs) ++ sources.foldLeft(Source.empty[String])(_ ++ _).map(name => array(name, obj(IsNode)))
   }
 
-  override def updateRoutee(routee: Routee): Routee = ???
+  override def updateRoutee(routee: Routee): Routee = routee
 }
 
 /**

@@ -23,7 +23,7 @@ import models.util.DsaToAkkaCoder._
   * When the actor is disconnected, it stashes incoming messages and releases them to the endpoint, once it
   * becomes connected again.
   */
-abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor with DSLinkStateSnapshotter with Stash with RouteeNavigator with ActorLogging with
+abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor with DSLinkStateSnapshotter with Stash  with ActorLogging with
   Meter {
 
   import Messages._

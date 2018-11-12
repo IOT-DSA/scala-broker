@@ -112,16 +112,6 @@ object AbstractDSLinkActorSpec {
     override def persistenceId = linkName
     override def receiveRecover = recoverBaseState orElse recoverDSLinkSnapshot
 
-    /**
-      * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
-      */
-    override def getDownlinkRoutee(dsaName: String): Routee = ???
 
-    /**
-      * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
-      */
-    override def getUplinkRoutee(dsaName: String): Routee = ???
-
-    override def updateRoutee(routee: Routee): Routee = ???
   }
 }
