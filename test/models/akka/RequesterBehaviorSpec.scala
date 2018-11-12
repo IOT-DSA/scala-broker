@@ -51,7 +51,7 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
       downstreamProbe.expectMsg(RegisterDSLink("requester", DSLinkMode.Requester, false))
     }
     "notify downstream on connection" in {
-      requester.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
+      requester.tell(Messages.ConnectEndpoint(ci), ws.ref)
       downstreamProbe.expectMsg(DSLinkStateChanged("requester", DSLinkMode.Requester, true))
     }
     "route requests to broker root" in {
@@ -101,5 +101,6 @@ object RequesterBehaviorSpec {
     override def connected = super.connected orElse requesterBehavior orElse snapshotReceiver
     override def disconnected = super.disconnected orElse requesterDisconnected orElse toStash orElse snapshotReceiver
     override def receiveRecover = recoverBaseState orElse requesterRecover orElse recoverDSLinkSnapshot
+
   }
 }

@@ -2,10 +2,10 @@ package models.akka
 
 import scala.concurrent.duration.DurationInt
 import org.scalatest.Inside
-import akka.actor.{ PoisonPill, Props }
+import akka.actor.{ActorRef, PoisonPill, Props}
 import akka.pattern.ask
-import akka.routing.{ ActorRefRoutee, Routee }
-import akka.testkit.{ TestActorRef, TestProbe }
+import akka.routing.{ActorRefRoutee, Routee}
+import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 
 /**
@@ -40,14 +40,14 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       }
     }
     "connect to endpoint and register with downstream" in {
-      dslink ! ConnectEndpoint(endpoint1, ci)
+      dslink.tell(ConnectEndpoint(ci), endpoint1)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       whenReady(dslink ? GetLinkInfo)(inside(_) {
         case LinkInfo(connInfo, true, Some(_), None) => connInfo mustBe ci
       })
     }
     "connect to another endpoint" in {
-      dslink ! ConnectEndpoint(endpoint2, ci)
+      dslink.tell(ConnectEndpoint(ci), endpoint2)
       expectTerminated(endpoint1)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
@@ -60,7 +60,7 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       })
     }
     "disconnect from endpoint and kill it" in {
-      dslink ! ConnectEndpoint(endpoint3, ci)
+      dslink.tell(ConnectEndpoint(ci), endpoint3)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       dslink ! DisconnectEndpoint(true)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
@@ -70,7 +70,7 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       expectTerminated(endpoint3)
     }
     "respond to endpoint termination" in {
-      dslink ! ConnectEndpoint(endpoint2, ci)
+      dslink.tell(ConnectEndpoint(ci), endpoint2)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       endpoint2 ! PoisonPill
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
@@ -111,5 +111,7 @@ object AbstractDSLinkActorSpec {
   class LinkActor(registry: Routee) extends AbstractDSLinkActor(registry) {
     override def persistenceId = linkName
     override def receiveRecover = recoverBaseState orElse recoverDSLinkSnapshot
+
+
   }
 }

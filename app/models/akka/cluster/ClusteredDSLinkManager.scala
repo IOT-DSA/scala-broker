@@ -10,6 +10,7 @@ import akka.cluster.ddata.DistributedData
 import models.api.{DSANode, DSANodeDescription, DistributedNodesRegistry}
 import models.api.DistributedNodesRegistry.{AddNode, RouteMessage}
 import akka.pattern.ask
+import models.Settings
 
 import scala.concurrent.Future
 
@@ -19,6 +20,7 @@ import scala.concurrent.Future
 class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSystem) extends DSLinkManager {
 
   import models.Settings._
+  import ClusteredDSLinkManager._
 
   implicit val ctx = system.dispatcher
 
@@ -85,17 +87,17 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     * Sends a message to its DSA destination using Akka Sharding for dslinks and Singleton for root node.
     */
   def dsaSend(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit = path match {
-    case Paths.Downstream                          => system.actorSelection("/user" + Paths.Downstream) ! message
+    case Paths.Downstream => system.actorSelection("/user" + Paths.Downstream) ! message
     case path if path.startsWith(Paths.Downstream) => getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ! message
-    case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ! message
-    case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
-    case Paths.Data                                => routeToDistributed(path, message)
-    case Paths.Sys                                 => routeToDistributed(path, message)
-    case path if path.startsWith(Paths.Data)       => routeToDistributed(path, message)
-    case path if path.startsWith(Paths.Tokens)     => routeToDistributed(path, message)
-    case path if path.startsWith(Paths.Roles)      => routeToDistributed(path, message)
+    case Paths.Upstream => system.actorSelection("/user" + Paths.Upstream) ! message
+    case path if path.startsWith(Paths.Upstream) => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ! message
+    case Paths.Data => routeToDistributed(path, message)
+    case Paths.Sys => routeToDistributed(path, message)
+    case path if path.startsWith(Paths.Data) => routeToDistributed(path, message)
+    case path if path.startsWith(Paths.Tokens) => routeToDistributed(path, message)
+    case path if path.startsWith(Paths.Roles) => routeToDistributed(path, message)
     //    case path if path.startsWith(Paths.Sys)         => system.actorSelection("/user" + Paths.Sys) ! message
-    case path                                      => RootNodeActor.childProxy(path)(system) ! message
+    case path => RootNodeActor.childProxy(path)(system) ! message
   }
 
   /**
@@ -106,32 +108,18 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     * @param sender
     * @return
     */
-  def dsaAsk(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender) : Future[Any] = path match {
-    case Paths.Downstream                          =>
+  def dsaAsk(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Future[Any] = path match {
+    case Paths.Downstream =>
       system.actorSelection("/user" + Paths.Downstream) ? message
     case path if path.startsWith(Paths.Downstream) =>
       getDownlinkRoutee(path.drop(Paths.Downstream.size + 1)) ? message
-    case Paths.Upstream                            => system.actorSelection("/user" + Paths.Upstream) ? message
-    case path if path.startsWith(Paths.Upstream)   => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ? message
-    case Paths.Data                                => ???
-    case path if path.startsWith(Paths.Data)       => ???
-    case path if path.startsWith(Paths.Tokens)     => distrubutedNodeRegistry ? message
-    case path if path.startsWith(Paths.Roles)      => distrubutedNodeRegistry ? message
-    case path                                      => RootNodeActor.childProxy(path)(system) ? message
-  }
-
-  /**
-    * Extracts DSLink name and payload from the message.
-    */
-  private val extractEntityId: ShardRegion.ExtractEntityId = {
-    case EntityEnvelope(linkName, payload) => (linkName, payload)
-  }
-
-  /**
-    * Extracts Shard Id from the message.
-    */
-  private val extractShardId: ShardRegion.ExtractShardId = {
-    case EntityEnvelope(linkName, _) => (math.abs(linkName.hashCode) % DownstreamShardCount).toString
+    case Paths.Upstream => system.actorSelection("/user" + Paths.Upstream) ? message
+    case path if path.startsWith(Paths.Upstream) => getUplinkRoutee(path.drop(Paths.Upstream.size + 1)) ? message
+    case Paths.Data => ???
+    case path if path.startsWith(Paths.Data) => ???
+    case path if path.startsWith(Paths.Tokens) => distrubutedNodeRegistry ? message
+    case path if path.startsWith(Paths.Roles) => distrubutedNodeRegistry ? message
+    case path => RootNodeActor.childProxy(path)(system) ? message
   }
 
   /**
@@ -149,7 +137,7 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
     */
   private def createRegion(typeName: String, linkProps: Props) = {
     val sharding = ClusterSharding(system)
-    if (proxyMode){
+    if (proxyMode) {
       sharding.startProxy(typeName, Some("backend"), extractEntityId, extractShardId)
     }
     else {
@@ -161,19 +149,42 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
         typeName,
         linkProps,
         settings,
-        extractEntityId,
-        extractShardId,
-        new CustomAllocationStrategy(threshold, maxSimultaneousRebalance),
-        PoisonPill
+        ClusteredDSLinkManager.extractEntityId,
+        ClusteredDSLinkManager.extractShardId
+        // new CustomAllocationStrategy(threshold, maxSimultaneousRebalance),
+        //  PoisonPill
       )
     }
-
-
   }
 
   private def routeToDistributed(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Unit =
     distrubutedNodeRegistry ! RouteMessage(path, message, sender)
 
-  private def ask4Distributed(path:String, message:Any)(implicit sender: ActorRef = ActorRef.noSender): Future[Any] =
+  private def ask4Distributed(path: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender): Future[Any] =
     distrubutedNodeRegistry ? RouteMessage(path, message, sender)
+
+  override def updateRoutee(routee: Routee): Routee = routee match {
+    case ShardedRoutee(region, entityId) => region.path.name match {
+      case Nodes.Downstream => getDownlinkRoutee(entityId)
+      case Nodes.Upstream => getUplinkRoutee(entityId)
+      case _ => routee
+    }
+    case _ => routee
+  }
+
+}
+
+object ClusteredDSLinkManager {
+
+  /**
+    * Extracts DSLink name and payload from the message.
+    */
+  val extractEntityId: ShardRegion.ExtractEntityId = {
+    case EntityEnvelope(linkName, payload) => (linkName, payload)
+  }
+
+  val extractShardId: ShardRegion.ExtractShardId = {
+    case EntityEnvelope(linkName, _) => (math.abs(linkName.hashCode) % Settings.DownstreamShardCount).toString
+  }
+
 }

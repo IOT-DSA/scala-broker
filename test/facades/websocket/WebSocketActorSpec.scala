@@ -1,17 +1,22 @@
 package facades.websocket
 
+import java.util.concurrent.TimeUnit
+
+import akka.NotUsed
+import akka.actor.{Actor, Props}
 import akka.actor.Status.Success
 import akka.routing.ActorRefRoutee
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, OverflowStrategy}
 
 import scala.concurrent.duration._
-import akka.stream.scaladsl.{Keep, Sink, StreamRefs}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
 import akka.testkit.TestProbe
 import models.{RequestEnvelope, ResponseEnvelope}
 import models.akka.{AbstractActorSpec, ConnectionInfo}
 import models.rpc._
 
 import scala.concurrent.Await
+import akka.pattern.ask
 
 /**
  * WebSocketActor test suite.
@@ -25,18 +30,32 @@ class WebSocketActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "ws", true, false)
   val config = WebSocketActorConfig(ci, "session", salt)
   val link = TestProbe()
+  implicit val timeout = akka.util.Timeout(2, TimeUnit.SECONDS)
 
   val futureSink = StreamRefs.sinkRef[DSAMessage]()
     .toMat(Sink.actorRef(testActor, Success(())))(Keep.left).run()
 
   val sink = Await.result(futureSink, 1 second)
 
-  val wsActor = system.actorOf(WebSocketActor.props(sink, new ActorRefRoutee(link.ref), config))
+  val actor = new ActorRefRoutee(link.ref)
+
+  val registry = system.actorOf(Props(new Actor(){
+    override def receive: Receive = {
+      case _ => sender ! actor
+    }
+  }))
+
+  val wsActor = system.actorOf(WebSocketActor.props(registry, config))
+  val flow = Await.result((wsActor ? StreamRequest()).mapTo[Flow[DSAMessage, DSAMessage, NotUsed]], 5 second)
+
+  val queue = flow
+    .toMat(Sink.actorRef(self, Success(())))(Keep.right)
+    .runWith(Source.queue(10, OverflowStrategy.backpressure))
 
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {
       expectMsg(AllowedMessage(true, salt))
-      link.expectMsg(ConnectEndpoint(wsActor, ci))
+      link.expectMsg(ConnectEndpoint(ci))
     }
     "return ack for a ping message" in {
       wsActor ! PingMessage(101)

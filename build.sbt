@@ -81,6 +81,10 @@ dockerEntrypoint ++= Seq(
   """-Dakka.remote.artery.canonical.hostname="$(eval "echo $AKKA_REMOTING_BIND_HOST")"""",
   """-Dakka.remote.artery.canonical.port="$AKKA_REMOTING_BIND_PORT"""",
   """$(IFS=','; I=0; for NODE in $AKKA_SEED_NODES; do echo "-Dakka.cluster.seed-nodes.$I=akka://$AKKA_ACTOR_SYSTEM_NAME@$NODE"; I=$(expr $I + 1); done)""",
+  """$(IFS=','; I=0; for NODE in $CASSANDRA_SEED_NODES; do echo "-Dcassandra-snapshot-store.contact-points.$I=$NODE"; I=$(expr $I + 1); done)""",
+  """$(IFS=','; I=0; for NODE in $CASSANDRA_SEED_NODES; do echo "-Dcassandra-journal.contact-points.$I=$NODE"; I=$(expr $I + 1); done)""",
+  """$(IFS=','; I=0; for NODE in $CASSANDRA_SEED_NODES; do echo "-Dcassandra-journal-settings.contact-points.$I=$NODE"; I=$(expr $I + 1); done)""",
+  """$(IFS=','; I=0; for NODE in $CASSANDRA_SEED_NODES; do echo "-Dcassandra-snapshot-store-settings.contact-points.$I=$NODE"; I=$(expr $I + 1); done)""",
   """-Dkamon.statsd.hostname="$STATSD_HOST"""",
   """-Dkamon.statsd.port=$STATSD_PORT""",
   """-Dkamon.zipkin.host="$ZIPKIN_HOST"""",
@@ -107,7 +111,7 @@ mappings in Universal ++= Seq(
   file("scripts/stop-frontend") -> "bin/stop-frontend")
 
 // scoverage options
-coverageMinimum := 65
+coverageMinimum := 63
 coverageFailOnMinimum := true
 
 coverageExcludedPackages := "controllers.javascript.*;facades.websocket.javascript.*;router.*;views.html.*"
@@ -162,7 +166,9 @@ lazy val commonDependencies = Seq(
   "io.kamon"                    %% "kamon-system-metrics"        % "1.0.0",
   "io.kamon"                    %% "kamon-core"                  % "1.0.0",
 //  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
-  "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12"
+  "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12",
+  "com.typesafe.akka"           %% "akka-persistence-cassandra"  % "0.91",
+  "com.typesafe.akka"           %% "akka-persistence-cassandra-launcher" % "0.91" % Test // Helps to start built-in single node of cassandra instance for tests
 )
 
 // akka and play test dependencies

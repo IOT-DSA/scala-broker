@@ -36,14 +36,12 @@ spec:
         - name: metrics-data
           mountPath: "/data"
 
-        restartPolicy: Always
-  
   volumeClaimTemplates:
   - metadata:
       name: metrics-data
     spec:
-      accessModes:
-      - ReadWriteOnce
+      storageClassName: fast
+      accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
           storage: 50Gi

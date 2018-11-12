@@ -2,10 +2,10 @@ package models.akka.responder
 
 import scala.concurrent.duration.DurationInt
 import akka.actor.Props
-import akka.routing.NoRoutee
+import akka.routing.{NoRoutee, Routee}
 import akka.testkit.TestProbe
 import models.{RequestEnvelope, ResponseEnvelope}
-import models.akka.{AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages}
+import models.akka.{AbstractActorSpec, AbstractDSLinkActor, ConnectionInfo, Messages, RouteeNavigator}
 import models.rpc._
 import models.rpc.DSAValue.{StringValue, longToNumericValue, obj}
 import models.util.DsaToAkkaCoder._
@@ -25,7 +25,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   val ws = TestProbe()
 
-  responder.tell(Messages.ConnectEndpoint(ws.ref, ci), ws.ref)
+  responder.tell(Messages.ConnectEndpoint(ci), ws.ref)
 
   val requesters = (1 to 5) map (_ -> TestProbe()) toMap
 
@@ -196,10 +196,21 @@ object PooledResponderBehaviorSpec {
   /**
    * Test actor.
    */
-  class Responder() extends AbstractDSLinkActor(NoRoutee) with PooledResponderBehavior {
+  class Responder() extends AbstractDSLinkActor(NoRoutee) with RouteeNavigator with PooledResponderBehavior {
     val linkPath = models.Settings.Paths.Downstream + "/" + linkName
     override def persistenceId = linkPath
     override def connected = super.connected orElse responderBehavior orElse snapshotReceiver
     override def receiveRecover = recoverBaseState orElse responderRecover orElse pooledResponderRecover orElse recoverDSLinkSnapshot
+
+    /**
+      * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
+      */
+    override def getDownlinkRoutee(dsaName: String): Routee = ???
+
+    /**
+      * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
+      */
+    override def getUplinkRoutee(dsaName: String): Routee = ???
+
   }
 }

@@ -22,7 +22,7 @@ spec:
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cassandra-internal.default.svc.cluster.local cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -61,16 +61,18 @@ spec:
               fieldPath: metadata.name
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
+        - name: CASSANDRA_SEED_NODES
+          value: "cassandra-0"
         - name: AKKA_SEED_NODES
           value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
-          value: "/opt/docker/conf/backend.conf"
+          value: "/opt/docker/conf/backend_cassandra.conf"
         resources:
           requests:
             memory: "3500Mi"
-            cpu: "1700m"
+            cpu: "3700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"
@@ -100,7 +102,7 @@ spec:
       initContainers:
       - name: init-resolv
         image: "busybox"
-        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+        command: ["sh", "-c", "echo 'search cassandra-internal.default.svc.cluster.local cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
       containers:
       - name: broker-cluster-squad
         image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance:latest"
@@ -143,16 +145,18 @@ spec:
               fieldPath: status.podIP
         - name: AKKA_REMOTING_BIND_PORT
           value: "2551"
+        - name: CASSANDRA_SEED_NODES
+          value: "cassandra-0"
         - name: AKKA_SEED_NODES
           value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
         - name: AKKA_ACTOR_SYSTEM_NAME
           value: DSASystem
         - name: CONF_FILE
-          value: "/opt/docker/conf/backend.conf"
+          value: "/opt/docker/conf/backend_cassandra.conf"
         resources:
           requests:
             memory: "3500Mi"
-            cpu: "1700m"
+            cpu: "3700m"
           limits:
             memory: "6500Mi"
             cpu: "3700m"

@@ -48,5 +48,7 @@ object DSLinkManagerSpec {
     def getDownlinkRoutee(name: String): Routee = ???
     def getUplinkRoutee(name: String): Routee = ???
     def dsaAsk(dsaPath: String, message: Any)(implicit sender: akka.actor.ActorRef): Future[Any] = ???
+
+    override def updateRoutee(routee: Routee): Routee = ???
   }
 }

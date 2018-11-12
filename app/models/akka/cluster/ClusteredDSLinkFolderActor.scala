@@ -18,6 +18,18 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
   import context.dispatcher
 
+
+  /**
+    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
+    */
+  override def getDownlinkRoutee(dsaName: String): Routee = linkProxy(dsaName)
+
+  /**
+    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
+    */
+  override def getUplinkRoutee(dsaName: String): Routee = linkProxy(dsaName)
+
+
   override def persistenceId = linkPath
 
   /**
@@ -144,6 +156,8 @@ class ClusteredDSLinkFolderActor(linkPath: String, linkProxy: (String) => Routee
 
     Source(configs) ++ sources.foldLeft(Source.empty[String])(_ ++ _).map(name => array(name, obj(IsNode)))
   }
+
+  override def updateRoutee(routee: Routee): Routee = routee
 }
 
 /**

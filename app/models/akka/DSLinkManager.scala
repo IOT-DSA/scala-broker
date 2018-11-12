@@ -12,6 +12,8 @@ import scala.concurrent.Future
  */
 trait DSLinkManager {
 
+  def updateRoutee(routee: Routee): Routee
+
   protected val log = Logger(getClass)
 
   /**
