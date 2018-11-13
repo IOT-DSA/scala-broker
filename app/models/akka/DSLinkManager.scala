@@ -1,7 +1,8 @@
 package models.akka
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.routing.{ActorSelectionRoutee, Routee}
+import models.Settings
 import models.Settings.{Paths, Responder}
 import play.api.Logger
 
@@ -55,6 +56,21 @@ trait DSLinkManager {
     * @return
     */
   def dsaAsk(dsaPath: String, message: Any)(implicit sender: ActorRef = ActorRef.noSender) : Future[Any]
+
+  /**
+    * navigates through path
+    * @param path
+    * @return
+    */
+  def routee(path:ActorPath, default: ActorPath => Routee):Routee = {
+    val nodeType = path.elements.find(name => name == Settings.Nodes.Downstream || name == Settings.Nodes.Upstream)
+
+    nodeType match {
+      case Some(Settings.Nodes.Downstream) => getDownlinkRoutee(path.name)
+      case Some(Settings.Nodes.Upstream) => getUplinkRoutee(path.name)
+      case None => default(path)
+    }
+  }
 
   /**
    * An instance of downlink actor props, according to the

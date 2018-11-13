@@ -110,15 +110,6 @@ class LocalDSLinkFolderActor(linkPath: String, linkProps: Props, extraConfigs: (
     Source(configs ++ children)
   }
 
-  /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
-    */
-  override def getDownlinkRoutee(dsaName: String): Routee = getOrCreateDSLink(dsaName)
-
-  /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
-    */
-  override def getUplinkRoutee(dsaName: String): Routee = getOrCreateDSLink(dsaName)
 }
 
 

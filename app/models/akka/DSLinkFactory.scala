@@ -1,17 +1,15 @@
 package models.akka
 
-import akka.actor.Props
+import akka.actor.{ActorPath, Props}
 import models.akka.responder.{PooledResponderBehavior, ResponderBehavior, SimpleResponderBehavior}
 import akka.routing.Routee
-import models.Settings.Nodes
-import models.akka.cluster.ShardedRoutee
 
 /**
  * Combines [[AbstractDSLinkActor]] with Requester behavior and abstract Responder behavior
  * (to be provided by the subclasses).
  */
 abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, dsaParent: String, registry: Routee) extends AbstractDSLinkActor(registry)
-  with RouteeNavigator with RequesterBehavior with ResponderBehavior {
+  with RequesterBehavior with ResponderBehavior {
   
   protected val linkPath = dsaParent + "/" + linkName
 
@@ -25,6 +23,25 @@ abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, dsaParent: String, regi
 
   override def persistenceId = linkPath
 
+
+  /**
+    * Wrap up base routee navigator method
+    *
+    * @param path
+    * @return
+    */
+  override def routee(path: ActorPath): Routee = dslinkMgr.routee(path, super.routee)
+
+
+  /**
+    * Function for routee update in case of recovery etc
+    * Base impl - without updating unithing actually
+    *
+    * @param routee
+    * @return
+    */
+  override def updateRoutee(routee: Routee): Routee = dslinkMgr.updateRoutee(routee)
+
   /**
    * Recovers DSLink state from the event journal or snapshot.
    */
@@ -37,17 +54,6 @@ abstract class BaseDSLinkActor(dslinkMgr: DSLinkManager, dsaParent: String, regi
    */
   override def connected = super.connected orElse requesterBehavior orElse responderBehavior orElse snapshotReceiver
 
-  /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
-    */
-  override def getDownlinkRoutee(dsaName: String): Routee  = dslinkMgr.getDownlinkRoutee(dsaName)
-
-  /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
-    */
-  override def getUplinkRoutee(dsaName: String): Routee = dslinkMgr.getUplinkRoutee(dsaName)
-
-  override def updateRoutee(routee: Routee): Routee = dslinkMgr.updateRoutee(routee)
 }
 
 /**
