@@ -41,16 +41,6 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
 
 
 
-  /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
-    */
-  override def getDownlinkRoutee(dsaName: String): Routee = ???
-
-  /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
-    */
-  override def getUplinkRoutee(dsaName: String): Routee = ???
-
   val dslinkFolderRecover: Receive = {
     case event: DSLinkCreated =>
       log.debug("{}: recovering with event {}", ownId, event)

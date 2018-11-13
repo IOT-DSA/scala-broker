@@ -26,6 +26,7 @@ object OriginUpdater{
         case originAdded: OriginAdded =>
           val origin = originAdded.origin.copy(source = routeeUpdater(originAdded.origin.source))
           originAdded.copy(origin = origin)
+        case anythingElse => anythingElse
       }
     }
   }
