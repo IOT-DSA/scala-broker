@@ -20,19 +20,24 @@ import models.akka.responder.OriginUpdater._
 /**
  * Handles communication with a remote DSLink in Responder mode.
  */
-trait ResponderBehavior extends DSLinkStateSnapshotter with Meter { me: RouteeNavigator with PersistentActor with ActorLogging =>
+trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNavigator { me: PersistentActor with ActorLogging =>
   import RidRegistry._
   import models.akka.RichRoutee
 
-  private def routee(path:ActorPath) = {
-    val nodeType = path.elements.find(name => name == Settings.Nodes.Downstream || name == Settings.Nodes.Upstream)
+  /**
+    * Base impl for local actors
+    * @param path
+    * @return
+    */
+  def routee(path:ActorPath):Routee = ActorSelectionRoutee(context.actorSelection(path))
 
-    nodeType match {
-      case Some(Settings.Nodes.Downstream) => getDownlinkRoutee(sender.path.name)
-      case Some(Settings.Nodes.Upstream) => getUplinkRoutee(sender.path.name)
-      case None => ActorSelectionRoutee(context.actorSelection(sender.path))
-    }
-  }
+  /**
+    * Function for routee update in case of recovery etc
+    * Base impl - without updating unithing actually
+    * @param routee
+    * @return
+    */
+  def updateRoutee(routee:Routee):Routee = routee
 
   private def shardingRoutee(nodeType:String): ShardedRoutee = {
     val sharding = ClusterSharding(context.system)

@@ -1,19 +1,23 @@
 package models.akka
 
-import akka.routing.Routee
+import akka.actor.ActorPath
+import akka.routing.{ActorSelectionRoutee, Routee}
 
 trait RouteeNavigator {
 
   /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
+    * Base impl for local actors
+    * @param path
+    * @return
     */
-  def getDownlinkRoutee(dsaName: String): Routee
+  def routee(path:ActorPath):Routee
 
   /**
-    * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
+    * Function for routee update in case of recovery etc
+    * Base impl - without updating unithing actually
+    * @param routee
+    * @return
     */
-  def getUplinkRoutee(dsaName: String): Routee
-
-  def updateRoutee(routee:Routee): Routee = routee
+  def updateRoutee(routee:Routee):Routee
 
 }

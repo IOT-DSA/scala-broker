@@ -13,7 +13,7 @@ object Messages {
 
   /**
    * Sent to Downstream actor to create or access a dslink. The Downstream actor will respond
-   * with a [[Routee]] for that dslink.
+   * with a [[akka.routing.Routee]] for that dslink.
    */
   case class GetOrCreateDSLink(name: String)
 

@@ -201,16 +201,5 @@ object PooledResponderBehaviorSpec {
     override def persistenceId = linkPath
     override def connected = super.connected orElse responderBehavior orElse snapshotReceiver
     override def receiveRecover = recoverBaseState orElse responderRecover orElse pooledResponderRecover orElse recoverDSLinkSnapshot
-
-    /**
-      * Returns a [[Routee]] that can be used for sending messages to a specific downlink.
-      */
-    override def getDownlinkRoutee(dsaName: String): Routee = ???
-
-    /**
-      * Returns a [[Routee]] that can be used for sending messages to a specific uplink.
-      */
-    override def getUplinkRoutee(dsaName: String): Routee = ???
-
   }
 }
