@@ -52,7 +52,7 @@ object Messages {
    * Sent by facade to a DSLinkActor to connect it to the specified Endpoint actor (the
    * one that manages the physical connection to a remote process via WebSockets, TCP/IP, etc.
    */
-  case class ConnectEndpoint(ci: ConnectionInfo)
+  case class ConnectEndpoint(ci: ConnectionInfo, wsActor: ActorRef)
 
   /**
    * Sent by facade to a DSLinkActor to disconnect it from  the endpoint actor,
