@@ -3,10 +3,13 @@ package models.akka
 import org.joda.time.DateTime
 import akka.persistence._
 import akka.actor.{ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
+import akka.remote.Ack
 import akka.routing.Routee
 import facades.websocket.RouteeUpdateRequest
 import models.metrics.Meter
+import models.rpc.PingMessage
 import models.util.DsaToAkkaCoder._
+import play.http.websocket.Message.Pong
 
 /**
   * Represents a DSLink endpoint, which may or may not be connected to an Endpoint.
@@ -124,10 +127,16 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
-    case ConnectEndpoint(ci) =>
-      log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
-      endpoint.foreach(disconnectFromEndpoint(_, true))
-      connectToEndpoint(sender, ci)
+    case ConnectEndpoint(ci, wsActor) =>
+      if(Some(sender) != endpoint){
+        sender ! s"Reconnecting, Prev connection ${endpoint} will be disconnected"
+        log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
+        endpoint.foreach(disconnectFromEndpoint(_, true))
+        connectToEndpoint(wsActor, ci)
+      } else {
+        sender ! "Already connected"
+      }
+    case m: PingMessage => sender ! "Ok"
 
   }
 
@@ -135,8 +144,9 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     * Handles messages in DISCONNECTED state.
     */
   def disconnected: Receive = {
-    case ConnectEndpoint(ci) =>
-      connectToEndpoint(sender(), ci)
+    case ConnectEndpoint(ci, wsActor) =>
+      sender ! s"Connecting"
+      connectToEndpoint(wsActor, ci)
       log.info("{}: connected to Endpoint {}", ownId, sender)
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
@@ -146,8 +156,8 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
   }
 
   def toStash: Receive = {
-    case _ =>
-      log.debug("{}: stashing the incoming message", ownId)
+    case m =>
+      log.debug("{}: stashing the incoming message: {}", ownId, m)
       stash()
   }
 
