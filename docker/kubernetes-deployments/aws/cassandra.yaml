@@ -160,3 +160,36 @@ spec:
     app: cassandra
   type: NodePort
   externalTrafficPolicy: Cluster
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra-external
+  labels:
+    app: cassandra-external
+spec:
+  ports:
+  - name: intra-node
+    port: 7000
+    targetPort: 7000
+    protocol: TCP
+  - name: tls-intra-node
+    port: 7001
+    targetPort: 7001
+    protocol: TCP
+  - name: jmx
+    port: 7199
+    targetPort: 7199
+    protocol: TCP
+  - name: cql
+    port: 9042
+    targetPort: 9042
+    protocol: TCP
+
+  selector:
+    app: cassandra
+  status: loadBalancer
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0
+  externalTrafficPolicy: Cluster
