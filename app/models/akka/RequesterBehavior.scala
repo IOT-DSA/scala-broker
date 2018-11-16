@@ -91,7 +91,7 @@ trait RequesterBehavior {
     */
   private def getSubscriptionSource(actorRef: ActorRef) = {
 
-    log.info("new subscription source connected: {}", actorRef)
+    log.info("{}: new subscription source connected: {}", ownId, actorRef)
 
     val toSocketVal = Source.queue[SubscriptionNotificationMessage](100, OnOverflow)
       .conflateWithSeed(List(_)){(list, next) => list :+ next}

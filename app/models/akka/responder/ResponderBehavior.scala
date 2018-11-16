@@ -133,7 +133,7 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
       log.debug("{}: recovering with event {}", ownId, event)
       addAttribute(event.nodePath, event.name, event.value)
     case offeredSnapshot: MainResponderBehaviorState =>
-      log.debug("{}: recovering with snapshot {}", ownId, offeredSnapshot)
+      log.info("{}: recovering with snapshot {}", ownId, offeredSnapshot)
       ridRegistry = RidRegistry(registryPersistentBehavior, offeredSnapshot.ridRegistry)
       sidRegistry = SidRegistry(registryPersistentBehavior, offeredSnapshot.sidRegistry)
       attributes = offeredSnapshot.attributes
