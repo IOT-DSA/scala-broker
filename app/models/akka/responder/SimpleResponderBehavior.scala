@@ -24,7 +24,7 @@ trait SimpleResponderBehavior extends ResponderBehavior { me: RouteeNavigator wi
       if (updated.value == RegistryType.SUBS) subsRegistry.restoreGroupCallRegistry(updated)
     case offeredSnapshot: SimpleResponderBehaviorState =>
       val updated = offeredSnapshot.update(updateRoutee)
-      log.debug("{}: recovering with snapshot {}", ownId, updated)
+      log.info("{}: recovering responder state with snapshot {}", ownId, updated)
       listRegistry.setBindings(updated.listBindings)
       subsRegistry.setBindings(updated.subsBindings)
   }
