@@ -307,8 +307,8 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
           if (rsp.stream == Some(StreamState.Closed))
             ridRegistry.removeLookup(rec)
           List((origin.source, rsp.copy(rid = origin.sourceId)))
-        case _ =>
-          log.warning(s"$ownId: Cannot find original request for target RID: ${rsp.rid}")
+        case anyOther =>
+          log.warning(s"$ownId: Cannot find original request for target RID: ${rsp.rid} -- ${anyOther}")
           Nil
       }
       log.debug("{}: handleNonSubscribeResponse result: {}", ownId, result)
