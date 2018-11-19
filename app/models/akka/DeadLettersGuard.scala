@@ -29,7 +29,7 @@ class DeadLettersGuard extends Actor with ActorLogging {
 
         toAnswer ! ResponseEnvelope(responses)
       }
-      case anyOther => log.error(
+      case anyOther => log.debug(
         s"""
           |Couldn't deliver message: ${msg},  to ${requested.path}, toAnswer: ${toAnswer.path}
         """.stripMargin)
