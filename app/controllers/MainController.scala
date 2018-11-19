@@ -60,10 +60,15 @@ class MainController @Inject() (actorSystem: ActorSystem,
     */
   def health = Action.async{
 
-    val mode = if (isClusterMode) "Clustered" else "Standalone"
+    val (mode, status) = if (isClusterMode) {
+      val mode = mode
+      val cluster = Cluster(actorSystem)
+      (mode, cluster.system)
+
+    } else ("Standalone", actorSystem)
 
     Future.successful{
-      Ok(s"i'm alive in ${mode}: system:${actorSystem}")
+      Ok(s"i'm alive in ${mode}: mode:${status}")
     }
   }
 
