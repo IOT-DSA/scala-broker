@@ -62,7 +62,7 @@ class MainController @Inject() (actorSystem: ActorSystem,
 
     val (mode, status) = if (isClusterMode) {
       val cluster = Cluster(actorSystem)
-      ("Clustered", cluster.system)
+      ("Clustered", cluster.selfUniqueAddress)
     } else ("Standalone", actorSystem)
 
     Future.successful{
