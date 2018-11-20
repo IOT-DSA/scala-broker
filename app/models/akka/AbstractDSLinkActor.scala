@@ -128,6 +128,7 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
     case ConnectEndpoint(ci, wsActor) =>
+      log.info("!!!!!!!!!!! {}: new connection message \n ci:{} \n new endpoint:{} \nold endpoint: {}", ownId,  ci, wsActor, endpoint)
       if(Some(wsActor) != endpoint){
         log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
         endpoint.foreach(disconnectFromEndpoint(_, true))
