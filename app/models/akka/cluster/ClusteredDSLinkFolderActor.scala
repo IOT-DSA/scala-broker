@@ -163,7 +163,7 @@ object ClusteredDSLinkFolderActor {
     Props(new ClusteredDSLinkFolderActor(linkPath, linkProxy, extraConfigs: _*))
 }
 
-class ControllFirstPriorityMailBox extends UnboundedPriorityMailbox(
+class ControllFirstPriorityMailBox(settings:akka.actor.ActorSystem.Settings, config:com.typesafe.config.Config) extends UnboundedPriorityMailbox(
   PriorityGenerator{
     case env @ EntityEnvelope(_, RequestEnvelope(requests)) => 1
     case m @ EntityEnvelope(_, ResponseMessage(_, _, responses)) => 2
