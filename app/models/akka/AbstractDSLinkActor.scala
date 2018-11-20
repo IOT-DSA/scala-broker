@@ -135,7 +135,8 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
         connectToEndpoint(wsActor, ci)
         wsActor ! s"Reconnecting, Prev connection ${endpoint} will be disconnected"
       } else {
-        wsActor ! "Already connected"
+        log.warning("{}: Already connected", ownId)
+        wsActor ! "Already connected, won't reconnect"
       }
     case m: PingMessage => sender ! "Ok"
 

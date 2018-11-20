@@ -94,7 +94,6 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
         case scala.util.Success(message) => log.info("{}: Connection accepted with message: {}", ownId, message)
         case scala.util.Failure(error) =>
           log.error(error, "{}: unable to connect", ownId)
-          context.system.scheduler.scheduleOnce(1 second, self, RouteeUpdateRequest())
         }
       }
 
