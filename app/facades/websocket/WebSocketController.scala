@@ -254,27 +254,32 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
       val sessionInfo = cache.get[DSLinkSessionInfo](dsId)
       log.debug(s"Session info retrieved for $dsId: $sessionInfo")
 
-      val res = if (validateAuth(sessionInfo, clientAuth)) {
-        if (checkToken(sessionInfo))
-          f(sessionInfo)
-        else {
-          val errorString = s"Token check failed"
-          log.error(errorString)
-          val failedResult = Result(
-            new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString)), HttpEntity.NoEntity
-          )
-          Future.successful(Left(failedResult))
-        }
-      } else {
-        val errorString = s"Authentication failed in request with dsId: '$dsId', auth value '$clientAuth' is not correct."
-        log.error(errorString)
-        val failedResult = Result(
-          new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString)), HttpEntity.NoEntity
-        )
-        Future.successful(Left(failedResult))
-      }
+      checkToken(sessionInfo) flatMap{
+        tokenCheck =>
 
-      res.map(_.right.map(getTransformer(sessionInfo).transform))
+          val res = if (validateAuth(sessionInfo, clientAuth)) {
+            if (tokenCheck)
+              f(sessionInfo)
+            else {
+              val errorString = s"Token check failed"
+              log.error(errorString)
+              val failedResult = Result(
+                new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString)), HttpEntity.NoEntity
+              )
+              Future.successful(Left(failedResult))
+            }
+          } else {
+            val errorString = s"Authentication failed in request with dsId: '$dsId', auth value '$clientAuth' is not correct."
+            log.error(errorString)
+            val failedResult = Result(
+              new ResponseHeader(UNAUTHORIZED, reasonPhrase = Option(errorString)), HttpEntity.NoEntity
+            )
+            Future.successful(Left(failedResult))
+          }
+
+          res.map(_.right.map(getTransformer(sessionInfo).transform))
+
+      }
     }
   }
 
@@ -301,12 +306,12 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
     }
   }
 
-  private def checkToken(si: Option[DSLinkSessionInfo]): Boolean = {
+  private def checkToken(si: Option[DSLinkSessionInfo]): Future[Boolean] = {
     if (Settings.AllowAllLinks)
-      true
+      Future.successful(true)
     else si.map(_.ci).fold({
       log.warn("Token is absent!");
-      false
+      Future.successful(false)
     }) { ci =>
       val token = ci.tokenHash
       val dsaPath = "/sys/tokens"
@@ -316,7 +321,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
 
       val fActiveTokens = dslinkMgr.dsaAsk(dsaPath, GetTokens).mapTo[List[DSANode]]
 
-      val fExist = fActiveTokens.map { listNodes =>
+      val fExist = fActiveTokens.flatMap{ listNodes =>
         log.debug("Available tokens are: " + listNodes.toString)
         val tokenId = token.flatMap(a => Option(a.substring(0, 16)))
 
@@ -325,19 +330,19 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
         val r = listNodes.indexWhere(tokenId.isDefined && _.name.equals(tokenId.get))
 
         r match {
-          case -1 => false
+          case -1 => Future.successful(false)
           case i =>
             val tokenNode = listNodes(i)
             val check = for {
               checkCount <- checkTokenCount(tokenId.get, tokenNode)
               checkDate <- checkTokenDates(tokenId.get, tokenNode)
             } yield checkCount && checkDate
-            Await.result(check, Duration.Inf)
+            check
         }
       }
 
       // TODO: try to avoid Await here
-      Await.result(fExist, Duration.Inf)
+      fExist
     }
   }
 
