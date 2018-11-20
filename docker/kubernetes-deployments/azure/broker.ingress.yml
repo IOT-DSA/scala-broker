@@ -1,0 +1,17 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: broker
+  annotations:
+    kubernetes.io/ingress.class: addon-http-application-routing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$http_ds_id"
+spec:
+  rules:
+    - host: broker.75bfb05a4fb5495ca754.eastus.aksapp.io
+      http:
+        paths: 
+        - path: / 
+          backend:
+            serviceName: "cloud-broker-external"
+            servicePort: 9000

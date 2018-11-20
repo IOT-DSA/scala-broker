@@ -1,0 +1,219 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cloud-broker-cluster
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-cluster
+  replicas: 3
+  podManagementPolicy: Parallel
+  serviceName: cloud-broker-internal
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-cluster
+    spec:
+      initContainers:
+      - name: init-resolv
+        image: "busybox"
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+      imagePullSecrets:
+        - name: regcred
+      containers:
+      - name: broker-cluster
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance"
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        ports:
+        - containerPort: 9000
+        - containerPort: 9005
+        - containerPort: 2551
+        - containerPort: 8558
+        - containerPort: 9443
+        env:
+        - name: JAVA_OPTS
+          value: "-Xmx2000m"
+        - name: STATSD_HOST
+          value: cloud-metrics-internal.default.svc.cluster.local
+        - name: STATSD_PORT
+          value: "8125"
+        - name: ZIPKIN_HOST
+          value: cloud-metrics-internal.default.svc.cluster.local
+        - name: ZIPKIN_PORT
+          value: "9411"
+        - name: AKKA_REMOTING_BIND_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: AKKA_REMOTING_BIND_PORT
+          value: "2551"
+        - name: AKKA_SEED_NODES
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
+        - name: AKKA_ACTOR_SYSTEM_NAME
+          value: DSASystem
+        - name: CONF_FILE
+          value: "/opt/docker/conf/backend.conf"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "1500m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-broker-cluster-squad
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: cloud-broker-cluster
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cloud-broker-cluster
+        depl_type: squad
+    spec:
+      initContainers:
+      - name: init-resolv
+        image: "busybox"
+        command: ["sh", "-c", "echo 'search cloud-broker-internal.default.svc.cluster.local cloud-broker-internal-squad.default.svc.cluster.local cloud-metrics-internal.default.svc.cluster.local' >> /etc/resolv.conf"]
+      imagePullSecrets:
+        - name: regcred
+      containers:
+      - name: broker-cluster-squad
+        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/broker-scala-performance"
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        ports:
+        - containerPort: 9000
+        - containerPort: 9005
+        - containerPort: 2551
+        - containerPort: 8558
+        - containerPort: 9443
+        env:
+        - name: JAVA_OPTS
+          value: "-Xmx2000m"
+        - name: STATSD_HOST
+          value: cloud-metrics-internal.default.svc.cluster.local
+        - name: STATSD_PORT
+          value: "8125"
+        - name: ZIPKIN_HOST
+          value: cloud-metrics-internal.default.svc.cluster.local
+        - name: ZIPKIN_PORT
+          value: "9411"
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: AKKA_REMOTING_BIND_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: AKKA_REMOTING_BIND_PORT
+          value: "2551"
+        - name: AKKA_SEED_NODES
+          value: "cloud-broker-cluster-0:2551,cloud-broker-cluster-1:2551,cloud-broker-cluster-2:2551"
+        - name: AKKA_ACTOR_SYSTEM_NAME
+          value: DSASystem
+        - name: CONF_FILE
+          value: "/opt/docker/conf/backend.conf"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "1500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-internal
+  labels:
+    app: cloud-broker-cluster
+spec:
+  ports:
+  - port: 2551
+    targetPort: 2551
+    protocol: TCP
+  selector:
+    app: cloud-broker-cluster
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-broker-external
+  labels:
+    app: cloud-broker-cluster
+spec:
+  ports:
+  - name: dsabroker-webinterface
+    port: 9000
+    targetPort: 9000
+  - name: dsa-9005
+    port: 9005
+    targetPort: 9005
+  selector:
+    app: cloud-broker-cluster
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: cloud-broker-external-lb
+#   labels:
+#     app: cloud-broker-cluster
+# spec:
+#   ports:
+#   - name: dsabroker-webinterface
+#     port: 9000
+#     targetPort: 9000
+#   - name: dsa-9005
+#     port: 9005
+#     targetPort: 9005
+#   type: LoadBalancer
+#   selector:
+#     app: cloud-broker-cluster
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cloud-broker-cluster-autoscaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cloud-broker-cluster-squad
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: 50

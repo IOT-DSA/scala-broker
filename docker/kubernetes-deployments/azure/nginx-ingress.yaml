@@ -1,0 +1,39 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: addon-http-application-routing-nginx-configuration
+  namespace: kube-system
+  labels:
+      addonmanager.kubernetes.io/mode: "EnsureExists"
+      app: "addon-http-application-routing-ingress-nginx"
+      kubernetes.io/cluster-service: "true"
+data:
+  client-body-buffer-size: 32M
+  proxy-body-size: 1G
+  proxy-buffering: "off"
+  proxy-read-timeout: "600"
+  proxy-send-timeout: "600"
+  upstream-keepalive-connections: "50"
+  enable-underscores-in-headers: "true"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: addon-http-application-routing-tcp-services
+  namespace: kube-system
+  labels:
+      addonmanager.kubernetes.io/mode: "EnsureExists"
+      app: "addon-http-application-routing-ingress-nginx"
+      kubernetes.io/cluster-service: "true"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: addon-http-application-routing-udp-services
+  namespace: kube-system
+  labels:
+      addonmanager.kubernetes.io/mode: "EnsureExists"
+      app: "addon-http-application-routing-ingress-nginx"
+      kubernetes.io/cluster-service: "true"
+      
