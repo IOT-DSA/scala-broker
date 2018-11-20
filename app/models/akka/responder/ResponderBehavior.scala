@@ -2,32 +2,34 @@ package models.akka.responder
 
 import java.net.URLEncoder
 
-import scala.util.control.NonFatal
-import akka.persistence.PersistentActor
+import _root_.akka.cluster.sharding.ClusterSharding
+import _root_.akka.event.LoggingAdapter
+import _root_.akka.pattern._
+import _root_.akka.routing.{ActorSelectionRoutee, Routee}
+import _root_.akka.util.Timeout
 import akka.actor._
-import akka.pattern._
+import akka.persistence.PersistentActor
 import kamon.Kamon
 import models._
+import models.akka.Messages._
+import models.akka.cluster.{ClusteredDSLinkManager, ShardedRoutee}
+import models.akka.responder.OriginUpdater._
 import models.akka._
+import models.api.DSANode
 import models.metrics.Meter
-import models.rpc._
 import models.rpc.DSAMethod.DSAMethod
 import models.rpc.DSAValue.{ArrayValue, DSAVal, MapValue, StringValue, array}
-import _root_.akka.routing.ActorSelectionRoutee
-import _root_.akka.routing.Routee
-import _root_.akka.event.LoggingAdapter
-import _root_.akka.util._
-import models.akka.Messages.{GetRules, GetToken, GetTokens}
-import models.api.DSANode
+import models.rpc._
 
-import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Handles communication with a remote DSLink in Responder mode.
   */
-trait ResponderBehavior extends DSLinkStateSnapshotter with Meter {
+trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNavigator {
   me: PersistentActor with ActorLogging =>
 
   import RidRegistry._
