@@ -15,7 +15,7 @@ import com.esotericsoftware.kryo.io.{ Input, Output, UnsafeInput, UnsafeOutput }
 
 import models.{ RequestEnvelope, ResponseEnvelope }
 import models.rpc.{ ColumnInfo, DSAResponse, InvokeRequest, StreamState }
-import models.rpc.DSAValue.DSAMap
+import models.rpc.DSAValue._
 
 /**
  * Message serialization test suite.

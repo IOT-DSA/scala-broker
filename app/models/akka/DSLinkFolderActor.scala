@@ -10,19 +10,20 @@ import akka.stream.scaladsl.Source
 import models.akka.DSLinkMode.DSLinkMode
 import models.akka.Messages.{DSLinkNodeStats, LinkState}
 import models.akka.responder.SimpleResponderBehavior
-import models.rpc.{ CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage }
+import models.rpc.{CloseRequest, DSARequest, DSAResponse, ListRequest, ResponseMessage}
 import models.{RequestEnvelope, Settings}
 
 /**
- * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.
- *
- * When started, it verifies its own location against the `linkPath` parameter. For example,
- * if linkPath is set to "/downstream", the actor path needs to be "/user/downstream".
- */
+  * Base actor for DSA "link folder" nodes, such as `/downstream` or `/upstream`.
+  *
+  * When started, it verifies its own location against the `linkPath` parameter. For example,
+  * if linkPath is set to "/downstream", the actor path needs to be "/user/downstream".
+  */
 abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor with ActorLogging with RouteeNavigator with SimpleResponderBehavior {
+
   import models.rpc.DSAValue._
   import models.rpc.StreamState._
-  
+
   checkPath(linkPath)
 
   protected def ownId: String = "[" + linkPath + "]"
@@ -42,19 +43,19 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
 
 
   val dslinkFolderRecover: Receive = {
-    case event: DSLinkCreated =>
+    case event: DSLinkCreated               =>
       log.debug("{}: recovering with event {}", ownId, event)
       getOrCreateDSLink(event.name)
-    case event: DSLinkRemoved =>
+    case event: DSLinkRemoved               =>
       log.debug("{}: recovering with event {}", ownId, event)
       removeDSLinks(event.names: _*)
-    case event: DSLinkRegistered =>
+    case event: DSLinkRegistered            =>
       log.debug("{}: recovering with event {}", ownId, event)
       links += (event.name -> LinkState(event.mode, event.connected))
-    case event: DSLinkUnregistered =>
+    case event: DSLinkUnregistered          =>
       log.debug("{}: recovering with event {}", ownId, event)
       links -= event.name
-    case event: ListRidUpdated =>
+    case event: ListRidUpdated              =>
       log.debug("{}: recovering with event {}", ownId, event)
       listRid = event.listRid
     case offeredSnapshot: DSLinkFolderState =>
@@ -66,8 +67,8 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   implicit val mat = ActorMaterializer()
 
   /**
-   * Terminates the actor system if the actor's path does not match `/user/<path>`.
-   */
+    * Terminates the actor system if the actor's path does not match `/user/<path>`.
+    */
   protected def checkPath(path: String) = if (self.path != self.path.root / "user" / path.split("/")) {
     val msg = s"${getClass.getSimpleName} should be created under [$path]"
     log.error(new IllegalStateException(msg), msg + ", not [" + self.path + "]")
@@ -75,8 +76,8 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   }
 
   /**
-   * Removes DSLinks actors that do not have a connected endpoint.
-   */
+    * Removes DSLinks actors that do not have a connected endpoint.
+    */
   protected def removeDisconnectedDSLinks = {
     val disconnected = links.filterNot(_._2.connected).keys.toSeq
     persist(DSLinkRemoved(disconnected: _*)) { event =>
@@ -88,8 +89,8 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   }
 
   /**
-   * Searches DSLinks by name pattern.
-   */
+    * Searches DSLinks by name pattern.
+    */
   protected def findDSLinks(regex: String, limit: Int, offset: Int) = {
     log.debug("{}: searching for dslinks: pattern={}, limit={}, offset={}", ownId, regex, limit, offset)
     val pattern = Pattern.compile(regex)
@@ -98,8 +99,8 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   }
 
   /**
-   * Returns the current DSLink node stats.
-   */
+    * Returns the current DSLink node stats.
+    */
   protected def buildDSLinkNodeStats = {
     val requestersOn = links.count(_._2 == LinkState(DSLinkMode.Requester, true))
     val requestersOff = links.count(_._2 == LinkState(DSLinkMode.Requester, false))
@@ -115,31 +116,31 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
   }
 
   /**
-   * Processes a DSA payload and forwards the results to [[models.akka.responder.ResponderBehavior]].
-   */
+    * Processes a DSA payload and forwards the results to [[models.akka.responder.ResponderBehavior]].
+    */
   protected def sendToEndpoint(msg: Any): Unit = msg match {
-    case RequestEnvelope(requests) => requests foreach handleRequest
-    case _                         => log.warning("Unknown message received: {}", msg)
+    case RequestEnvelope(requests, _) => requests foreach handleRequest
+    case _                            => log.warning("Unknown message received: {}", msg)
   }
 
   /**
-   * Generates response for LIST request.
-   */
+    * Generates response for LIST request.
+    */
   protected def listNodes: Source[ArrayValue, _]
 
   /**
-   * Creates/accesses a new DSLink actor and emits an update, if there is an active LIST request.
-   */
+    * Creates/accesses a new DSLink actor and emits an update, if there is an active LIST request.
+    */
   protected def getOrCreateDSLink(name: String): Routee
 
   /**
-   * Orders the removal of the specified DSLink actors.
-   */
+    * Orders the removal of the specified DSLink actors.
+    */
   protected def removeDSLinks(names: String*): Unit
 
   /**
-   * Processes an incoming request and produces a list of response envelopes, if any.
-   */
+    * Processes an incoming request and produces a list of response envelopes, if any.
+    */
   protected def handleRequest(request: DSARequest): Unit = request match {
     case ListRequest(rid, "/") =>
       persist(ListRidUpdated(Some(rid))) { event =>
@@ -152,37 +153,37 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
         }
         messages.runForeach(self.forward)
       }
-    case CloseRequest(_) =>
+    case CloseRequest(_)       =>
       persist(ListRidUpdated(None)) { event =>
         log.debug("{}: persisting {}", ownId, event)
         listRid = event.listRid
         saveSnapshot(DSLinkFolderState(links, listRid))
       }
-    case _ => log.error(s"Invalid request - $request")
+    case _                     => log.error(s"Invalid request - $request")
   }
 
   /**
-   * Generates and sends response messages to notify the listeners about the registered dslink.
-   */
+    * Generates and sends response messages to notify the listeners about the registered dslink.
+    */
   protected def notifyOnRegister(name: String): Unit = listRid foreach { rid =>
     val updates = rows(name -> obj(IsNode))
     self ! ResponseMessage(-1, None, DSAResponse(rid, Some(Open), Some(updates)) :: Nil)
   }
 
   /**
-   * Generates and sends response messages to notify the listeners about the removed dslinks.
-   */
+    * Generates and sends response messages to notify the listeners about the removed dslinks.
+    */
   protected def notifyOnRemove(names: String*) = listRid foreach { rid =>
     val updates = names map (name => obj("name" -> name, "change" -> "remove"))
     self ! ResponseMessage(-1, None, DSAResponse(rid, Some(Open), Some(updates.toList)) :: Nil)
   }
 
   /**
-   * Changes the recorded link state.
-   */
+    * Changes the recorded link state.
+    */
   protected def changeLinkState(name: String, mode: DSLinkMode, connected: Boolean, warnIfNotFound: Boolean) = {
     links.get(name) match {
-      case Some(_) =>
+      case Some(_)                =>
         persist(DSLinkRegistered(name, mode, connected)) { event =>
           log.debug("{}: persisting {}", ownId, event)
           links += (event.name -> LinkState(event.mode, event.connected))
@@ -191,7 +192,7 @@ abstract class DSLinkFolderActor(val linkPath: String) extends PersistentActor w
         }
       case None if warnIfNotFound =>
         log.warning("{}: DSLink '{}' is not registered, ignoring state change", ownId, name)
-      case _ =>
+      case _                      =>
     }
   }
 }

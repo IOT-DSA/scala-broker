@@ -11,9 +11,9 @@ import models.akka.Messages.{DisconnectEndpoint, GetOrCreateDSLink, RemoveDSLink
 import models.api._
 import models.rpc.DSAValue.{ArrayValue, DSAVal, StringValue}
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 /**
   * Standard node actions.
@@ -285,8 +285,7 @@ object StandardActions {
   }
 
   /**
-    * Regenerate the token, first 18 bytes became the same, rest ones
-    * are regenerated
+    * Regenerate the token: the first 16 bytes became the same, the rest are regenerated.
     */
   val RegenerateToken: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
@@ -302,49 +301,45 @@ object StandardActions {
   })
 
   /**
-    * Modify current token node
+    * Sets "$group" attribute of the token node.
     */
   val UpdateToken: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
     val group = ctx.args("Group").value.toString
 
-    node.addConfigs("group" -> group)
+    node.addConfigs("$group" -> group)
   }, Param("Group", DSAString))
 
   /**
-    * Remove all clients related to the token. Token is the same
+    * Remove all clients related to the token.
     */
   val RemoveTokenClients: DSAAction = DSAAction((ctx: ActionContext) => {
     val node = ctx.node.parent.get
 
-    val fids = node.config("$dsLinkIds")
-
+    // TODO: this needs to be refactored either by IoC or passing AS explicitly
     implicit val system: ActorSystem =
       if (ctx.node.isInstanceOf[DistributedDSANode])
         ctx.node.asInstanceOf[DistributedDSANode]._system
       else
         ctx.node.asInstanceOf[InMemoryDSANode].system
 
-    fids foreach {
-      case Some(x) =>
-        val arrDsId = x.asInstanceOf[ArrayValue].value
-        arrDsId foreach { dsId =>
-          val dstName = if (dsId.toString.size > 44)
-            dsId.toString.substring(0, dsId.toString.size - 44)
-          else dsId.toString
-
-          val dstActorRef = system.actorSelection("/user" + Paths.Downstream)
-
-          val fRoutee = (dstActorRef ? GetOrCreateDSLink(dstName)).mapTo[Routee]
-
-          fRoutee foreach { routee =>
-            routee ! DisconnectEndpoint(true)
-            dstActorRef ! RemoveDSLink(dstName)
-          }
-        }
-
-      case None =>
+    val fDsIds = node.config("$dsLinkIds") map { cfg =>
+      cfg.toSeq.collect {
+        case arr: ArrayValue => arr.value.map(_.toString)
+      }.flatten
     }
+
+    val dstActorRef = system.actorSelection("/user" + Paths.Downstream)
+
+    fDsIds foreach (_.foreach { dsId =>
+      val dstName = if (dsId.size > 44) dsId.take(dsId.size - 44) else dsId
+      val fRoutee = (dstActorRef ? GetOrCreateDSLink(dstName)).mapTo[Routee]
+      fRoutee foreach { routee =>
+        routee ! DisconnectEndpoint(true)
+        dstActorRef ! RemoveDSLink(dstName)
+      }
+    })
+
     node.removeConfig("$dsLinkIds")
   })
 

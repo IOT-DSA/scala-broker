@@ -12,7 +12,7 @@ class DeadLettersGuard extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case DeadLetter(msg, toAnswer, requested) => msg match {
-      case RequestEnvelope(requests) => {
+      case RequestEnvelope(requests, _) => {
         val responses = requests.map {
           r =>
             DSAResponse(r.rid, Some(StreamState.Closed), None, None, Some(DSAError(

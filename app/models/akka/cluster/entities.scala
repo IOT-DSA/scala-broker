@@ -26,7 +26,7 @@ final case class PeerMessage(payload: Any)
   */
 trait ClusteredActor extends Actor with ActorLogging {
 
-  implicit val timeout = Timeout(Settings.QueryTimeout)
+  implicit def timeout: Timeout
 
   import context.dispatcher
 
