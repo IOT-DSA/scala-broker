@@ -183,21 +183,25 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
   /**
     * Accepts a connection request and sends back the server config JSON.
     */
-  def dslinkHandshake = Action(validateJson[ConnectionRequest]) { implicit request =>
-    log.debug(s"Conn request received at $request : ${request.body}")
+  def dslinkHandshake = Action(validateJson[ConnectionRequest]).async { implicit request =>
 
-    val ci = buildConnectionInfo(request)
+    Future {
+      log.info(s"Conn request received at $request : ${request.body}")
 
-    val json = Settings.ServerConfiguration ++ createHandshakeResponse(ci)
+      val ci = buildConnectionInfo(request)
 
-    val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
+      val json = Settings.ServerConfiguration ++ createHandshakeResponse(ci)
 
-    cache.set(ci.dsId, DSLinkSessionInfo(ci, sessionId))
+      val sessionId = ci.linkName + "_" + ci.linkAddress + "_" + Random.nextInt(1000000)
 
-    meterTags(messageTags("handshake", ci): _*)
+      cache.set(ci.dsId, DSLinkSessionInfo(ci, sessionId))
 
-    log.debug(s"Conn response sent: ${json.toString}")
-    Ok(json)
+      meterTags(messageTags("handshake", ci): _*)
+
+      log.info(s"Conn response sent: ${json.toString}")
+      Ok(json)
+    }
+
   }
 
   /**
@@ -435,7 +439,12 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
     for{
       wsActor <- (watcher ? "GivMeActorPlease").mapTo[ActorRef]
       flow <- (wsActor ? StreamRequest()).mapTo[Flow[DSAMessage, DSAMessage, NotUsed]]
-    } yield flow
+    } yield {
+
+      log.info(s"starting flow: ${flow}")
+      flow
+
+    }
 
   }
 

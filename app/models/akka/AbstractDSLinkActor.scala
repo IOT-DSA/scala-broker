@@ -4,7 +4,7 @@ import org.joda.time.DateTime
 import akka.persistence._
 import akka.actor.{ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.remote.Ack
-import akka.routing.Routee
+import akka.routing.{ActorRefRoutee, Routee}
 import facades.websocket.RouteeUpdateRequest
 import models.metrics.Meter
 import models.rpc.PingMessage
@@ -26,7 +26,7 @@ import play.http.websocket.Message.Pong
   * When the actor is disconnected, it stashes incoming messages and releases them to the endpoint, once it
   * becomes connected again.
   */
-abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor with DSLinkStateSnapshotter with Stash  with ActorLogging with
+abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentActor with DSLinkStateSnapshotter with Stash with ActorLogging with
   Meter {
 
   import Messages._
@@ -54,7 +54,7 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     connInfo = ConnectionInfo("", linkName, true, false)
     sendToRegistry(RegisterDSLink(linkName, connInfo.mode, false))
 
-    if(endpoint.isEmpty){
+    if (endpoint.isEmpty) {
       log.info("{}: initialized, not connected to Endpoint", ownId)
     } else {
       log.info("{}: initialized connected to Endpoint {}", ownId, endpoint)
@@ -127,17 +127,16 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
-    case ConnectEndpoint(ci, wsActor) =>
-      log.info("!!!!!!!!!!! {}: new connection message \n ci:{} \n new endpoint:{} \nold endpoint: {}", ownId,  ci, wsActor, endpoint)
-      if(Some(wsActor) != endpoint){
-        log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
+    case ConnectEndpoint(ci, ref) =>
+      log.info("!!!!!!!!!!! {}: new connection message \n ci:{} \n new endpoint:{} \nold endpoint: {}", ownId, ci, ref, endpoint)
+      log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
+      if(Some(ref) != endpoint){
         endpoint.foreach(disconnectFromEndpoint(_, true))
-        connectToEndpoint(wsActor, ci)
-        wsActor ! s"Reconnecting, Prev connection ${endpoint} will be disconnected"
-      } else {
-        log.warning("{}: Already connected", ownId)
-        wsActor ! "Already connected, won't reconnect"
       }
+      connectToEndpoint(ref, ci)
+      sender ! s"Reconnecting"
+
+
     case m: PingMessage => sender ! "Ok"
 
   }
@@ -146,10 +145,10 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     * Handles messages in DISCONNECTED state.
     */
   def disconnected: Receive = {
-    case ConnectEndpoint(ci, wsActor) =>
-      connectToEndpoint(wsActor, ci)
-      log.info("{}: connected to Endpoint {}", ownId, wsActor)
-      wsActor ! s"Connecting"
+    case ConnectEndpoint(ci, ref) =>
+      connectToEndpoint(ref, ci)
+      log.info("{}: connected to Endpoint {}", ownId, ref)
+      sender ! s"Connecting"
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
@@ -173,7 +172,6 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     persist(DSLinkBaseState(Some(ref), ci, Some(DateTime.now.toDate), lastDisconnected.map {
       _.toDate
     })) { event =>
-      context.watch(ref)
       log.debug("{}: persisting {}", ownId, event)
       updateState(event)
       saveSnapshot(event)

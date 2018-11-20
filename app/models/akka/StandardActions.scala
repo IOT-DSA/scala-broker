@@ -228,8 +228,8 @@ object StandardActions {
     }
 
     // TODO: Change it to non-blocking way
-//    val token = Await.result(fToken, Duration.Inf)
-//    (token.take(16), token)
+    val token = Await.result(fToken, Duration.Inf)
+    (token.take(16), token)
   },
     Param("Group", DSAString),
     Param("TimeRange", DSAString) withEditor "daterange" writableAs "config",
