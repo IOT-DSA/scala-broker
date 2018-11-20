@@ -86,16 +86,19 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
 
     log.info("{}: updateRoutee(). Current routee value: {}", ownId, routee)
 
-    futureRoutee.flatMap{ r =>
+    futureRoutee.map{ r =>
       log.info("{}: send ConnectEndpoint({}) to {}",ownId,  ci, r)
       val futureAcceptance = (r ? ConnectEndpoint(ci, self)).mapTo[String]
 
-      futureAcceptance.map(_ => r).recoverWith{
-        case t =>
-          log.error(t, "{}: unable to connect", ownId)
-          updateRoutee()
+      futureAcceptance.onComplete { _ match {
+        case scala.util.Success(message) => log.info("{}: Connection accepted with message: {}", ownId, message)
+        case scala.util.Failure(error) =>
+          log.error(error, "{}: unable to connect", ownId)
+          context.system.scheduler.scheduleOnce(1 second, self, RouteeUpdateRequest())
+        }
       }
 
+      r
       }
 
   }
