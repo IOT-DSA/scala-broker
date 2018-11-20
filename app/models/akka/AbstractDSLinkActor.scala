@@ -128,13 +128,13 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
     case ConnectEndpoint(ci, wsActor) =>
-      if(Some(sender) != endpoint){
-        sender ! s"Reconnecting, Prev connection ${endpoint} will be disconnected"
+      if(Some(wsActor) != endpoint){
         log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
         endpoint.foreach(disconnectFromEndpoint(_, true))
         connectToEndpoint(wsActor, ci)
+        wsActor ! s"Reconnecting, Prev connection ${endpoint} will be disconnected"
       } else {
-        sender ! "Already connected"
+        wsActor ! "Already connected"
       }
     case m: PingMessage => sender ! "Ok"
 
@@ -145,9 +145,9 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     */
   def disconnected: Receive = {
     case ConnectEndpoint(ci, wsActor) =>
-      sender ! s"Connecting"
       connectToEndpoint(wsActor, ci)
-      log.info("{}: connected to Endpoint {}", ownId, sender)
+      log.info("{}: connected to Endpoint {}", ownId, wsActor)
+      wsActor ! s"Connecting"
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)
