@@ -87,8 +87,7 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
     log.info("{}: updateRoutee(). Current routee value: {}", ownId, routee)
 
     futureRoutee.map{ r =>
-      log.info("{}: send ConnectEndpoint({}) to {}",ownId,  ci, r)
-      val futureAcceptance = (r ? ConnectEndpoint(ci, self)).mapTo[String]
+      val futureAcceptance = (r ? ConnectEndpoint(ci, self))
 
       futureAcceptance.onComplete { _ match {
         case scala.util.Success(message) => log.info("{}: Connection accepted with message: {}", ownId, message)

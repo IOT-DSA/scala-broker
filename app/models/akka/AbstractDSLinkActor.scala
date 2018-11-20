@@ -4,7 +4,7 @@ import org.joda.time.DateTime
 import akka.persistence._
 import akka.actor.{ActorLogging, ActorRef, PoisonPill, Stash, Terminated, actorRef2Scala}
 import akka.remote.Ack
-import akka.routing.Routee
+import akka.routing.{ActorRefRoutee, Routee}
 import facades.websocket.RouteeUpdateRequest
 import models.metrics.Meter
 import models.rpc.PingMessage
