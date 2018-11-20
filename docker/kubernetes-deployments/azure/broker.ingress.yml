@@ -1,20 +1,3 @@
-# ---
-# apiVersion: extensions/v1beta1
-# kind: Ingress
-# metadata:
-#   name: broker
-#   annotations:
-#     kubernetes.io/ingress.class: "nginx"
-#     nginx.ingress.kubernetes.io/upstream-hash-by: "$http_ds_id"
-# spec:
-#   rules:
-#     - http:
-#         paths: 
-#         - path: / 
-#           backend:
-#             serviceName: "cloud-broker-external"
-#             servicePort: 9000
-
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
