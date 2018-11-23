@@ -54,7 +54,7 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     connInfo = ConnectionInfo("", linkName, true, false)
     sendToRegistry(RegisterDSLink(linkName, connInfo.mode, false))
 
-    if(endpoint.isEmpty){
+    if (endpoint.isEmpty) {
       log.info("{}: initialized, not connected to Endpoint", ownId)
     } else {
       log.info("{}: initialized connected to Endpoint {}", ownId, endpoint)
