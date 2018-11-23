@@ -129,12 +129,16 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
     case ConnectEndpoint(ci, ref) =>
       log.info("!!!!!!!!!!! {}: new connection message \n ci:{} \n new endpoint:{} \nold endpoint: {}", ownId, ci, ref, endpoint)
-      log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
       if(Some(ref) != endpoint){
+        log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
         endpoint.foreach(disconnectFromEndpoint(_, true))
+        connectToEndpoint(ref, ci)
+        sender ! s"Reconnecting"
+      } else {
+        log.info("{}: Won't reconnect, already connected to this Endpoint", ownId)
+        sender ! s"Already connecting"
       }
-      connectToEndpoint(ref, ci)
-      sender ! s"Reconnecting"
+
 
 
     case m: PingMessage => sender ! "Ok"
