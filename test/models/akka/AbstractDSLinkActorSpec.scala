@@ -69,15 +69,6 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       })
       expectTerminated(endpoint3)
     }
-    "respond to endpoint termination" in {
-      dslink.tell(ConnectEndpoint(ci, endpoint2), endpoint2)
-      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
-      endpoint2 ! PoisonPill
-      downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
-      whenReady(dslink ? GetLinkInfo)(inside(_) {
-        case LinkInfo(connInfo, false, Some(_), Some(_)) => connInfo mustBe ci
-      })
-    }
     "unregister from backend" in {
       dslink ! PoisonPill
       downProbe.expectMsg(UnregisterDSLink(linkName))
