@@ -19,8 +19,11 @@ import models.metrics.Meter
 import models.rpc._
 import akka.pattern.ask
 
-import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 import java.util.concurrent.{TimeUnit => TU}
+
+import akka.remote.WireFormats.TimeUnit
 
 
 /**
@@ -77,15 +80,25 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
   }
 
   private def updateRoutee(): Future[Routee] = {
-    val future = (registry ? GetOrCreateDSLink(config.connInfo.linkName)).mapTo[Routee]
-    future.map{ r =>
+    val futureRoutee = (registry ? GetOrCreateDSLink(config.connInfo.linkName)).mapTo[Routee]
 
-      r ! ConnectEndpoint(ci)
-      log.info("send ConnectEndpoint({}) to {}", ci, r)
-      incrementTags(tagsForConnection("connected")(ci): _*)
+    incrementTags(tagsForConnection("connected")(ci): _*)
+
+    log.info("{}: updateRoutee(). Current routee value: {}", ownId, routee)
+
+    futureRoutee.map{ r =>
+      val futureAcceptance = (r ? ConnectEndpoint(ci, self))
+
+      futureAcceptance.onComplete { _ match {
+        case scala.util.Success(message) => log.info("{}: Connection accepted with message: {}", ownId, message)
+        case scala.util.Failure(error) =>
+          log.error(error, "{}: unable to connect", ownId)
+        }
+      }
+
       r
+      }
 
-    }
   }
 
   /**
@@ -102,9 +115,12 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
   def receive = {
     case EmptyMessage =>
       log.debug("{}: received empty message from WebSocket, ignoring...", ownId)
-    case PingMessage(msg, ack) =>
+    case ping@PingMessage(msg, ack) =>
       log.debug("{}: received ping from WebSocket with msg={}, acking...", ownId, msg)
-      sendAck(msg)
+      for(
+        r <- routee;
+        _ <- (r ? ping)
+      ) sendAck(msg)
     case m@RequestMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "request")
       log.debug("{}: received request message {} from WebSocket", ownId, formatMessage(m))

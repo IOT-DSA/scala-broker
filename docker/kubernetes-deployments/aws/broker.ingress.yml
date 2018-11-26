@@ -5,6 +5,7 @@ metadata:
   name: broker
   annotations:
     kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$http_ds_id"
 spec:
   rules:
     - http:

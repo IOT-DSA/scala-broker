@@ -36,7 +36,7 @@ abstract class AbstractEndpointActor(linkName: String, mode: DSLinkMode, routee:
    * Registers endpoint and start stats collection loop.
    */
   override def preStart() = {
-    routee ! ConnectEndpoint(connInfo)
+    routee ! ConnectEndpoint(connInfo, self)
 
     if (config.statsInterval > Duration.Zero)
       statsJob = Some(context.system.scheduler.schedule(config.statsInterval, config.statsInterval, self, StatsTick))

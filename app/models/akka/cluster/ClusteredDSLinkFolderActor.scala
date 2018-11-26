@@ -2,11 +2,14 @@ package models.akka.cluster
 
 import models.akka.{DSLinkCreated, DSLinkFolderActor, DSLinkFolderState, DSLinkRegistered, DSLinkRemoved, DSLinkUnregistered, IsNode, RichRoutee, rows}
 import akka.actor.{Identify, PoisonPill, Props, actorRef2Scala}
+import akka.dispatch.{PriorityGenerator, UnboundedPriorityMailbox}
 import akka.pattern.pipe
 import akka.routing.Routee
 import akka.stream.scaladsl.Source
+import models.{RequestEnvelope, ResponseEnvelope}
 import models.akka.Messages._
 import models.rpc.DSAValue.{ArrayValue, DSAVal, StringValue, array, obj}
+import models.rpc.ResponseMessage
 
 import scala.concurrent.Future
 
@@ -158,4 +161,13 @@ object ClusteredDSLinkFolderActor {
     */
   def props(linkPath: String, linkProxy: (String) => Routee, extraConfigs: (String, DSAVal)*) =
     Props(new ClusteredDSLinkFolderActor(linkPath, linkProxy, extraConfigs: _*))
+}
+
+class ControllFirstPriorityMailBox(settings:akka.actor.ActorSystem.Settings, config:com.typesafe.config.Config) extends UnboundedPriorityMailbox(
+  PriorityGenerator{
+    case env @ EntityEnvelope(_, RequestEnvelope(requests, _)) => 1
+    case m @ EntityEnvelope(_, ResponseMessage(_, _, responses)) => 1
+    case _ => 0
+  }, 1000000){
+
 }

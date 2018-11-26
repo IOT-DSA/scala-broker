@@ -30,6 +30,7 @@ class WebSocketActorSpec extends AbstractActorSpec {
   val ci = ConnectionInfo("", "ws", true, false)
   val config = WebSocketActorConfig(ci, "session", salt)
   val link = TestProbe()
+
   implicit val timeout = akka.util.Timeout(2, TimeUnit.SECONDS)
 
   val futureSink = StreamRefs.sinkRef[DSAMessage]()
@@ -55,12 +56,16 @@ class WebSocketActorSpec extends AbstractActorSpec {
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {
       expectMsg(AllowedMessage(true, salt))
-      link.expectMsg(ConnectEndpoint(ci))
+      link.expectMsg(ConnectEndpoint(ci, wsActor))
     }
     "return ack for a ping message" in {
       wsActor ! PingMessage(101)
+      link.expectMsg(PingMessage(101))
+      link.sender() ! "Ok"
       expectMsg(PongMessage(101))
       wsActor ! PingMessage(102)
+      link.expectMsg(PingMessage(102))
+      link.sender() ! "Ok"
       expectMsg(PongMessage(102))
     }
     "forward request message to link and return ack to socket" in {
@@ -85,5 +90,12 @@ class WebSocketActorSpec extends AbstractActorSpec {
       wsActor ! ResponseEnvelope(List(rsp))
       expectMsg(ResponseMessage(2, None, List(rsp)))
     }
+  }
+}
+
+class PingActor extends Actor {
+  def receive = {
+    case PingMessage(_, _)       => sender ! "Ok"
+    case _ =>
   }
 }
