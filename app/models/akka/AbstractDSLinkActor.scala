@@ -127,16 +127,16 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, true, lastConnected, lastDisconnected)
-    case ConnectEndpoint(ci, wsActor) =>
-      log.info("!!!!!!!!!!! {}: new connection message \n ci:{} \n new endpoint:{} \nold endpoint: {}", ownId,  ci, wsActor, endpoint)
-      if(Some(wsActor) != endpoint){
+    case ConnectEndpoint(ci, ref) =>
+      log.info("!!!!!!!!!!! {}: new connection message \n ci:{} \n new endpoint:{} \nold endpoint: {}", ownId, ci, ref, endpoint)
+      if(Some(ref) != endpoint){
         log.warning("{}: already connected to Endpoint, dropping previous association", ownId)
         endpoint.foreach(disconnectFromEndpoint(_, true))
-        connectToEndpoint(wsActor, ci)
-        wsActor ! s"Reconnecting, Prev connection ${endpoint} will be disconnected"
+        connectToEndpoint(ref, ci)
+        sender ! s"Reconnecting"
       } else {
-        log.warning("{}: Already connected", ownId)
-        wsActor ! "Already connected, won't reconnect"
+        log.info("{}: Won't reconnect, already connected to this Endpoint", ownId)
+        sender ! s"Already connecting"
       }
     case m: PingMessage => sender ! "Ok"
 
@@ -146,10 +146,10 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
     * Handles messages in DISCONNECTED state.
     */
   def disconnected: Receive = {
-    case ConnectEndpoint(ci, wsActor) =>
-      connectToEndpoint(wsActor, ci)
-      log.info("{}: connected to Endpoint {}", ownId, wsActor)
-      wsActor ! s"Connecting"
+    case ConnectEndpoint(ci, ref) =>
+      connectToEndpoint(ref, ci)
+      log.info("{}: connected to Endpoint {}", ownId, ref)
+      sender ! s"Connecting"
     case GetLinkInfo =>
       log.debug("{}: LinkInfo requested, dispatching", ownId)
       sender ! LinkInfo(connInfo, false, lastConnected, lastDisconnected)

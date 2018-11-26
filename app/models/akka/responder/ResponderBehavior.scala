@@ -81,12 +81,15 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
 
   def onPersistRegistry: Unit = saveResponderBehaviorSnapshot(mainResponderBehaviorState)
 
+  implicit val timeout = Timeout(5 seconds)
+
   /**
-   * Processes incoming requests and responses.
-   */
+    * Processes incoming requests and responses.
+    */
   val responderBehavior: Receive = {
-    case env @ RequestEnvelope(requests) =>
+    case env @ RequestEnvelope(requests, header) =>
       log.info("{}: received {} from {}", ownId, env, sender)
+      val tokenId = header.flatMap(_.get("token")).map(_.toString)
       val result = processRequests(requests)
       if (!result.requests.isEmpty)
         sendToEndpoint(RequestEnvelope(result.requests))
@@ -192,9 +195,9 @@ trait ResponderBehavior extends DSLinkStateSnapshotter with Meter with RouteeNav
   }
 
   /**
-   * Translates the original request before sending it to responder link.
-   */
-  private def handlePasstroughRequest: RequestHandler = {
+    * Translates the original request before sending it to responder link.
+    */
+  private def handlePassthroughRequest: RequestHandler = {
 
     def tgtId(srcId: Int, method: DSAMethod) = {
       val tgtId = ridRegistry.nextTgtId
