@@ -1,16 +1,16 @@
-package models.sdk
+package models.sdk.node
 
 import akka.stream.scaladsl.Source
 import models.akka.AbstractActorSpec
 import models.api.DSAValueType.{DSANumber, DSAString}
 import models.rpc.DSAValue._
+import models.sdk.Implicits._
 
 /**
   * NodeAction test suite.
   */
 class NodeActionSpec extends AbstractActorSpec {
 
-  import ActionContext._
 
   "Param" should {
     "implement withEditor" in {

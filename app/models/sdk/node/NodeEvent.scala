@@ -1,6 +1,7 @@
-package models.sdk
+package models.sdk.node
 
 import models.rpc.DSAValue._
+import models.sdk.{AttributeListener, ChildListener, ConfigListener, ValueListener}
 
 /**
   * Events processed by a node.

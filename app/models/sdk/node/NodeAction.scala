@@ -1,8 +1,9 @@
-package models.sdk
+package models.sdk.node
 
 import akka.stream.scaladsl.Source
 import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue._
+import models.sdk.NodeRef
 
 import scala.concurrent.Future
 
@@ -44,48 +45,6 @@ case class ActionContext(actionNode: NodeRef, args: DSAMap) {
   def as[T](name: String)(implicit cnv: DSAVal => T): T = args(name)
 
   def get[T](name: String)(implicit cnv: DSAVal => T): Option[T] = args.get(name).map(cnv)
-}
-
-/**
-  * DSAVal conversion functions.
-  */
-object ActionContext {
-
-  implicit def dsa2boolean(arg: DSAVal) = arg match {
-    case x: BooleanValue => x.value
-    case _               => throw new IllegalArgumentException("Wrong argument type, must be NumericValue")
-  }
-
-  implicit def dsa2binary(arg: DSAVal) = arg match {
-    case x: BinaryValue => x.value
-    case _              => throw new IllegalArgumentException("Wrong argument type, must be BinaryValue")
-  }
-
-  implicit def dsa2string(arg: DSAVal) = arg match {
-    case x: StringValue => x.value
-    case _              => throw new IllegalArgumentException("Wrong argument type, must be StringValue")
-  }
-
-  implicit def dsa2number(arg: DSAVal) = arg match {
-    case x: NumericValue => x.value
-    case _               => throw new IllegalArgumentException("Wrong argument type, must be NumericValue")
-  }
-
-  implicit def dsa2int(arg: DSAVal)(implicit cnv: DSAVal => BigDecimal) = cnv(arg).toInt
-
-  implicit def dsa2long(arg: DSAVal)(implicit cnv: DSAVal => BigDecimal) = cnv(arg).toLong
-
-  implicit def dsa2double(arg: DSAVal)(implicit cnv: DSAVal => BigDecimal) = cnv(arg).toDouble
-
-  implicit def dsa2array(arg: DSAVal) = arg match {
-    case x: ArrayValue => x.value
-    case _             => throw new IllegalArgumentException("Wrong argument type, must be ArrayValue")
-  }
-
-  implicit def dsa2map(arg: DSAVal) = arg match {
-    case x: MapValue => x.value
-    case _           => throw new IllegalArgumentException("Wrong argument type, must be MapValue")
-  }
 }
 
 /**

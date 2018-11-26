@@ -1,4 +1,4 @@
-package models.sdk
+package models.sdk.node
 
 import akka.actor.typed.scaladsl.AskPattern.Askable
 import akka.actor.typed.scaladsl.Behaviors
@@ -11,9 +11,9 @@ import models.akka.AbstractActorSpec
 import models.api.DSAValueType
 import models.api.DSAValueType._
 import models.rpc.DSAValue._
-import models.sdk.NodeBehavior._
-import models.sdk.NodeCommand._
-import models.sdk.NodeEvent._
+import models.sdk.node.NodeBehavior._
+import models.sdk.{DisplayCfg, NodeRef, NodeRefs, ProfileCfg, ValueTypeCfg}
+import models.sdk.Implicits._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -23,7 +23,8 @@ import scala.concurrent.duration._
   */
 class NodeBehaviorSpec extends AbstractActorSpec {
 
-  import ActionContext._
+  import NodeCommand._
+  import NodeEvent._
 
   implicit val timeout: Timeout = 5 seconds
   implicit val scheduler = system.scheduler
@@ -42,19 +43,19 @@ class NodeBehaviorSpec extends AbstractActorSpec {
     "work as a child of typed actor" in {
       val as = createActorSystem("dsa")
       as.systemActorOf(Behaviors.setup[NodeCommand] { ctx =>
-        val child = ctx.spawn(node("child", Some(ctx.self)), "child")
+        val child = ctx.spawn(node(Some(ctx.self)), "child")
         checkStatus(child, NodeStatus("child", Some(ctx.self)))
-        node("root", None)
+        node(None)
       }, "root")
     }
     "work as a child of untyped actor system" in {
-      val root = system.spawn(node("root2", None), "root2")
+      val root = system.spawn(node(None), "root2")
       checkStatus(root, NodeStatus("root2"))
     }
     "work as a child of untyped actor" in {
       system.actorOf(akka.actor.Props(new akka.actor.Actor {
         untyped =>
-        val child = context.spawn(node("child", Some(self)), "child")
+        val child = context.spawn(node(Some(self)), "child")
         checkStatus(child, NodeStatus("child", Some(untyped.self)))
 
         def receive = {
@@ -64,7 +65,7 @@ class NodeBehaviorSpec extends AbstractActorSpec {
     }
   }
 
-  val root = system.spawn(node("root", None), "root")
+  val root = system.spawn(node(None), "root")
 
   "NodeBehavior" should {
     "handle basic management commands" in {
@@ -195,7 +196,7 @@ class NodeBehaviorSpec extends AbstractActorSpec {
       root ! Stop
       expectTerminated(root.toUntyped)
 
-      val root2 = system.spawn(node("root", None), "root")
+      val root2 = system.spawn(node(None), "root")
       checkStatus(root2, NodeStatus(name = "root", value = Some(556), attributes = Map("@a" -> 1, "@b" -> true)))
       whenReady(root2 ? (GetChildren)) { children =>
         children.map(_.path.name).toSet mustBe Set("a1", "a2")
@@ -209,7 +210,7 @@ class NodeBehaviorSpec extends AbstractActorSpec {
     }
   }
 
-  val link = system.spawn(node("link", None), "link")
+  val link = system.spawn(node(None), "link")
 
   "NodeBehavior" should {
     "notify about value changes" in {

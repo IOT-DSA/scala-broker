@@ -1,9 +1,10 @@
-package models.sdk
+package models.sdk.node
 
 import akka.Done
 import akka.actor.typed.ActorRef
 import models.api.DSAValueType.DSAValueType
 import models.rpc.DSAValue.{DSAMap, DSAVal}
+import models.sdk.{AttributeListener, ChildListener, ConfigListener, NodeRef, NodeRefs, ValueListener}
 
 /**
   * Command that can be sent to a typed actor representing a DSA node.

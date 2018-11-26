@@ -1,12 +1,11 @@
-package models.sdk
+package models.sdk.node
 
 import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorSystem, Behavior}
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import models.rpc.DSAValue.{DSAMap, DSAVal}
-import models.sdk.NodeCommand._
-import models.sdk.NodeEvent._
+import models.sdk._
 
 /**
   * Describes DSA node behavior.
@@ -14,6 +13,8 @@ import models.sdk.NodeEvent._
 object NodeBehavior {
 
   import Effect._
+  import NodeCommand._
+  import NodeEvent._
 
   /**
     * Creates a node command handler.
@@ -105,7 +106,7 @@ object NodeBehavior {
         case (ctx, _, AddChild(name, ref))    =>
           ctx.log.info("{}: adding child [{}]", ctx.self.path, name)
           persistAndNotify(ChildAdded(name)).thenRun { state =>
-            val child = ctx.spawn(node(name, Some(ctx.self)), name)
+            val child = ctx.spawn(node(Some(ctx.self)), name)
             if (ref != null)
               ref ! child
           }
@@ -227,28 +228,27 @@ object NodeBehavior {
   /**
     * Creates a node behavior.
     *
-    * @param name
     * @param parent
     * @return
     */
-  def node(name: String, parent: Option[NodeRef]): Behavior[NodeCommand] =
+  def node(parent: Option[NodeRef]): Behavior[NodeCommand] =
     Behaviors.setup { ctx =>
-      ctx.log.info("{}: node created under name [{}]", ctx.self.path, name)
+      ctx.log.info("{}: node created", ctx.self.path)
       PersistentBehaviors.receive[NodeCommand, NodeEvent, NodeState](
         persistenceId = ctx.self.path.toStringWithoutAddress,
-        emptyState = DefaultNodeState.Empty,
+        emptyState = NodeState.Empty,
         commandHandler = (ctx, state, cmd) => nodeCmdHandler(parent)((ctx, state, cmd)),
         eventHandler = (state, event) => nodeEventHandler((state, event))
       ).onRecoveryCompleted { (ctx, state) =>
         ctx.log.debug("{}: recovery complete, {} children to spawn", ctx.self.path, state.children.size)
-        state.children foreach (childName => ctx.spawn(node(childName, Some(ctx.self)), childName))
+        state.children foreach (childName => ctx.spawn(node(Some(ctx.self)), childName))
       }
     }
 
   /**
     * Creates a new actor system realizing the `NodeBehavior`.
     */
-  def createActorSystem(name: String) = ActorSystem(node(name, None), name)
+  def createActorSystem(name: String) = ActorSystem(node(None), name)
 
   /**
     * If `str` does not start with `prefix`, adds it to the beginning of it.

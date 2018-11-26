@@ -1,8 +1,9 @@
-package models.sdk
+package models.sdk.node
 
 import models.akka.AbstractActorSpec
-import models.rpc.DSAValue._
 import models.api.DSAValueType._
+import models.rpc.DSAValue._
+import models.sdk.{DisplayCfg, ProfileCfg, ValueTypeCfg}
 
 /**
   * NodeState test suite.
@@ -38,5 +39,5 @@ class NodeStateSpec extends AbstractActorSpec {
     }
   }
 
-  private def stateWithConfig(cfgs: (String, DSAVal)*) = DefaultNodeState(None, None, Map.empty, cfgs.toMap, Set.empty)
+  private def stateWithConfig(cfgs: (String, DSAVal)*) = NodeState(None, None, Map.empty, cfgs.toMap, Set.empty)
 }
