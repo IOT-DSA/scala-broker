@@ -25,7 +25,7 @@ class PooledResponderBehaviorSpec extends AbstractActorSpec {
 
   val ws = TestProbe()
 
-  responder.tell(Messages.ConnectEndpoint(ci), ws.ref)
+  responder.tell(Messages.ConnectEndpoint(ci, ws.ref), ws.ref)
 
   val requesters = (1 to 5) map (_ -> TestProbe()) toMap
 
