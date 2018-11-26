@@ -31,7 +31,7 @@ class BenchmarkRequesterSpec extends AbstractActorSpec with Inside {
   "BenchmarkRequester" should {
     "register with proxy" in {
       val ci = ConnectionInfo(reqName + "0" * 44, reqName, true, false, None, "1.1.2", List("json"))
-      probe.expectMsg(ConnectEndpoint(ci))
+      probe.expectMsg(ConnectEndpoint(ci, probe.ref))
     }
     "subscribe to events" in {
       val req = SubscribeRequest(1, SubscriptionPath(nodePath, 101))

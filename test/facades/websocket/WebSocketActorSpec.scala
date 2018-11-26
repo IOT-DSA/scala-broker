@@ -55,7 +55,7 @@ class WebSocketActorSpec extends AbstractActorSpec {
   "WSActor" should {
     "send 'allowed' to socket and 'connected' to link on startup" in {
       expectMsg(AllowedMessage(true, salt))
-      link.expectMsg(ConnectEndpoint(ci))
+      link.expectMsg(ConnectEndpoint(ci, wsActor))
     }
     "return ack for a ping message" in {
       wsActor ! PingMessage(101)

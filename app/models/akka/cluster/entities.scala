@@ -1,6 +1,6 @@
 package models.akka.cluster
 
-import akka.actor.{Actor, ActorLogging, RootActorPath}
+import akka.actor.{Actor, ActorLogging, Address, RootActorPath}
 import akka.cluster.Cluster
 import akka.cluster.ddata.DistributedData
 import akka.pattern.ask
@@ -53,11 +53,18 @@ trait ClusteredActor extends Actor with ActorLogging {
   /**
     * Sends a message to all downstream nodes in the cluster and collects the responses into a map.
     */
-  protected def askPeers[T: ClassTag](request: Any, includeSelf: Boolean = true)= {
-    val results = peers(includeSelf) map {
+  protected def askPeers[T: ClassTag](request: Any, includeSelf: Boolean = true) = {
+    val results: Set[Future[(Address, T)]] = peers(includeSelf) map {
       case (address, selection) => selection.ask(request)
         .mapTo[T]
-        .map(x => address -> x)
+        .map(x => address -> Some(x))
+        .recover {
+          case anyException =>
+            log.error(anyException, "Couldn't receive lincs from address:{}", address)
+            (address -> None)
+        }
+        .filter { case (_, option) => option.isDefined }
+        .map { case (address, value) => (address, value.get) }
     }
     Future.sequence(results) map (_.toMap)
   }
@@ -65,12 +72,12 @@ trait ClusteredActor extends Actor with ActorLogging {
   /**
     * Sends a message to all downstream nodes in the cluster and collects the responses into a map.
     */
-  protected def askPeersWithRecover[T: ClassTag](request: Any, includeSelf: Boolean = true)= {
+  protected def askPeersWithRecover[T: ClassTag](request: Any, includeSelf: Boolean = true) = {
     val results = peers(includeSelf) map {
       case (address, selection) => selection.ask(request)
         .mapTo[T]
         .map(x => Some(address -> x))
-        .recover{case NonFatal(e) =>
+        .recover { case NonFatal(e) =>
           log.error("Couldn't get data for reqquest:{}", request, e)
           None
         }

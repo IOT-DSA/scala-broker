@@ -40,14 +40,14 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       }
     }
     "connect to endpoint and register with downstream" in {
-      dslink.tell(ConnectEndpoint(ci), endpoint1)
+      dslink.tell(ConnectEndpoint(ci, endpoint1), endpoint1)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       whenReady(dslink ? GetLinkInfo)(inside(_) {
         case LinkInfo(connInfo, true, Some(_), None) => connInfo mustBe ci
       })
     }
     "connect to another endpoint" in {
-      dslink.tell(ConnectEndpoint(ci), endpoint2)
+      dslink.tell(ConnectEndpoint(ci, endpoint2), endpoint2)
       expectTerminated(endpoint1)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
@@ -60,7 +60,7 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       })
     }
     "disconnect from endpoint and kill it" in {
-      dslink.tell(ConnectEndpoint(ci), endpoint3)
+      dslink.tell(ConnectEndpoint(ci, endpoint3), endpoint3)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       dslink ! DisconnectEndpoint(true)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))
@@ -70,7 +70,7 @@ class AbstractDSLinkActorSpec extends AbstractActorSpec with Inside {
       expectTerminated(endpoint3)
     }
     "respond to endpoint termination" in {
-      dslink.tell(ConnectEndpoint(ci), endpoint2)
+      dslink.tell(ConnectEndpoint(ci, endpoint2), endpoint2)
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, true))
       endpoint2 ! PoisonPill
       downProbe.expectMsg(DSLinkStateChanged(linkName, DSLinkMode.Requester, false))

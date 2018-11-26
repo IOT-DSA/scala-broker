@@ -51,7 +51,7 @@ class RequesterBehaviorSpec extends AbstractActorSpec with Inside {
       downstreamProbe.expectMsg(RegisterDSLink("requester", DSLinkMode.Requester, false))
     }
     "notify downstream on connection" in {
-      requester.tell(Messages.ConnectEndpoint(ci), ws.ref)
+      requester.tell(Messages.ConnectEndpoint(ci, ws.ref), ws.ref)
       downstreamProbe.expectMsg(DSLinkStateChanged("requester", DSLinkMode.Requester, true))
     }
     "route requests to broker root" in {
