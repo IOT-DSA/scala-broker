@@ -138,9 +138,6 @@ abstract class AbstractDSLinkActor(routeeRegistry: Routee) extends PersistentAct
         log.info("{}: Won't reconnect, already connected to this Endpoint", ownId)
         sender ! s"Already connecting"
       }
-
-
-
     case m: PingMessage => sender ! "Ok"
 
   }
