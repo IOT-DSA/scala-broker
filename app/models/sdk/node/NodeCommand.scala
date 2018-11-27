@@ -27,6 +27,7 @@ object NodeCommand {
 
   final case class SetValue(value: Option[DSAVal]) extends Cmd
 
+  final case class GetAction(replyTo: ActorRef[Option[NodeAction]]) extends Cmd
   final case class SetAction(action: NodeAction) extends Cmd
   final case class Invoke(args: DSAMap, replyTo: ActorRef[ActionResult]) extends Cmd
 

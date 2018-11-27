@@ -143,6 +143,7 @@ lazy val commonDependencies = Seq(
   "com.typesafe.akka"           %% "akka-persistence"            % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-remote"                 % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-actor-typed"            % AKKA_VERSION,
+  "com.typesafe.akka"           %% "akka-stream-typed"           % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-persistence-typed"      % AKKA_VERSION,
   "com.typesafe.akka"           %% "akka-cluster-metrics"        % AKKA_VERSION,
   "org.fusesource.leveldbjni"    % "leveldbjni-all"              % "1.8",
@@ -158,12 +159,9 @@ lazy val commonDependencies = Seq(
   "org.msgpack"                 %% "msgpack-scala"               % "0.8.13",
   "org.json4s"                  %% "json4s-native"               % "3.5.0",
   "io.kamon"                     % "sigar-loader"                % "1.6.6-rev002",
-//  "io.kamon"                    %% "kamon-akka-remote-2.5"       % "1.0.0",
-//  "io.kamon"                    %% "kamon-akka-2.5"              % "1.0.0",
   "io.kamon"                    %% "kamon-statsd"                % "1.0.0",
   "io.kamon"                    %% "kamon-system-metrics"        % "1.0.0",
   "io.kamon"                    %% "kamon-core"                  % "1.0.0",
-//  "io.kamon"                    %% "kamon-zipkin"                % "1.0.0",
   "com.github.TanUkkii007"      %% "akka-cluster-custom-downing" % "0.0.12"
 )
 
@@ -175,9 +173,7 @@ lazy val playTestDependencies = Seq(
 
 // common test dependencies
 lazy val testDependencies = Seq(
-  "org.scalatest"           %% "scalatest"               % "3.0.4"         % "test",
   "org.scalacheck"          %% "scalacheck"              % "1.13.5"        % "test",
-  "org.mockito"              % "mockito-core"            % "2.13.0"        % "test",
   "com.typesafe.akka"       %% "akka-testkit"            % AKKA_VERSION    % "test",
   "com.typesafe.akka"       %% "akka-multi-node-testkit" % AKKA_VERSION    % "test"
 )
@@ -194,7 +190,6 @@ lazy val itDependencies = Seq(
 
 lazy val msgpackDependencies = Seq(
   "org.scalatest" %% "scalatest" % "3.0.4" % "test",
-  "org.mockito" % "mockito-all" % "1.9.0" % "test",
   "com.rojoma" %% "rojoma-json-v3" % "3.7.0",
   "org.json4s" %% "json4s-native" % "3.5.0",
   "org.apache.commons" % "commons-io" % "1.3.2",

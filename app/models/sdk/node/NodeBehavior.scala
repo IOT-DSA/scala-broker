@@ -95,12 +95,12 @@ object NodeBehavior {
 
       {
         case (ctx, _, GetChildren(ref))       =>
-          ctx.log.info("{}: children requested, returning {} entries", ctx.self.path, ctx.children.size)
+          ctx.log.debug("{}: children requested, returning {} entries", ctx.self.path, ctx.children.size)
           ref ! ctx.children.map(_.upcast[NodeCommand])
           none
         case (ctx, _, GetChild(name, ref))    =>
           val child = ctx.child(name)
-          ctx.log.info("{}: child [{}] requested, returning {}", ctx.self.path, name, child)
+          ctx.log.debug("{}: child [{}] requested, returning {}", ctx.self.path, name, child)
           ref ! child.map(_.upcast[NodeCommand])
           none
         case (ctx, _, AddChild(name, ref))    =>
@@ -113,7 +113,7 @@ object NodeBehavior {
         case (ctx, _, RemoveChild(name, ref)) =>
           ctx.log.info("{}: removing child [{}]", ctx.self.path, name)
           persistAndNotify(ChildRemoved(name)).thenRun { state =>
-            ctx.child(name).foreach(_.upcast[NodeCommand] ! Stop)
+            ctx.child(name) foreach (ctx.stop)
             if (ref != null)
               ref ! Done
           }
@@ -167,18 +167,12 @@ object NodeBehavior {
         persist(ChildListenersRemoved)
     }
 
-    attributeHandler orElse configHandler orElse childHandler orElse listenerHandler orElse {
-      case (ctx, state, GetStatus(ref)) => none.thenRun { _ =>
-        val status = NodeStatus(ctx.self.path.name, parent, state)
-        ctx.log.info("{}: status requested, returning {}", ctx.self.path, status)
-        ref ! status
+    // action management
+    val actionHandler: CmdH[NodeCommand, NodeEvent, NodeState] = {
+      case (ctx, state, GetAction(ref)) => none.thenRun { _ =>
+        ctx.log.debug("{}: action requested, returning {}", ctx.self.path, state.action)
+        ref ! state.action
       }
-      case (ctx, _, SetValue(value))    =>
-        ctx.log.info("{}: setting value to {}", ctx.self.path, value)
-        val event = ValueChanged(value)
-        persist(event).thenRun { state =>
-          state.notifyValueListeners(event)
-        }
       case (ctx, _, SetAction(action))  => parent.map { _ =>
         ctx.log.info("{}: setting action to {}", ctx.self.path, action)
         persist[ActionChanged, NodeState](ActionChanged(action))
@@ -190,6 +184,21 @@ object NodeBehavior {
         val context = ActionContext(ctx.self, args)
         action.handler(context) foreach (ref ! _)
       }
+    }
+
+    // main handler
+    attributeHandler orElse configHandler orElse childHandler orElse actionHandler orElse listenerHandler orElse {
+      case (ctx, state, GetStatus(ref)) => none.thenRun { _ =>
+        val status = NodeStatus(ctx.self.path.name, parent, state)
+        ctx.log.debug("{}: status requested, returning {}", ctx.self.path, status)
+        ref ! status
+      }
+      case (ctx, _, SetValue(value))    =>
+        ctx.log.info("{}: setting value to {}", ctx.self.path, value)
+        val event = ValueChanged(value)
+        persist(event).thenRun { state =>
+          state.notifyValueListeners(event)
+        }
       case (ctx, _, Stop)               =>
         ctx.log.info("{}: node stopped", ctx.self.path)
         stop

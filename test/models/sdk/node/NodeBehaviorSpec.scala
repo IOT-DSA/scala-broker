@@ -14,6 +14,7 @@ import models.rpc.DSAValue._
 import models.sdk.node.NodeBehavior._
 import models.sdk.{DisplayCfg, NodeRef, NodeRefs, ProfileCfg, ValueTypeCfg}
 import models.sdk.Implicits._
+import org.scalatest.events.TestFailed
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -160,6 +161,16 @@ class NodeBehaviorSpec extends AbstractActorSpec {
         child.value ! SetAction(action)
         checkStatus(child.value, NodeStatus(name = "bbb", parent = Some(root), value = Some(2), invokable = true,
           attributes = Map("@x" -> "y"), configs = Map(DisplayCfg -> "Bbb")))
+      }
+    }
+    "handle GetAction command" in {
+      val fAction = for {
+        optChild <- (root ? (GetChild("bbb", _))): Future[Option[NodeRef]]
+        child = optChild.get
+        action <- child ? GetAction
+      } yield action
+      whenReady(fAction) {
+       _.value.params mustBe Seq(Param("x", DSAValueType.DSANumber))
       }
     }
     "handle valid Invoke command" in {
