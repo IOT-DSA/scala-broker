@@ -181,7 +181,7 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
     */
   private def createWSFlow(): Flow[DSAMessage, DSAMessage, NotUsed] = {
     log.info("{}: receives RouteeUpdateRequest", ownId)
-    val messageSink = Flow[Any].async.to(Sink.actorRef(self, Success(())))
+    val messageSink = Flow[Any].to(Sink.actorRef(self, Success(())))
     val src = Source.fromPublisher(publisher)
     Flow.fromSinkAndSource[DSAMessage, DSAMessage](messageSink, src).recover {
       case e: InvalidSequenceNumberException =>
@@ -191,7 +191,7 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
       case e:Exception =>
         log.error(s"Some strange exception: ${e.getMessage}", e)
         throw e
-    }
+    }.async
 
   }
 }

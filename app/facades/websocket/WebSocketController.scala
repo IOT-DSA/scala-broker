@@ -278,7 +278,7 @@ class WebSocketController @Inject()(actorSystem: ActorSystem,
         Future.successful(Left(failedResult))
       }
 
-      res.map(_.right.map(flow => getTransformer(sessionInfo).transform(flow.async)))
+      res.map(_.right.map(getTransformer(sessionInfo).transform))
     }
   }
 
