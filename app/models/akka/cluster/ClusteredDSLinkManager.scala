@@ -150,9 +150,9 @@ class ClusteredDSLinkManager(proxyMode: Boolean)(implicit val system: ActorSyste
         linkProps,
         settings,
         ClusteredDSLinkManager.extractEntityId,
-        ClusteredDSLinkManager.extractShardId,
-         new CustomAllocationStrategy(threshold, maxSimultaneousRebalance),
-          PoisonPill
+        ClusteredDSLinkManager.extractShardId
+        // new CustomAllocationStrategy(threshold, maxSimultaneousRebalance),
+        //  PoisonPill
       )
     }
   }
