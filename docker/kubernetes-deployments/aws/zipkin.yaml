@@ -1,0 +1,17 @@
+kind: Deployment
+metadata:
+  name: zipkin
+  labels:
+    name: zipkin
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: zipkin
+    spec:
+      containers:
+      - name: zipkin
+        image: openzipkin/zipkin
+        ports:
+        - containerPort: 9411

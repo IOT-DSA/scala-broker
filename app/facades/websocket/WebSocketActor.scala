@@ -116,11 +116,7 @@ class WebSocketActor(registry: ActorRef, config: WebSocketActorConfig)(implicit 
     case EmptyMessage =>
       log.debug("{}: received empty message from WebSocket, ignoring...", ownId)
     case ping@PingMessage(msg, ack) =>
-      log.debug("{}: received ping from WebSocket with msg={}, acking...", ownId, msg)
-      for(
-        r <- routee;
-        _ <- (r ? ping)
-      ) sendAck(msg)
+      sendAck(msg)
     case m@RequestMessage(msg, _, _) =>
       Kamon.currentSpan().tag("type", "request")
       log.debug("{}: received request message {} from WebSocket", ownId, formatMessage(m))

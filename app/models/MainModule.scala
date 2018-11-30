@@ -5,10 +5,10 @@ import scala.collection.Seq
 import _root_.akka.actor.ActorSystem
 import _root_.akka.cluster.Cluster
 import javax.inject.{Inject, Provider, Singleton}
-
 import kamon.Kamon
 import kamon.statsd.StatsDReporter
 import kamon.system.SystemMetrics
+import kamon.zipkin.ZipkinReporter
 //import kamon.zipkin.ZipkinReporter
 import models.akka.{BrokerActors, DSLinkManager, DeadLettersGuard, SystemGuard}
 import models.akka.cluster.ClusteredDSLinkManager
@@ -53,7 +53,7 @@ class DSLinkManagerProvider @Inject() (actorSystem: ActorSystem)
 class StatsDConnection @Inject()(lifecycle: ApplicationLifecycle) {
 
   if(Settings.MetricsReporters.statsdConfigured)  Kamon.addReporter(new StatsDReporter())
-//  if(Settings.MetricsReporters.zipkinConfigured)  Kamon.addReporter(new ZipkinReporter())
+  if(Settings.MetricsReporters.zipkinConfigured)  Kamon.addReporter(new ZipkinReporter())
 
   SystemMetrics.startCollecting()
 

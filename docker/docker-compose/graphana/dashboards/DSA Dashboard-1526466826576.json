@@ -2,7 +2,6 @@
   "annotations": {
     "list": []
   },
-  "editMode": false,
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
@@ -13,8 +12,84 @@
   "rows": [
     {
       "collapse": false,
-      "height": "250px",
+      "height": 250,
       "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": null,
+          "fill": 1,
+          "id": 8,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "aliasByNode(stats.gauges.$Application.*.handshake, 3)"
+            },
+            {
+              "refId": "B",
+              "target": "alias(sumSeries(stats.gauges.$Application.*.handshake), 'cluster')"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "handshakes",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
         {
           "aliasColors": {},
           "bars": false,
@@ -42,41 +117,17 @@
           "renderer": "flot",
           "seriesOverrides": [],
           "spaceLength": 10,
-          "span": 12,
+          "span": 6,
           "stack": false,
           "steppedLine": false,
           "targets": [
             {
-              "refId": "A",
-              "target": "alias(stats.gauges.$Application.$Host.connected, 'Total connections on node')"
-            },
-            {
-              "refId": "B",
-              "target": "alias(stats.gauges.$Application.$Host.connected_mode_Requester, 'Requesters on node')"
-            },
-            {
-              "refId": "C",
-              "target": "alias(stats.gauges.$Application.$Host.connected_mode_Responder, 'Responders on node')"
-            },
-            {
-              "refId": "D",
-              "target": "alias(stats.gauges.$Application.$Host.handshake, 'Handshakes on node')"
-            },
-            {
-              "refId": "E",
-              "target": "alias(sumSeries(stats.gauges.$Application.*.connected), 'Total connections on cluster')"
-            },
-            {
-              "refId": "F",
-              "target": "alias(sumSeries(stats.gauges.$Application.*.connected_mode_Requester), 'Requesters on cluster')"
-            },
-            {
               "refId": "G",
-              "target": "alias(sumSeries(stats.gauges.$Application.*.connected_mode_Responder), 'Responders on cluster')"
+              "target": "alias(sumSeries(stats.gauges.$Application.*.connected), 'Responders on cluster')"
             },
             {
-              "refId": "H",
-              "target": "alias(stats.gauges.$Application.$Host.handshake, 'Handshakes on cluster')"
+              "refId": "A",
+              "target": "aliasByNode(stats.gauges.$Application.*.connected, 3)"
             }
           ],
           "thresholds": [],
@@ -125,7 +176,171 @@
     },
     {
       "collapse": false,
-      "height": 319,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": null,
+          "fill": 1,
+          "id": 6,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": null,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "B",
+              "target": "alias(sumSeries(stats.gauges.$Application.*.connected_mode_Requester), 'Requesters on node')"
+            },
+            {
+              "refId": "A",
+              "target": "aliasByNode(stats.gauges.$Application.*.connected_mode_Requester, 3)"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Requesters",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": null,
+          "fill": 1,
+          "id": 7,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": null,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "G",
+              "target": "alias(sumSeries(stats.gauges.$Application.*.connected_mode_Responder), 'Responders on cluster')"
+            },
+            {
+              "refId": "A",
+              "target": "aliasByNode(stats.gauges.$Application.*.connected_mode_Responder, 3)"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Responders",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
       "panels": [
         {
           "aliasColors": {},
@@ -162,23 +377,13 @@
           "targets": [
             {
               "hide": false,
-              "refId": "E",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.response_in.count, 1)), 'responses.in.cluster')"
+              "refId": "C",
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.request_in.count, 1)), 'requests on cluster')"
             },
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.response_in.count, 1), 'responses.in.node')"
-            },
-            {
-              "hide": false,
-              "refId": "B",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.request_in.count, 1), 'requests.in.node')"
-            },
-            {
-              "hide": false,
-              "refId": "C",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.request_in.count, 1)), 'requests.in.cluster')"
+              "target": "aliasByNode(scaleToSeconds(stats.counters.$Application.*.request_in.count, 1), 3)"
             }
           ],
           "thresholds": [],
@@ -221,6 +426,99 @@
         {
           "aliasColors": {},
           "bars": false,
+          "cacheTimeout": "",
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": null,
+          "fill": 1,
+          "hideTimeOverride": false,
+          "id": 9,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": true,
+            "min": true,
+            "show": true,
+            "total": false,
+            "values": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": null,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "hide": false,
+              "refId": "A",
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.response_in.count, 1)), 'cluster')"
+            },
+            {
+              "hide": false,
+              "refId": "B",
+              "target": "aliasByNode(scaleToSeconds(stats.counters.$Application.*.response_in.count, 1), 3)"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "responses",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "transparent": true,
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 319,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
           "dashLength": 10,
           "dashes": false,
           "datasource": null,
@@ -252,40 +550,98 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_notification_out.count, 1), 'subscriptions sent from node to requester')"
-            },
-            {
-              "hide": false,
-              "refId": "C",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_level_0_dropped.count, 1), 'node qos0 replacement count')",
-              "textEditor": false
+              "target": "aliasByNode(scaleToSeconds(stats.counters.$Application.*.qos_notification_out.count, 1), 3)"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.subscribe_response_in.count, 1), 'subscriptions received by node from responders')"
-            },
-            {
-              "hide": false,
-              "refId": "G",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.subscribe_response_in.count, 1)), 'subscriptions received by cluster from responders')"
-            },
-            {
-              "hide": false,
-              "refId": "H",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_notification_out.count, 1)), 'subscriptions sent from cluster to requester')"
-            },
-            {
-              "hide": false,
-              "refId": "I",
-              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_level_0_dropped.count, 1)), 'cluster qos0 replacement count')",
-              "textEditor": false
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_notification_out.count, 1)), 'cluster')"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
           "title": "subscriptions  statistics",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": null,
+          "fill": 1,
+          "id": 10,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": null,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "hide": false,
+              "refId": "I",
+              "target": "alias(sumSeries(scaleToSeconds(stats.counters.$Application.*.qos_level_0_dropped.count, 1)), 'cluster-qos0')",
+              "textEditor": false
+            },
+            {
+              "hide": false,
+              "refId": "A",
+              "target": "alias(scaleToSeconds(stats.counters.$Application.*.qos_level_0_dropped.count, 1), '$Host - qos0')",
+              "textEditor": false
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "qos skip",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -363,7 +719,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(scaleToSeconds(stats.counters.$Application.$Host.qos_level_0_total.count, 1), 'qos 0 on node')"
+              "target": "alias(scaleToSeconds(stats.counters.$Application.*.qos_level_0_total.count, 1), 'qos 0 on $Host')"
             },
             {
               "refId": "B",
@@ -374,86 +730,6 @@
           "timeFrom": null,
           "timeShift": null,
           "title": "QoS levels",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ]
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": null,
-          "fill": 1,
-          "id": 5,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": null,
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "span": 6,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "hide": true,
-              "refId": "A",
-              "target": "alias(stats.timers.$Application.$Host.qos_sids_size.count, 'sids sizes')",
-              "textEditor": false
-            },
-            {
-              "hide": false,
-              "refId": "B",
-              "target": "alias(stats.counters.$Application.$Host.qos_level_0_total.count, 'sids sizes')",
-              "textEditor": false
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "QoS statistics",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -543,7 +819,7 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {
@@ -573,5 +849,5 @@
   },
   "timezone": "",
   "title": "DSA Dashboard",
-  "version": 1
+  "version": 4
 }
