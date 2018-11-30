@@ -15,7 +15,7 @@ spec:
       subdomain: "cloud-metrics-internal"
       containers:
       - name: grafana
-        image: "582161142462.dkr.ecr.us-west-2.amazonaws.com/graphana"
+        image: "lerrox/sbgrafana:0.1"
         imagePullPolicy: Always
         ports:
         - containerPort: 80
