@@ -7,13 +7,13 @@
 	<appender name="FILE" class="ch.qos.logback.core.FileAppender">
 		<file>${application.home:-.}/logs/application.log</file>
 		<encoder>
-			<pattern>%date [%level] %logger{15} - %message%n%xException{10}</pattern>
+			<pattern>%date [%level][%marker] %logger{15} - %message%n%xException{10}</pattern>
 		</encoder>
 	</appender>
 
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
 		<encoder>
-			<pattern>%date{ISO8601} %coloredLevel %logger{15} - %message%n%xException{10}</pattern>
+			<pattern>%date{ISO8601} %coloredLevel[%marker] %logger{15} - %message%n%xException{10}</pattern>
 		</encoder>
 	</appender>
 

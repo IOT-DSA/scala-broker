@@ -1,5 +1,7 @@
 package models.sdk
 
+import akka.actor.typed.LogMarker
+import akka.actor.typed.scaladsl.ActorContext
 import models.api.DSAValueType
 import models.rpc.DSAValue._
 
@@ -62,4 +64,64 @@ object Implicits {
     def displayName = configs.get(DisplayCfg).map(_.toString)
   }
 
+  /**
+    * Provides convenience methods for actor context.
+    *
+    * @param ctx
+    * @tparam T
+    */
+  implicit private[sdk] class RichActorContext[T](val ctx: ActorContext[T]) extends AnyVal {
+
+    def info(template: String)(implicit marker: LogMarker) =
+      log.info(marker, "{}: " + template, ownId)
+
+    def info(template: String, arg1: Any)(implicit marker: LogMarker) =
+      log.info(marker, "{}: " + template, ownId, arg1)
+
+    def info(template: String, arg1: Any, arg2: Any)(implicit marker: LogMarker) =
+      log.info(marker, "{}: " + template, ownId, arg1, arg2)
+
+    def info(template: String, arg1: Any, arg2: Any, arg3: Any)(implicit marker: LogMarker) =
+      log.info(marker, "{}: " + template, ownId, arg1, arg2, arg3)
+
+    def debug(template: String)(implicit marker: LogMarker) =
+      log.debug(marker, "{}: " + template, ownId)
+
+    def debug(template: String, arg1: Any)(implicit marker: LogMarker) =
+      log.debug(marker, "{}: " + template, ownId, arg1)
+
+    def debug(template: String, arg1: Any, arg2: Any)(implicit marker: LogMarker) =
+      log.debug(marker, "{}: " + template, ownId, arg1, arg2)
+
+    def debug(template: String, arg1: Any, arg2: Any, arg3: Any)(implicit marker: LogMarker) =
+      log.debug(marker, "{}: " + template, ownId, arg1, arg2, arg3)
+
+    def warning(template: String)(implicit marker: LogMarker) =
+      log.warning(marker, "{}: " + template, ownId)
+
+    def warning(template: String, arg1: Any)(implicit marker: LogMarker) =
+      log.warning(marker, "{}: " + template, ownId, arg1)
+
+    def warning(template: String, arg1: Any, arg2: Any)(implicit marker: LogMarker) =
+      log.warning(marker, "{}: " + template, ownId, arg1, arg2)
+
+    def warning(template: String, arg1: Any, arg2: Any, arg3: Any)(implicit marker: LogMarker) =
+      log.warning(marker, "{}: " + template, ownId, arg1, arg2, arg3)
+
+    def error(template: String)(implicit marker: LogMarker) =
+      log.error(marker, "{}: " + template, ownId)
+
+    def error(template: String, arg1: Any)(implicit marker: LogMarker) =
+      log.error(marker, "{}: " + template, ownId, arg1)
+
+    def error(template: String, arg1: Any, arg2: Any)(implicit marker: LogMarker) =
+      log.error(marker, "{}: " + template, ownId, arg1, arg2)
+
+    def error(template: String, arg1: Any, arg2: Any, arg3: Any)(implicit marker: LogMarker) =
+      log.error(marker, "{}: " + template, ownId, arg1, arg2, arg3)
+
+    private def log = ctx.log
+
+    private def ownId = ctx.self.path.elements.tail.mkString("/", "/", "")
+  }
 }

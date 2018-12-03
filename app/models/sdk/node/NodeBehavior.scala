@@ -2,10 +2,11 @@ package models.sdk.node
 
 import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorSystem, Behavior}
+import akka.actor.typed.{ActorSystem, Behavior, LogMarker}
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import models.rpc.DSAValue.{DSAMap, DSAVal}
 import models.sdk._
+import models.sdk.Implicits._
 
 /**
   * Describes DSA node behavior.
@@ -15,6 +16,8 @@ object NodeBehavior {
   import Effect._
   import NodeCommand._
   import NodeEvent._
+
+  private implicit val marker = LogMarker("node")
 
   /**
     * Creates a node command handler.
@@ -35,18 +38,18 @@ object NodeBehavior {
           val attributes = attrs map[(String, DSAVal), DSAMap] {
             case (name, value) => ensurePrefix(name, AttrPrefix) -> value
           }
-          ctx.log.info("{}: setting attributes to {}", ctx.self.path, attributes)
+          ctx.info("setting attributes to {}", attributes)
           persistAndNotify(AttributesChanged(attributes))
         case (ctx, _, PutAttribute(name, value)) =>
           val attrName = ensurePrefix(name, AttrPrefix)
-          ctx.log.info("{}: adding attribute {} -> {}", ctx.self.path, attrName, value)
+          ctx.info("adding attribute {} -> {}", attrName, value)
           persistAndNotify(AttributeAdded(attrName, value))
         case (ctx, _, RemoveAttribute(name))     =>
           val attrName = ensurePrefix(name, AttrPrefix)
-          ctx.log.info("{}: removing attribute {}", ctx.self.path, attrName)
+          ctx.info("removing attribute {}", attrName)
           persistAndNotify(AttributeRemoved(attrName))
         case (ctx, _, ClearAttributes)           =>
-          ctx.log.info("{}: removing all attributes", ctx.self.path)
+          ctx.info("removing all attributes")
           persistAndNotify(AttributesChanged(Map.empty))
       }
     }
@@ -62,27 +65,27 @@ object NodeBehavior {
           val configs = attrs map[(String, DSAVal), DSAMap] {
             case (name, value) => ensurePrefix(name, CfgPrefix) -> value
           }
-          ctx.log.info("{}: setting configs to {}", ctx.self.path, configs)
+          ctx.info("setting configs to {}", configs)
           persistAndNotify(ConfigsChanged(configs))
         case (ctx, _, PutConfig(name, value))  =>
           val cfgName = ensurePrefix(name, CfgPrefix)
-          ctx.log.info("{}: adding config {} -> {}", ctx.self.path, cfgName, value)
+          ctx.info("adding config {} -> {}", cfgName, value)
           persistAndNotify(ConfigAdded(cfgName, value))
         case (ctx, _, RemoveConfig(name))      =>
           val cfgName = ensurePrefix(name, CfgPrefix)
-          ctx.log.info("{}: removing config {}", ctx.self.path, cfgName)
+          ctx.info("removing config {}", cfgName)
           persistAndNotify(ConfigRemoved(cfgName))
         case (ctx, _, ClearConfigs)            =>
-          ctx.log.info("{}: removing all configs", ctx.self.path)
+          ctx.info("removing all configs")
           persistAndNotify(ConfigsChanged(Map.empty))
         case (ctx, _, SetDisplayName(display)) =>
-          ctx.log.info("{}: setting display name to {}", ctx.self.path, display)
+          ctx.info("setting display name to {}", display)
           persistAndNotify(ConfigAdded(DisplayCfg, display))
         case (ctx, _, SetValueType(vType))     =>
-          ctx.log.info("{}: setting value type to {}", ctx.self.path, vType)
+          ctx.info("setting value type to {}", vType)
           persistAndNotify(ConfigAdded(ValueTypeCfg, vType))
         case (ctx, _, SetProfile(profile))     =>
-          ctx.log.info("{}: setting profile to {}", ctx.self.path, profile)
+          ctx.info("setting profile to {}", profile)
           persistAndNotify(ConfigAdded(ProfileCfg, profile))
       }
     }
@@ -95,30 +98,30 @@ object NodeBehavior {
 
       {
         case (ctx, _, GetChildren(ref))       =>
-          ctx.log.debug("{}: children requested, returning {} entries", ctx.self.path, ctx.children.size)
+          ctx.debug("children requested, returning {} entries", ctx.children.size)
           ref ! ctx.children.map(_.upcast[NodeCommand])
           none
         case (ctx, _, GetChild(name, ref))    =>
           val child = ctx.child(name)
-          ctx.log.debug("{}: child [{}] requested, returning {}", ctx.self.path, name, child)
+          ctx.debug("child [{}] requested, returning {}", name, child)
           ref ! child.map(_.upcast[NodeCommand])
           none
         case (ctx, _, AddChild(name, ref))    =>
-          ctx.log.info("{}: adding child [{}]", ctx.self.path, name)
-          persistAndNotify(ChildAdded(name)).thenRun { state =>
+          ctx.info("adding child [{}]", name)
+          persistAndNotify(ChildAdded(name)).thenRun { _ =>
             val child = ctx.spawn(node(Some(ctx.self)), name)
             if (ref != null)
               ref ! child
           }
         case (ctx, _, RemoveChild(name, ref)) =>
-          ctx.log.info("{}: removing child [{}]", ctx.self.path, name)
-          persistAndNotify(ChildRemoved(name)).thenRun { state =>
-            ctx.child(name) foreach (ctx.stop)
+          ctx.info("removing child [{}]", name)
+          persistAndNotify(ChildRemoved(name)).thenRun { _ =>
+            ctx.child(name) foreach ctx.stop
             if (ref != null)
               ref ! Done
           }
         case (ctx, _, RemoveChildren(ref))    =>
-          ctx.log.info("{}: removing all children", ctx.self.path)
+          ctx.info("removing all children")
           persistAndNotify(ChildrenRemoved).thenRun { _ =>
             ctx.children.foreach(_.upcast[NodeCommand] ! Stop)
             if (ref != null)
@@ -130,55 +133,55 @@ object NodeBehavior {
     // event listener management
     val listenerHandler: CmdH[NodeCommand, NodeEvent, NodeState] = {
       case (ctx, _, AddValueListener(ref))        =>
-        ctx.log.info("{}: adding value listener {}", ctx.self.path, ref)
+        ctx.info("adding value listener {}", ref)
         persist(ValueListenerAdded(ref))
       case (ctx, _, AddAttributeListener(ref))    =>
-        ctx.log.info("{}: adding value listener {}", ctx.self.path, ref)
+        ctx.info("adding value listener {}", ref)
         persist(AttributeListenerAdded(ref))
       case (ctx, _, AddConfigListener(ref))       =>
-        ctx.log.info("{}: adding config listener {}", ctx.self.path, ref)
+        ctx.info("adding config listener {}", ref)
         persist(ConfigListenerAdded(ref))
       case (ctx, _, AddChildListener(ref))        =>
-        ctx.log.info("{}: adding child listener {}", ctx.self.path, ref)
+        ctx.info("adding child listener {}", ref)
         persist(ChildListenerAdded(ref))
       case (ctx, _, RemoveValueListener(ref))     =>
-        ctx.log.info("{}: removing value listener {}", ctx.self.path, ref)
+        ctx.info("removing value listener {}", ref)
         persist(ValueListenerRemoved(ref))
       case (ctx, _, RemoveAttributeListener(ref)) =>
-        ctx.log.info("{}: removing attribute listener {}", ctx.self.path, ref)
+        ctx.info("removing attribute listener {}", ref)
         persist(AttributeListenerRemoved(ref))
       case (ctx, _, RemoveConfigListener(ref))    =>
-        ctx.log.info("{}: removing config listener {}", ctx.self.path, ref)
+        ctx.info("removing config listener {}", ref)
         persist(ConfigListenerRemoved(ref))
       case (ctx, _, RemoveChildListener(ref))     =>
-        ctx.log.info("{}: removing child listener {}", ctx.self.path, ref)
+        ctx.info("removing child listener {}", ref)
         persist(ChildListenerRemoved(ref))
       case (ctx, _, RemoveAllValueListeners)      =>
-        ctx.log.info("{}: removing all value listeners", ctx.self.path)
+        ctx.info("removing all value listeners")
         persist(ValueListenersRemoved)
       case (ctx, _, RemoveAllAttributeListeners)  =>
-        ctx.log.info("{}: removing all attribute listeners", ctx.self.path)
+        ctx.info("removing all attribute listeners")
         persist(AttributeListenersRemoved)
       case (ctx, _, RemoveAllConfigListeners)     =>
-        ctx.log.info("{}: removing all config listeners", ctx.self.path)
+        ctx.info("removing all config listeners")
         persist(ConfigListenersRemoved)
       case (ctx, _, RemoveAllChildListeners)      =>
-        ctx.log.info("{}: removing all child listeners", ctx.self.path)
+        ctx.info("removing all child listeners")
         persist(ChildListenersRemoved)
     }
 
     // action management
     val actionHandler: CmdH[NodeCommand, NodeEvent, NodeState] = {
       case (ctx, state, GetAction(ref)) => none.thenRun { _ =>
-        ctx.log.debug("{}: action requested, returning {}", ctx.self.path, state.action)
+        ctx.debug("action requested, returning {}", state.action)
         ref ! state.action
       }
       case (ctx, _, SetAction(action))  => parent.map { _ =>
-        ctx.log.info("{}: setting action to {}", ctx.self.path, action)
+        ctx.info("setting action to {}", action)
         persist[ActionChanged, NodeState](ActionChanged(action))
       }.getOrElse(throw new IllegalStateException("Root node cannot be an action"))
       case (ctx, _, Invoke(args, ref))  => none.thenRun { state =>
-        ctx.log.info("{}: invoking action with {}", ctx.self.path, args)
+        ctx.info("invoking action with {}", args)
         import ctx.executionContext
         val action = state.action.getOrElse(throw new IllegalStateException("Node has no action"))
         val context = ActionContext(ctx.self, args)
@@ -190,17 +193,17 @@ object NodeBehavior {
     attributeHandler orElse configHandler orElse childHandler orElse actionHandler orElse listenerHandler orElse {
       case (ctx, state, GetStatus(ref)) => none.thenRun { _ =>
         val status = NodeStatus(ctx.self.path.name, parent, state)
-        ctx.log.debug("{}: status requested, returning {}", ctx.self.path, status)
+        ctx.debug("status requested, returning {}", status)
         ref ! status
       }
       case (ctx, _, SetValue(value))    =>
-        ctx.log.info("{}: setting value to {}", ctx.self.path, value)
+        ctx.info("setting value to {}", value)
         val event = ValueChanged(value)
         persist(event).thenRun { state =>
           state.notifyValueListeners(event)
         }
       case (ctx, _, Stop)               =>
-        ctx.log.info("{}: node stopped", ctx.self.path)
+        ctx.info("node stopped")
         stop
     }
   }
@@ -242,14 +245,14 @@ object NodeBehavior {
     */
   def node(parent: Option[NodeRef]): Behavior[NodeCommand] =
     Behaviors.setup { ctx =>
-      ctx.log.info("{}: node created", ctx.self.path)
+      ctx.info("node created")
       PersistentBehaviors.receive[NodeCommand, NodeEvent, NodeState](
         persistenceId = ctx.self.path.toStringWithoutAddress,
         emptyState = NodeState.Empty,
         commandHandler = (ctx, state, cmd) => nodeCmdHandler(parent)((ctx, state, cmd)),
         eventHandler = (state, event) => nodeEventHandler((state, event))
       ).onRecoveryCompleted { (ctx, state) =>
-        ctx.log.debug("{}: recovery complete, {} children to spawn", ctx.self.path, state.children.size)
+        ctx.debug("recovery complete, {} children to spawn", state.children.size)
         state.children foreach (childName => ctx.spawn(node(Some(ctx.self)), childName))
       }
     }
