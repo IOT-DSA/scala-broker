@@ -6,6 +6,11 @@ import models.sdk.node.NodeStatus
 package object dsa {
 
   /**
+    * Name of the root Node actor bound to this DSA Node actor.
+    */
+  val RootNode = "root"
+
+  /**
     * Helper methods for creating a changed status copy.
     *
     * @param status

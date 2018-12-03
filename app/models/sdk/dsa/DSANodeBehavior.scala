@@ -1,14 +1,12 @@
 package models.sdk.dsa
 
-import akka.actor.ActorSelection
 import akka.actor.typed.scaladsl.AskPattern._
-import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, Behavior, LogMarker}
+import akka.actor.typed.{Behavior, LogMarker}
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import akka.util.Timeout
 import models.rpc.DSAValue._
-import models.rpc.{DSAResponse, ListRequest, ResponseMessage, SetRequest, StreamState}
+import models.rpc.{DSAResponse, ListRequest, RemoveRequest, ResponseMessage, SetRequest, StreamState}
 import models.sdk.Implicits._
 import models.sdk._
 import models.sdk.node.NodeCommand._
@@ -27,8 +25,6 @@ object DSANodeBehavior {
   import DSANodeCommand._
   import DSANodeEvent._
   import Effect._
-
-  val RootNode = "root"
 
   private implicit val marker = LogMarker("dsa")
 
@@ -57,17 +53,13 @@ object DSANodeBehavior {
 
     case (ctx, _, pr @ ProcessRequest(SetRequest(rid, path, newValue, _), ref)) => none.thenRun { _ =>
       logRequest(ctx, pr)
-      val parts = path.split("/")
-
-      val name = parts.lastOption.getOrElse("")
-      val (destination, cmd) = if (name.startsWith(CfgPrefix))
-        (ctx.self.path / RootNode / parts.init, PutConfig(name, newValue))
-      else if (name.startsWith(AttrPrefix))
-        (ctx.self.path / RootNode / parts.init, PutAttribute(name, newValue))
-      else
-        (ctx.self.path / RootNode / parts, SetValue(Some(newValue)))
-
-      ctx.system.toUntyped.actorSelection(destination) ! cmd
+      val target = DSATarget.parse(ctx, path)
+      val cmd = target.item match {
+        case Some(DSATarget.Item(name, true))  => PutAttribute(name, newValue)
+        case Some(DSATarget.Item(name, false)) => PutConfig(name, newValue)
+        case _                                 => SetValue(Some(newValue))
+      }
+      target ! cmd
       ref ! ResponseMessage(0, None, DSAResponse(rid, Some(StreamState.Closed)) :: Nil)
     }
 
@@ -93,6 +85,20 @@ object DSANodeBehavior {
           }
         }
       }
+
+    /* remove */
+
+    case (ctx, _, pr @ ProcessRequest(RemoveRequest(rid, path), ref)) => none.thenRun { _ =>
+      logRequest(ctx, pr)
+      val target = DSATarget.parse(ctx, path)
+      val cmd = target.item match {
+        case Some(DSATarget.Item(name, true))  => RemoveAttribute(name)
+        case Some(DSATarget.Item(name, false)) => RemoveConfig(name)
+        case _                                 => throw new IllegalArgumentException("Invalid path to remove: " + path)
+      }
+      target ! cmd
+      ref ! ResponseMessage(0, None, DSAResponse(rid, Some(StreamState.Closed)) :: Nil)
+    }
 
     case (ctx, _, msg @ DeliverListInfo(path, info)) =>
       logRequest(ctx, msg)
@@ -199,9 +205,9 @@ object DSANodeBehavior {
     */
   private def setupListSubscription(ctx: ActorContext[DSANodeCommand], path: String, origin: Origin)
                                    (implicit ec: ExecutionContext) = {
-    val destination = selectNode(ctx, path)
+    val target = DSATarget.parse(ctx, path)
     for {
-      node <- selection2ref[NodeCommand](destination)
+      node <- target.resolve[NodeCommand]
       info <- retrieveListInfo(ctx, node)
     } {
       node ! AddAttributeListener(ctx.messageAdapter(evt => DeliverAttributeEvent(path, evt)))
@@ -210,28 +216,7 @@ object DSANodeBehavior {
       ctx.self ! DeliverListInfo(path, info)
     }
   }
-
-  /**
-    * Returns an untyped actor selection for the node specified by the path.
-    *
-    * @param ctx
-    * @param dsaPath
-    * @return
-    */
-  private def selectNode(ctx: ActorContext[DSANodeCommand], dsaPath: String) =
-    ctx.system.toUntyped.actorSelection(ctx.self.path / RootNode / dsaPath.split("/"))
-
-  /**
-    * Tries to resolve an untyped actor selection into a typed actor reference.
-    *
-    * @param selection
-    * @param ec
-    * @tparam T
-    * @return
-    */
-  private def selection2ref[T](selection: ActorSelection)(implicit ec: ExecutionContext) =
-    (selection.resolveOne()).map(_.upcast: ActorRef[T])
-
+  
   /**
     * Retrieve the complete LIST information from a node.
     *

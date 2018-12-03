@@ -10,7 +10,7 @@ import akka.testkit.TestProbe
 import akka.util.Timeout
 import models.akka.AbstractActorSpec
 import models.rpc.DSAValue._
-import models.rpc.{DSAResponse, ListRequest, ResponseMessage, SetRequest, StreamState}
+import models.rpc.{DSAResponse, ListRequest, RemoveRequest, ResponseMessage, SetRequest, StreamState}
 import models.sdk._
 import models.sdk.dsa.DSANodeBehavior._
 import models.sdk.node.NodeCommand._
@@ -58,7 +58,7 @@ class DSANodeBehaviorSpec extends AbstractActorSpec {
         status <- root ? GetStatus
       } yield status
       whenReady(fStatus) {
-        _ mustBe NodeStatus(DSANodeBehavior.RootNode)
+        _ mustBe NodeStatus(RootNode)
       }
     }
   }
@@ -162,6 +162,41 @@ class DSANodeBehaviorSpec extends AbstractActorSpec {
       root ! RemoveChild("jake", null)
       broker1.expectMsg(response(201, obj("name" -> "jake", "change" -> REMOVE)))
       broker5.expectMsg(response(205, obj("name" -> "jake", "change" -> REMOVE)))
+    }
+  }
+
+  "DSANodeBehavior with REMOVE" should {
+    "handle removing root attribute" in {
+      val broker = TestProbe()
+      link ! ProcessRequest(RemoveRequest(103, "/@john"), broker.ref)
+      broker.expectMsg(ResponseMessage(0, None, DSAResponse(103, Some(StreamState.Closed)) :: Nil))
+      whenReady(root ? GetStatus) { status =>
+        status.attributes.get("@john") mustBe None
+      }
+    }
+    "handle removing child attribute" in {
+      val broker = TestProbe()
+      link ! ProcessRequest(RemoveRequest(104, "/childA/@bbb"), broker.ref)
+      broker.expectMsg(ResponseMessage(0, None, DSAResponse(104, Some(StreamState.Closed)) :: Nil))
+      whenReady(child ? GetStatus) { status =>
+        status.attributes.get("@bbb") mustBe None
+      }
+    }
+    "handle removing root config" in {
+      val broker = TestProbe()
+      link ! ProcessRequest(RemoveRequest(105, "/$jane"), broker.ref)
+      broker.expectMsg(ResponseMessage(0, None, DSAResponse(105, Some(StreamState.Closed)) :: Nil))
+      whenReady(root ? GetStatus) { status =>
+        status.configs.get("$jane") mustBe None
+      }
+    }
+    "handle removing child config" in {
+      val broker = TestProbe()
+      link ! ProcessRequest(RemoveRequest(106, "/childA/$ddd"), broker.ref)
+      broker.expectMsg(ResponseMessage(0, None, DSAResponse(106, Some(StreamState.Closed)) :: Nil))
+      whenReady(child ? GetStatus) { status =>
+        status.configs.get("$bbb") mustBe None
+      }
     }
   }
 
